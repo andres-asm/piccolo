@@ -7,41 +7,55 @@
 // emulator GUI, but that software is GPL: its font, logo and graphics are never
 // copied. See CLAUDE.md.)
 //
-// Layout: each glyph is 5x5 pixels; text advances 6 pixels per character
-// (1 pixel gap) and 7 pixels per line. Lowercase letters draw as capitals.
-// Characters without a glyph draw as a hollow box, so missing ones are obvious.
+// Layout: each letter is 5x5 pixels inside an 8-pixel-tall cell: 2 rows above
+// it for accents, 1 below for cedillas and the like. Text advances 6 pixels
+// per character (1 pixel gap) and 8 per line. Characters are Unicode code
+// points (text is UTF-8): ASCII, Latin-1 (accented letters for Western
+// European languages, ¡ ¿ « » € ...), a few from Latin Extended-A (Œ Š Ž Ÿ)
+// and the UI symbols below. Lowercase letters draw as capitals. Characters
+// without a glyph draw as a hollow box, so missing ones are obvious.
 
 #include <cstdint>
 
 constexpr int32_t PIXEL_FONT_GLYPH_WIDTH  = 5;
-constexpr int32_t PIXEL_FONT_GLYPH_HEIGHT = 5;
+constexpr int32_t PIXEL_FONT_GLYPH_HEIGHT = 5;   // the letter itself
+constexpr int32_t PIXEL_FONT_MARK_ROWS    = 2;   // above the letter, for accents
+constexpr int32_t PIXEL_FONT_CELL_HEIGHT  = 8;   // marks + letter + 1 row below
 constexpr int32_t PIXEL_FONT_ADVANCE      = 6;   // glyph width + 1 pixel gap
-constexpr int32_t PIXEL_FONT_LINE_HEIGHT  = 7;   // glyph height + 2 pixels
+constexpr int32_t PIXEL_FONT_LINE_HEIGHT  = 8;   // = the cell
 
-// Special characters outside ASCII printing range, for UI arrows.
-constexpr char PIXEL_FONT_ARROW_UP    = '\x01';
-constexpr char PIXEL_FONT_ARROW_DOWN  = '\x02';
-constexpr char PIXEL_FONT_ARROW_LEFT  = '\x03';
-constexpr char PIXEL_FONT_ARROW_RIGHT = '\x04';
-constexpr char PIXEL_FONT_CHECK       = '\x05';   // check mark, for checkboxes
+// UI symbols, by their Unicode code points.
+constexpr uint32_t PIXEL_FONT_ARROW_UP    = 0x25B2;   // BLACK UP-POINTING TRIANGLE
+constexpr uint32_t PIXEL_FONT_ARROW_DOWN  = 0x25BC;   // BLACK DOWN-POINTING TRIANGLE
+constexpr uint32_t PIXEL_FONT_ARROW_LEFT  = 0x25C0;   // BLACK LEFT-POINTING TRIANGLE
+constexpr uint32_t PIXEL_FONT_ARROW_RIGHT = 0x25B6;   // BLACK RIGHT-POINTING TRIANGLE
+constexpr uint32_t PIXEL_FONT_CHECK       = 0x2714;   // HEAVY CHECK MARK
 
-// One glyph row as 5 bits: bit 4 = leftmost pixel, bit 0 = rightmost.
-// Returns false if `character` has no glyph (the rows of the hollow box are
-// returned then). Call pixel_font_init() once first.
-bool pixel_font_glyph_rows(char character, uint8_t rows[PIXEL_FONT_GLYPH_HEIGHT]);
+// One cell row as 5 bits: bit 4 = leftmost pixel, bit 0 = rightmost. Row 0 is
+// the top of the cell (accents), rows 2..6 the letter, row 7 below it.
+// Returns false if `codepoint` has no glyph (the hollow box is returned then).
+// Call pixel_font_init() once first.
+bool pixel_font_glyph_rows(uint32_t codepoint, uint8_t rows[PIXEL_FONT_CELL_HEIGHT]);
 
-// Builds the bit rows from the readable table in pixel_font.cpp, checking it
-// (rows of exactly 5 '#'/'.' characters, no character defined twice). Returns
-// false and logs the first problem if the table is malformed.
+// Builds the bit rows from the readable tables in pixel_font.cpp, checking
+// them (rows of exactly 5 '#'/'.' characters, nothing defined twice, accented
+// letters built on letters that exist). Returns false and logs the first
+// problem if a table is malformed.
 bool pixel_font_init();
 
-// Draws `text` into a 32-bit pixel buffer (pitch in pixels), clipped to it.
-// Each font pixel becomes a scale x scale block. '\n' starts a new line.
+// Decodes the next UTF-8 character of *text and moves past it. Invalid bytes
+// come back as U+FFFD (no glyph: drawn as the box). 0 at the end.
+uint32_t pixel_font_next_codepoint(const char** text);
+
+// Draws UTF-8 `text` into a 32-bit pixel buffer (pitch in pixels), clipped to
+// it. (x, y) is the top of the first line's cell; each font pixel becomes a
+// scale x scale block. '\n' starts a new line.
 void pixel_font_draw_text(uint32_t* pixels, int32_t width, int32_t height, int32_t pitch_pixels,
                           int32_t x, int32_t y, const char* text, uint32_t color, int32_t scale);
 
 // Width and height in pixels `text` takes at `scale` (longest line, all lines).
 void pixel_font_measure(const char* text, int32_t scale, int32_t* width, int32_t* height);
 
-// Every character that has a glyph, in table order (for previews and tests).
-const char* pixel_font_characters();
+// Every code point that has its own glyph, in table order (previews, tests).
+uint32_t pixel_font_glyph_count();
+uint32_t pixel_font_glyph_codepoint(uint32_t index);

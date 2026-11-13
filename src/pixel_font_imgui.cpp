@@ -17,40 +17,15 @@ static int32_t block_size(float font_size)
     return size < 1 ? 1 : size;
 }
 
-// The Unicode arrows ImGui text can use, drawn with our own arrow glyphs.
-struct ArrowCodepoint
-{
-    ImWchar unicode;
-    char    glyph;
-};
-
-static const ArrowCodepoint ARROWS[] = {
-    { 0x25B2, PIXEL_FONT_ARROW_UP },      // BLACK UP-POINTING TRIANGLE
-    { 0x25BC, PIXEL_FONT_ARROW_DOWN },    // BLACK DOWN-POINTING TRIANGLE
-    { 0x25C0, PIXEL_FONT_ARROW_LEFT },    // BLACK LEFT-POINTING TRIANGLE
-    { 0x25B6, PIXEL_FONT_ARROW_RIGHT },   // BLACK RIGHT-POINTING TRIANGLE
-    { 0x2714, PIXEL_FONT_CHECK },         // HEAVY CHECK MARK
-};
-
-// ImGui reserves glyph index 0 for "not found", so index = character + 1.
+// ImGui reserves glyph index 0 for "not found", so index = code point + 1.
 static int loader_glyph_index(ImFontAtlas* atlas, ImFontConfig* src, ImWchar codepoint)
 {
     (void)atlas;
     (void)src;
-    for (size_t i = 0; i < sizeof(ARROWS) / sizeof(ARROWS[0]); i++)
-    {
-        if (ARROWS[i].unicode == codepoint)
-        {
-            return static_cast<int>(static_cast<unsigned char>(ARROWS[i].glyph)) + 1;
-        }
-    }
-    if (codepoint >= 256)
-    {
-        return 0;
-    }
-    uint8_t rows[PIXEL_FONT_GLYPH_HEIGHT] = {};
+    uint8_t rows[PIXEL_FONT_CELL_HEIGHT] = {};
     // pixel_font_glyph_rows() maps lowercase to capitals itself.
-    return pixel_font_glyph_rows(static_cast<char>(codepoint), rows) ? static_cast<int>(codepoint) + 1 : 0;
+    bool found = pixel_font_glyph_rows(static_cast<uint32_t>(codepoint), rows);
+    return found ? static_cast<int>(codepoint) + 1 : 0;
 }
 
 static bool loader_src_init(ImFontAtlas* atlas, ImFontConfig* src)
@@ -60,7 +35,8 @@ static bool loader_src_init(ImFontAtlas* atlas, ImFontConfig* src)
     return true;   // nothing to load: the glyphs are compiled in
 }
 
-// Line metrics: 1 empty font pixel above the 5-pixel glyph, 1 below (7 per line).
+// Line metrics: the 8-pixel cell is the line (2 rows for accents above the
+// letter, 1 below it).
 static bool loader_baked_init(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked* baked, void* loader_data)
 {
     (void)atlas;
@@ -68,7 +44,7 @@ static bool loader_baked_init(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked
     if (!src->MergeMode)
     {
         float block = static_cast<float>(block_size(baked->Size));
-        baked->Ascent = block * 6.0f;
+        baked->Ascent = block * static_cast<float>(PIXEL_FONT_CELL_HEIGHT - 1);
         baked->Descent = -block;
     }
     return true;
@@ -89,10 +65,10 @@ static bool loader_load_glyph(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked
     }
     out_glyph->AdvanceX = advance;
 
-    uint8_t rows[PIXEL_FONT_GLYPH_HEIGHT] = {};
-    pixel_font_glyph_rows(static_cast<char>(glyph_index - 1), rows);
+    uint8_t rows[PIXEL_FONT_CELL_HEIGHT] = {};
+    pixel_font_glyph_rows(static_cast<uint32_t>(glyph_index - 1), rows);
     bool any_pixel = false;
-    for (int32_t y = 0; y < PIXEL_FONT_GLYPH_HEIGHT; y++)
+    for (int32_t y = 0; y < PIXEL_FONT_CELL_HEIGHT; y++)
     {
         any_pixel = any_pixel || rows[y] != 0;
     }
@@ -102,7 +78,7 @@ static bool loader_load_glyph(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked
     }
 
     int width = PIXEL_FONT_GLYPH_WIDTH * block;
-    int height = PIXEL_FONT_GLYPH_HEIGHT * block;
+    int height = PIXEL_FONT_CELL_HEIGHT * block;
     ImFontAtlasRectId pack_id = ImFontAtlasPackAddRect(atlas, width, height);
     if (pack_id == ImFontAtlasRectId_Invalid)
     {
@@ -114,7 +90,7 @@ static bool loader_load_glyph(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked
     ImVector<unsigned char>* pixels = &atlas->Builder->TempBuffer;
     pixels->resize(width * height);
     std::memset(pixels->Data, 0, static_cast<size_t>(width * height));
-    for (int32_t y = 0; y < PIXEL_FONT_GLYPH_HEIGHT; y++)
+    for (int32_t y = 0; y < PIXEL_FONT_CELL_HEIGHT; y++)
     {
         for (int32_t x = 0; x < PIXEL_FONT_GLYPH_WIDTH; x++)
         {
@@ -129,11 +105,11 @@ static bool loader_load_glyph(ImFontAtlas* atlas, ImFontConfig* src, ImFontBaked
         }
     }
 
-    // Glyph quad relative to the text position: one font pixel down from the line's top.
+    // Glyph quad relative to the text position: the whole cell, from the line's top.
     out_glyph->X0 = 0.0f;
-    out_glyph->Y0 = static_cast<float>(block);
+    out_glyph->Y0 = 0.0f;
     out_glyph->X1 = static_cast<float>(width);
-    out_glyph->Y1 = static_cast<float>(block + height);
+    out_glyph->Y1 = static_cast<float>(height);
     out_glyph->Visible = true;
     out_glyph->PackId = pack_id;
     ImFontAtlasBakedSetFontGlyphBitmap(atlas, baked, src, out_glyph, rect, pixels->Data, ImTextureFormat_Alpha8, width);

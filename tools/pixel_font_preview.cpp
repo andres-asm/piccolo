@@ -158,22 +158,54 @@ static bool write_png(const char* path, const uint32_t* pixels, int32_t width, i
 // No two characters may look the same (e.g. 0 and O): that's unreadable in a UI.
 static bool check_glyphs_distinct()
 {
-    const char* characters = pixel_font_characters();
-    size_t count = std::strlen(characters);
+    uint32_t count = pixel_font_glyph_count();
     bool ok = true;
-    for (size_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < count; i++)
     {
-        uint8_t a[PIXEL_FONT_GLYPH_HEIGHT] = {};
-        pixel_font_glyph_rows(characters[i], a);
-        for (size_t j = i + 1; j < count; j++)
+        uint32_t first = pixel_font_glyph_codepoint(i);
+        uint8_t a[PIXEL_FONT_CELL_HEIGHT] = {};
+        pixel_font_glyph_rows(first, a);
+        for (uint32_t j = i + 1; j < count; j++)
         {
-            uint8_t b[PIXEL_FONT_GLYPH_HEIGHT] = {};
-            pixel_font_glyph_rows(characters[j], b);
-            if (std::memcmp(a, b, sizeof(a)) == 0 && characters[i] != ' ')
+            uint32_t second = pixel_font_glyph_codepoint(j);
+            uint8_t b[PIXEL_FONT_CELL_HEIGHT] = {};
+            pixel_font_glyph_rows(second, b);
+            if (std::memcmp(a, b, sizeof(a)) == 0 && first != ' ')
             {
-                std::printf("FAIL glyphs '%c' and '%c' are identical\n", characters[i], characters[j]);
+                std::printf("FAIL glyphs U+%04X and U+%04X are identical\n", first, second);
                 ok = false;
             }
+        }
+    }
+    return ok;
+}
+
+// Lowercase and the other spellings must find a glyph (not the box).
+static bool check_lookups()
+{
+    static const uint32_t MUST_EXIST[] = {
+        'a', 'z', 0x00E1, 0x00F1, 0x00FC, 0x00E7, 0x00E3, 0x00F5, 0x00DF, 0x00BF, 0x00A1, 0x00FF, 0x0153,
+        0x0161, 0x017E, 0x20AC, 0x00A0, 0x2019, PIXEL_FONT_ARROW_DOWN, PIXEL_FONT_CHECK,
+    };
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(MUST_EXIST) / sizeof(MUST_EXIST[0]); i++)
+    {
+        uint8_t rows[PIXEL_FONT_CELL_HEIGHT] = {};
+        if (!pixel_font_glyph_rows(MUST_EXIST[i], rows))
+        {
+            std::printf("FAIL U+%04X has no glyph\n", MUST_EXIST[i]);
+            ok = false;
+        }
+    }
+    const char* text = "\xC3\xB1\xE2\x82\xAC\xFF!";   // ñ € (an invalid byte) !
+    uint32_t expected[] = {0x00F1, 0x20AC, 0xFFFD, '!', 0};
+    for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
+    {
+        uint32_t got = pixel_font_next_codepoint(&text);
+        if (got != expected[i])
+        {
+            std::printf("FAIL UTF-8 decode %zu: expected U+%04X, got U+%04X\n", i, expected[i], got);
+            ok = false;
         }
     }
     return ok;
@@ -211,21 +243,20 @@ int main(int argc, char** argv)
         }
     }
 
-    if (!pixel_font_init() || !check_glyphs_distinct())
+    if (!pixel_font_init() || !check_glyphs_distinct() || !check_lookups())
     {
         return 1;
     }
-    std::printf("pixel font: %zu glyphs, table OK\n", std::strlen(pixel_font_characters()));
+    std::printf("pixel font: %u glyphs, table OK\n", pixel_font_glyph_count());
     if (check_only)
     {
         return 0;
     }
 
     // Layout: a grid of every glyph (16 per row, each in a tinted cell), then sample text.
-    const char* characters = pixel_font_characters();
-    int32_t count = static_cast<int32_t>(std::strlen(characters));
+    int32_t count = static_cast<int32_t>(pixel_font_glyph_count());
     constexpr int32_t COLUMNS = 16;
-    int32_t cell = (PIXEL_FONT_ADVANCE + 2) * scale;
+    int32_t cell = (PIXEL_FONT_CELL_HEIGHT + 2) * scale;   // square cells, tall enough for accents
     int32_t grid_rows = (count + COLUMNS - 1) / COLUMNS;
     int32_t margin = 4 * scale;
 
@@ -238,8 +269,13 @@ int main(int argc, char** argv)
         "SAVE STATE  SLOT 0 [OK]\n"
         "VIDEO MODE: 720X480 (3:2)\n"
         "SOUND: 48000 HZ STEREO\n"
-        "\x01 \x02 \x03 \x04  ARROWS\n"
-        "lowercase draws as capitals";
+        "\xE2\x96\xB2 \xE2\x96\xBC \xE2\x97\x80 \xE2\x96\xB6 \xE2\x9C\x94  ARROWS, CHECK\n"
+        "lowercase draws as capitals\n"
+        "\n"
+        "\xC2\xBFQU\xC3\x89 TAL? \xC2\xA1SE GUARD\xC3\x93 LA PARTIDA! A\xC3\x91O, PING\xC3\x9CINO\n"
+        "Fran\xC3\xA7" "ais: \xC3\xA0 \xC3\xA2 \xC3\xA8 \xC3\xAA \xC3\xAB \xC3\xAE \xC3\xB4 \xC3\xB9 \xC5\x93 \xC2\xAB OK \xC2\xBB\n"
+        "Portugu\xC3\xAAs: S\xC3\x83O JO\xC3\x83O, A\xC3\x87\xC3\x83O, P\xC3\x95" "E\n"
+        "Deutsch: \xC3\x84 \xC3\x96 \xC3\x9C STRA\xC3\x9F" "E  10 \xE2\x82\xAC  20\xC2\xB0";
     int32_t sample_width = 0;
     int32_t sample_height = 0;
     pixel_font_measure(SAMPLE, scale, &sample_width, &sample_height);
@@ -263,7 +299,24 @@ int main(int argc, char** argv)
                 pixels[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)] = CELL_COLOR;
             }
         }
-        char text[2] = { characters[i], '\0' };
+        // The glyph as UTF-8 (up to 3 bytes for what the font has).
+        uint32_t codepoint = pixel_font_glyph_codepoint(static_cast<uint32_t>(i));
+        char text[5] = {};
+        if (codepoint < 0x80)
+        {
+            text[0] = static_cast<char>(codepoint);
+        }
+        else if (codepoint < 0x800)
+        {
+            text[0] = static_cast<char>(0xC0u | (codepoint >> 6));
+            text[1] = static_cast<char>(0x80u | (codepoint & 0x3Fu));
+        }
+        else
+        {
+            text[0] = static_cast<char>(0xE0u | (codepoint >> 12));
+            text[1] = static_cast<char>(0x80u | ((codepoint >> 6) & 0x3Fu));
+            text[2] = static_cast<char>(0x80u | (codepoint & 0x3Fu));
+        }
         pixel_font_draw_text(pixels, width, height, width, cell_x + scale, cell_y + scale, text, TEXT_COLOR, scale);
     }
 
