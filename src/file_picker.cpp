@@ -8,6 +8,7 @@
 
 #include "imgui.h"
 
+#include "piccolo_text.h"
 #include "retro_ui.h"
 
 // ---------------------------------------------------------------------------
@@ -176,7 +177,7 @@ static bool choose(FilePicker* picker, const CoreCatalog* catalog, const char* f
 }
 
 bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pixel_font, int32_t scale,
-                      FilePickerChoice* choice)
+                      const Localization* strings, FilePickerChoice* choice)
 {
     if (!picker->open)
     {
@@ -201,7 +202,9 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
 
     bool keep_open = true;
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("LOAD GAME", nullptr, flags))
+    char title[200] = {};
+    std::snprintf(title, sizeof(title), "%s###load_game", piccolo_text(strings, Str::picker_title));
+    if (ImGui::Begin(title, nullptr, flags))
     {
         retro_ui_begin_window(scale);
         if (retro_ui_close_button())
@@ -212,10 +215,10 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         // Core first: it decides which files are shown.
         const LibretroCoreInfo* core = selected_core(picker, catalog);
         char preview[LIBRETRO_INFO_TEXT_MAX * 2 + 8] = {};
-        std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : "no cores found",
+        std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : piccolo_text(strings, Str::picker_no_cores),
                       core != nullptr ? core->version : "");
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("CORE");
+        ImGui::TextUnformatted(piccolo_text(strings, Str::picker_core));
         ImGui::SameLine();
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (retro_ui_begin_combo("##core", preview))
@@ -259,7 +262,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         }
         if (picker->file_count == 0)
         {
-            ImGui::TextDisabled("NOTHING THIS CORE LOADS HERE");
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::picker_nothing_here));
         }
         ImGui::EndChild();
 
@@ -295,16 +298,23 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         ImGui::TextDisabled("%s", picker->directory);
 
         // Bottom row.
-        if (retro_ui_checkbox("SHOW ALL FILES", &picker->show_all))
+        char show_all[200] = {};
+        std::snprintf(show_all, sizeof(show_all), "%s###show_all", piccolo_text(strings, Str::picker_show_all));
+        if (retro_ui_checkbox(show_all, &picker->show_all))
         {
             picker->listing_stale = true;
         }
         bool can_run_alone = core != nullptr && core->supports_no_game;
-        float load_width = ImGui::CalcTextSize("LOAD").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        float alone_width = ImGui::CalcTextSize("START WITHOUT GAME").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        const char* load = piccolo_text(strings, Str::picker_load);
+        const char* alone = piccolo_text(strings, Str::picker_start_without_game);
+        float load_width = ImGui::CalcTextSize(load).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        float alone_width = ImGui::CalcTextSize(alone).x + ImGui::GetStyle().FramePadding.x * 2.0f;
         float right = load_width + (can_run_alone ? alone_width + ImGui::GetStyle().ItemSpacing.x : 0.0f);
         ImGui::SameLine(ImGui::GetContentRegionMax().x - right);
-        if (can_run_alone && ImGui::Button("START WITHOUT GAME"))
+        ImGui::PushID("alone");
+        bool start_alone = can_run_alone && ImGui::Button(alone);
+        ImGui::PopID();
+        if (start_alone)
         {
             picked = choose(picker, catalog, nullptr, choice);
         }
@@ -313,7 +323,10 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             ImGui::SameLine();
         }
         ImGui::BeginDisabled(picker->selected_file < 0);
-        if (ImGui::Button("LOAD") && picker->selected_file >= 0)
+        ImGui::PushID("load");
+        bool load_clicked = ImGui::Button(load);
+        ImGui::PopID();
+        if (load_clicked && picker->selected_file >= 0)
         {
             picked = choose(picker, catalog, picker->files[picker->selected_file], choice);
         }

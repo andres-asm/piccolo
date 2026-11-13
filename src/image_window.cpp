@@ -1,10 +1,12 @@
 #include "image_window.h"
 
+#include <cstdio>
 #include <cstdlib>
 
 #include "imgui.h"
 
 #include "piccolo_settings.h"
+#include "piccolo_text.h"
 #include "retro_ui.h"
 
 // Shading over the cut-off parts, and the outline of what stays (0xAABBGGRR,
@@ -65,7 +67,9 @@ static void draw_preview(const SettingsUiContext* context, const ImageWindowSour
 // collapsible section; more join them later.
 static void draw_controls(const SettingsUiContext* context)
 {
-    if (ImGui::CollapsingHeader("OVERSCAN CROP", ImGuiTreeNodeFlags_DefaultOpen))
+    char header[200] = {};
+    std::snprintf(header, sizeof(header), "%s###crop", piccolo_text(context->strings, Str::image_section_crop));
+    if (ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
     {
         for (int32_t i = 0; i < CROP_KEY_COUNT; i++)
         {
@@ -116,14 +120,17 @@ void image_window_draw(bool* open, const SettingsUiContext* context, const Image
                             ImVec2(0.5f, 0.5f));
 
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("IMAGE SETTINGS", nullptr, flags))
+    char title[200] = {};
+    std::snprintf(title, sizeof(title), "%s###image_settings", piccolo_text(context->strings, Str::image_title));
+    if (ImGui::Begin(title, nullptr, flags))
     {
         retro_ui_begin_window(scale);
         if (retro_ui_close_button())
         {
             *open = false;
         }
-        ImGui::TextDisabled("EDITING: %s", settings_ui_scope_name(context->scope));
+        ImGui::TextDisabled("%s: %s", piccolo_text(context->strings, Str::image_editing),
+                            settings_ui_scope_name(context->strings, context->scope));
 
         if (has_picture)
         {
@@ -132,8 +139,7 @@ void image_window_draw(bool* open, const SettingsUiContext* context, const Image
         else
         {
             ImGui::BeginGroup();
-            ImGui::TextDisabled("START A GAME TO");
-            ImGui::TextDisabled("SEE ITS PICTURE HERE");
+            ImGui::TextDisabled("%s", piccolo_text(context->strings, Str::image_no_picture));
             ImGui::Dummy(ImVec2(picture.x, 0.0f));
             ImGui::EndGroup();
         }

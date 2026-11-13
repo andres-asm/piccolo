@@ -21,7 +21,35 @@ add_executable(piccolo
     src/settings_window.cpp
     src/image_window.cpp
     src/piccolo_window.cpp
+    src/piccolo_text.cpp
 )
+
+# UI text: src/strings.txt is the one English source. The build turns it into
+# the string IDs (enum class Str), the English table and piccolo.pot (the
+# translators' template), all in the build folder.
+set(PICCOLO_GENERATED "${CMAKE_CURRENT_BINARY_DIR}/generated")
+add_custom_command(
+    OUTPUT "${PICCOLO_GENERATED}/piccolo_strings.h" "${PICCOLO_GENERATED}/piccolo_strings.cpp"
+           "${PICCOLO_GENERATED}/piccolo.pot"
+    COMMAND multitap_strings_generator "${CMAKE_CURRENT_SOURCE_DIR}/src/strings.txt" piccolo "${PICCOLO_GENERATED}"
+    DEPENDS multitap_strings_generator "${CMAKE_CURRENT_SOURCE_DIR}/src/strings.txt"
+    COMMENT "Generating piccolo's string IDs from strings.txt"
+    VERBATIM)
+target_sources(piccolo PRIVATE "${PICCOLO_GENERATED}/piccolo_strings.cpp")
+target_include_directories(piccolo PRIVATE "${PICCOLO_GENERATED}")
+
+# Translations (lang/<code>.po) next to the program, in the build folder and
+# in piccolo's own folder.
+add_custom_command(TARGET piccolo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "$<TARGET_FILE_DIR:piccolo>/lang"
+    VERBATIM)
+if(MULTITAP_PICCOLO_DIR)
+    add_custom_target(copy_piccolo_lang ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "${MULTITAP_PICCOLO_DIR}/lang"
+        DEPENDS piccolo
+        COMMENT "Copying piccolo's translations to ${MULTITAP_PICCOLO_DIR}/lang"
+        VERBATIM)
+endif()
 
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
@@ -37,4 +65,15 @@ if(MULTITAP_BUILD_TESTS)
     # Table well formed, no character defined twice, no two glyphs identical.
     add_test(NAME piccolo_pixel_font COMMAND pixel_font_preview --check)
     set_tests_properties(piccolo_pixel_font PROPERTIES PASS_REGULAR_EXPRESSION "table OK")
+
+    # The UI text against the translations and the font (missing translations,
+    # stale keys, characters the font can't draw). Unknown keys in a .po are
+    # reported in the log too.
+    add_executable(piccolo_strings_check tools/strings_check.cpp "${PICCOLO_GENERATED}/piccolo_strings.cpp")
+    target_include_directories(piccolo_strings_check PRIVATE "${PICCOLO_GENERATED}")
+    target_link_libraries(piccolo_strings_check PRIVATE frontend_common piccolo_font)
+    multitap_set_project_flags(piccolo_strings_check)
+    add_test(NAME piccolo_strings COMMAND piccolo_strings_check "${CMAKE_CURRENT_SOURCE_DIR}/lang" es)
+    set_tests_properties(piccolo_strings PROPERTIES
+        FAIL_REGULAR_EXPRESSION "some keys are unknown|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 endif()

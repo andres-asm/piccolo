@@ -8,6 +8,7 @@
 #include "imgui.h"
 
 #include "libretro_host.h"   // LIBRETRO_PATH_MAX
+#include "piccolo_text.h"
 #include "retro_ui.h"
 
 // Marker colors: our own, distinct from the theme's blues (0xAARRGGBB).
@@ -20,25 +21,41 @@ static ImVec4 color_of(uint32_t argb)
                   static_cast<float>(argb & 0xFFu) / 255.0f, static_cast<float>(argb >> 24) / 255.0f);
 }
 
-const char* settings_ui_scope_name(SettingLayer scope)
+const char* settings_ui_scope_name(const Localization* strings, SettingLayer scope)
 {
     switch (scope)
     {
     case SettingLayer::defaults:
     case SettingLayer::global:
-        return "GLOBAL";
+        return piccolo_text(strings, Str::scope_global);
     case SettingLayer::core:
-        return "THIS CORE";
+        return piccolo_text(strings, Str::scope_core);
     case SettingLayer::game:
-        return "THIS GAME";
+        return piccolo_text(strings, Str::scope_game);
     }
-    return "GLOBAL";
+    return piccolo_text(strings, Str::scope_global);
 }
 
-void settings_ui_marker(const Settings* settings, const char* key)
+float settings_ui_label_width(const Settings* settings, const Localization* strings)
+{
+    float widest = 0.0f;
+    for (uint32_t i = 0; i < settings->descriptor_count; i++)
+    {
+        const SettingDescriptor* descriptor = &settings->descriptors[i];
+        if (descriptor->type == SettingType::boolean || descriptor->label == SETTING_NO_TEXT)
+        {
+            continue;
+        }
+        float width = ImGui::CalcTextSize(piccolo_text_id(strings, descriptor->label)).x;
+        widest = width > widest ? width : widest;
+    }
+    return widest + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+}
+
+void settings_ui_marker(const SettingsUiContext* context, const char* key)
 {
     SettingLayer source = SettingLayer::defaults;
-    settings_get(settings, key, &source);
+    settings_get(context->settings, key, &source);
     ImVec2 size = ImGui::CalcTextSize("C");
     if (source != SettingLayer::core && source != SettingLayer::game)
     {
@@ -47,7 +64,7 @@ void settings_ui_marker(const Settings* settings, const char* key)
     }
     bool core = source == SettingLayer::core;
     ImGui::TextColored(color_of(core ? MARKER_CORE : MARKER_GAME), "%s", core ? "C" : "G");
-    ImGui::SetItemTooltip("%s", core ? "SET FOR THIS CORE" : "SET FOR THIS GAME");
+    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, core ? Str::marker_core_help : Str::marker_game_help));
 }
 
 bool settings_ui_reset_button(const SettingsUiContext* context, const char* key)
@@ -56,11 +73,14 @@ bool settings_ui_reset_button(const SettingsUiContext* context, const char* key)
     {
         return false;
     }
-    float width = ImGui::CalcTextSize("RESET").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const char* reset = piccolo_text(context->strings, Str::reset);
+    float width = ImGui::CalcTextSize(reset).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     ImGui::SameLine(ImGui::GetContentRegionMax().x - width);
-    bool clicked = ImGui::Button("RESET");
-    ImGui::SetItemTooltip("%s", context->scope == SettingLayer::global ? "BACK TO THE DEFAULT"
-                                                                       : "BACK TO THE VALUE BELOW (STOP OVERRIDING)");
+    ImGui::PushID("reset");
+    bool clicked = ImGui::Button(reset);
+    ImGui::PopID();
+    Str help = context->scope == SettingLayer::global ? Str::reset_help_global : Str::reset_help_override;
+    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, help));
     if (clicked)
     {
         settings_reset(context->settings, context->scope, key);
@@ -74,19 +94,25 @@ static void label_column(const SettingsUiContext* context, const SettingDescript
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
     float start = ImGui::GetCursorPosX();
-    ImGui::TextUnformatted(descriptor->label);
-    if (descriptor->help != nullptr)
+    ImGui::TextUnformatted(piccolo_text_id(context->strings, descriptor->label));
+    if (descriptor->help != SETTING_NO_TEXT)
     {
-        ImGui::SetItemTooltip("%s", descriptor->help);
+        ImGui::SetItemTooltip("%s", piccolo_text_id(context->strings, descriptor->help));
     }
     ImGui::SameLine(start + context->label_width);
 }
 
 // Room left for the widget, keeping space for the reset button.
-static float widget_width()
+static float widget_width(const SettingsUiContext* context)
 {
-    float reset = ImGui::CalcTextSize("RESET").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float reset = ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     return ImGui::GetContentRegionAvail().x - reset - ImGui::GetStyle().ItemSpacing.x;
+}
+
+// An enum value's label in the current language, or its key ("4:3") when it has none.
+static const char* value_label(const SettingsUiContext* context, const SettingEnumValue* value)
+{
+    return value->label == SETTING_NO_TEXT ? value->key : piccolo_text_id(context->strings, value->label);
 }
 
 static bool enum_widget(const SettingsUiContext* context, const SettingDescriptor* descriptor, const char* value)
@@ -100,12 +126,15 @@ static bool enum_widget(const SettingsUiContext* context, const SettingDescripto
         }
     }
     bool changed = false;
-    ImGui::SetNextItemWidth(widget_width());
-    if (retro_ui_begin_combo("##value", descriptor->values[current].label))
+    ImGui::SetNextItemWidth(widget_width(context));
+    if (retro_ui_begin_combo("##value", value_label(context, &descriptor->values[current])))
     {
         for (uint32_t i = 0; i < descriptor->value_count; i++)
         {
-            if (ImGui::Selectable(descriptor->values[i].label, i == current) && i != current)
+            ImGui::PushID(static_cast<int>(i));
+            bool picked = ImGui::Selectable(value_label(context, &descriptor->values[i]), i == current);
+            ImGui::PopID();
+            if (picked && i != current)
             {
                 changed = settings_set_enum(context->settings, context->scope, descriptor->key, i);
             }
@@ -118,7 +147,7 @@ static bool enum_widget(const SettingsUiContext* context, const SettingDescripto
 static bool integer_widget(const SettingsUiContext* context, const SettingDescriptor* descriptor, const char* value)
 {
     int number = static_cast<int>(std::strtol(value, nullptr, 10));
-    ImGui::SetNextItemWidth(widget_width());
+    ImGui::SetNextItemWidth(widget_width(context));
     if (!ImGui::InputInt("##value", &number, descriptor->step > 0 ? descriptor->step : 1, 8))
     {
         return false;
@@ -130,7 +159,7 @@ static bool integer_widget(const SettingsUiContext* context, const SettingDescri
 static bool real_widget(const SettingsUiContext* context, const SettingDescriptor* descriptor, const char* value)
 {
     float number = std::strtof(value, nullptr);
-    ImGui::SetNextItemWidth(widget_width());
+    ImGui::SetNextItemWidth(widget_width(context));
     if (!ImGui::SliderFloat("##value", &number, static_cast<float>(descriptor->min_real),
                             static_cast<float>(descriptor->max_real), "%.1f%%"))
     {
@@ -151,7 +180,7 @@ static bool path_widget(const SettingsUiContext* context, const SettingDescripto
     // this buffer only seeds it. The value is set when editing ends.
     char buffer[LIBRETRO_PATH_MAX] = {};
     std::snprintf(buffer, sizeof(buffer), "%s", value);
-    ImGui::SetNextItemWidth(widget_width());
+    ImGui::SetNextItemWidth(widget_width(context));
     ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer));
     if (!ImGui::IsItemDeactivatedAfterEdit())
     {
@@ -176,19 +205,22 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     bool changed = false;
 
     ImGui::PushID(key);
-    settings_ui_marker(context->settings, key);
+    settings_ui_marker(context, key);
     ImGui::BeginDisabled(global_only_here);
     if (descriptor->type == SettingType::boolean)
     {
         ImGui::SameLine();
         bool checked = std::strcmp(value, "true") == 0;
-        if (retro_ui_checkbox(descriptor->label, &checked))
+        // "###" keeps the widget's ID the same whatever the language.
+        char label[256] = {};
+        std::snprintf(label, sizeof(label), "%s###check", piccolo_text_id(context->strings, descriptor->label));
+        if (retro_ui_checkbox(label, &checked))
         {
             changed = settings_set_bool(context->settings, context->scope, key, checked);
         }
-        if (descriptor->help != nullptr)
+        if (descriptor->help != SETTING_NO_TEXT)
         {
-            ImGui::SetItemTooltip("%s", descriptor->help);
+            ImGui::SetItemTooltip("%s", piccolo_text_id(context->strings, descriptor->help));
         }
     }
     else
@@ -219,7 +251,7 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
         // A disabled item needs AllowWhenDisabled for its tooltip.
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            ImGui::SetTooltip("GLOBAL ONLY: SWITCH THE SCOPE TO GLOBAL TO CHANGE IT");
+            ImGui::SetTooltip("%s", piccolo_text(context->strings, Str::global_only_help));
         }
     }
     else if (settings_ui_reset_button(context, key))

@@ -2,41 +2,41 @@
 
 struct MenuItem
 {
-    const char* label;
+    Str         label;
     MenuAction  action;
 };
 
 struct Menu
 {
-    const char*     label;
+    Str             label;
     const MenuItem* items;
     int32_t         item_count;
 };
 
 static const MenuItem GAME_ITEMS[] = {
-    { "LOAD GAME...", MenuAction::load_game },
-    { "RESET",        MenuAction::reset },
-    { "SAVE STATE",   MenuAction::save_state },
-    { "LOAD STATE",   MenuAction::load_state },
-    { "QUIT",         MenuAction::quit },
+    { Str::menu_load_game,  MenuAction::load_game },
+    { Str::menu_reset,      MenuAction::reset },
+    { Str::menu_save_state, MenuAction::save_state },
+    { Str::menu_load_state, MenuAction::load_state },
+    { Str::menu_quit,       MenuAction::quit },
 };
 
 static const MenuItem CONFIG_ITEMS[] = {
-    { "GENERAL...", MenuAction::general },
-    { "VIDEO...",   MenuAction::video },
-    { "INPUT...",   MenuAction::input },
-    { "SOUND...",   MenuAction::sound },
+    { Str::menu_general, MenuAction::general },
+    { Str::menu_video,   MenuAction::video },
+    { Str::menu_input,   MenuAction::input },
+    { Str::menu_sound,   MenuAction::sound },
 };
 
 static const MenuItem MISC_ITEMS[] = {
-    { "DEBUG WINDOW",  MenuAction::debug_window },
-    { "ABOUT PICCOLO", MenuAction::about },
+    { Str::menu_debug_window, MenuAction::debug_window },
+    { Str::menu_about,        MenuAction::about },
 };
 
 static const Menu MENUS[] = {
-    { "GAME",   GAME_ITEMS,   static_cast<int32_t>(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0])) },
-    { "CONFIG", CONFIG_ITEMS, static_cast<int32_t>(sizeof(CONFIG_ITEMS) / sizeof(CONFIG_ITEMS[0])) },
-    { "MISC",   MISC_ITEMS,   static_cast<int32_t>(sizeof(MISC_ITEMS) / sizeof(MISC_ITEMS[0])) },
+    { Str::menu_game,   GAME_ITEMS,   static_cast<int32_t>(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0])) },
+    { Str::menu_config, CONFIG_ITEMS, static_cast<int32_t>(sizeof(CONFIG_ITEMS) / sizeof(CONFIG_ITEMS[0])) },
+    { Str::menu_misc,   MISC_ITEMS,   static_cast<int32_t>(sizeof(MISC_ITEMS) / sizeof(MISC_ITEMS[0])) },
 };
 
 constexpr int32_t MENU_COUNT = static_cast<int32_t>(sizeof(MENUS) / sizeof(MENUS[0]));
@@ -46,7 +46,7 @@ int32_t menus_count()
     return MENU_COUNT;
 }
 
-const char* menus_label(int32_t menu)
+Str menus_label(int32_t menu)
 {
     return MENUS[menu].label;
 }
@@ -56,7 +56,7 @@ int32_t menus_item_count(int32_t menu)
     return MENUS[menu].item_count;
 }
 
-const char* menus_item_label(int32_t menu, int32_t item)
+Str menus_item_label(int32_t menu, int32_t item)
 {
     return MENUS[menu].items[item].label;
 }

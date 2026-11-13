@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"   // DC.CurrLineTextBaseOffset: where ImGui puts a widget's text on its line
 
+#include "piccolo_text.h"
 #include "pixel_font_imgui.h"
 
 // Palette (0xAARRGGBB): our own colors.
@@ -85,7 +86,7 @@ int32_t retro_ui_scale_for_width(float window_width)
     return scale < 1 ? 1 : scale;
 }
 
-MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale)
+MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings)
 {
     MenuAction picked = MenuAction::none;
     float block = static_cast<float>(scale);
@@ -118,7 +119,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale)
         ImDrawList* bar_draw_list = ImGui::GetWindowDrawList();
         for (int32_t menu = 0; menu < menus_count(); menu++)
         {
-            const char* label = menus_label(menu);
+            const char* label = piccolo_text(strings, menus_label(menu));
 
             // On the bar, BeginMenu indents its text by half the item spacing (imgui_widgets.cpp).
             ImVec2 label_position = next_text_position(IM_TRUNC(ImGui::GetStyle().ItemSpacing.x * 0.5f));
@@ -138,7 +139,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale)
                 draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_LIGHT, true);
                 for (int32_t item = 0; item < menus_item_count(menu); item++)
                 {
-                    const char* item_label = menus_item_label(menu, item);
+                    const char* item_label = piccolo_text(strings, menus_item_label(menu, item));
                     ImVec2 item_position = next_text_position(0.0f);
                     push_invisible_text();
                     if (ImGui::MenuItem(item_label))

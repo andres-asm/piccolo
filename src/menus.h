@@ -6,6 +6,8 @@
 
 #include <cstdint>
 
+#include "piccolo_text.h"   // Str
+
 enum class MenuAction
 {
     none,
@@ -23,10 +25,10 @@ enum class MenuAction
 };
 
 int32_t     menus_count();
-const char* menus_label(int32_t menu);
+Str         menus_label(int32_t menu);
 int32_t     menus_item_count(int32_t menu);
-const char* menus_item_label(int32_t menu, int32_t item);
+Str         menus_item_label(int32_t menu, int32_t item);
 MenuAction  menus_item_action(int32_t menu, int32_t item);
 
-// "LOAD GAME" etc., for logs and status text.
+// "LOAD GAME" etc., for logs (English on purpose).
 const char* menu_action_name(MenuAction action);

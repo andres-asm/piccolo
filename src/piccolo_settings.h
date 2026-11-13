@@ -9,10 +9,12 @@
 #include <cstdint>
 
 #include "frame_timing.h"
+#include "piccolo_text.h"
 #include "settings.h"
 #include "viewport.h"
 
 // Keys (file keys: stable, never translated).
+constexpr const char* PICCOLO_LANGUAGE = "language";
 constexpr const char* PICCOLO_PAUSE_IN_MENU = "pause_in_menu";
 constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
@@ -55,6 +57,11 @@ void piccolo_settings_viewport(const Settings* settings, ViewportInput* input);
 
 TimingMode piccolo_settings_timing(const Settings* settings);
 
+// The language to show: an index for piccolo_language_code() (piccolo_text.h).
+// "auto" picks the first of the system's preferred languages piccolo has,
+// else English.
+uint32_t piccolo_settings_language(const Settings* settings);
+
 // Low latency: frames in flight (1 or 2).
 uint32_t piccolo_settings_frames_in_flight(const Settings* settings);
 
@@ -62,7 +69,7 @@ uint32_t piccolo_settings_frames_in_flight(const Settings* settings);
 // Index 0..2 = OFF, LOW, LOWEST; piccolo_settings_latency_preset() gives the
 // one the current values (at `layer`) match, or 3 (CUSTOM).
 constexpr uint32_t PICCOLO_LATENCY_PRESET_COUNT = 3;
-const char* piccolo_settings_latency_preset_name(uint32_t preset);
+Str piccolo_settings_latency_preset_name(uint32_t preset);
 uint32_t piccolo_settings_latency_preset(const Settings* settings, SettingLayer layer);
 bool piccolo_settings_apply_latency_preset(Settings* settings, SettingLayer layer, uint32_t preset);
 

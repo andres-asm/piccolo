@@ -1,0 +1,180 @@
+# piccolo's UI text, in English: the ONE source of every string ID.
+#
+# key = English text
+#
+# The build turns this into enum class Str (one ID per key, in this order),
+# the English table, and piccolo.pot (the template translators start from).
+# Translations live in lang/<language>.po (msgctxt = the key).
+#
+# Keys: lowercase letters, digits and '_' (they become C++ names; never
+# rename one without updating the .po files). Text: the rest of the line;
+# \n is a line break, \" a quote, \\ a backslash. Keep printf-style %
+# formats out of the text: numbers and names are added by the code.
+
+# Menu bar
+menu_game = GAME
+menu_config = CONFIG
+menu_misc = MISC
+menu_load_game = LOAD GAME...
+menu_reset = RESET
+menu_save_state = SAVE STATE
+menu_load_state = LOAD STATE
+menu_quit = QUIT
+menu_general = GENERAL...
+menu_video = VIDEO...
+menu_input = INPUT...
+menu_sound = SOUND...
+menu_debug_window = DEBUG WINDOW
+menu_about = ABOUT PICCOLO
+
+# Status line
+status_start = GAME > LOAD GAME TO START
+status_reset = RESET
+status_not_there_yet = NOT THERE YET
+
+# LOAD GAME window
+picker_title = LOAD GAME
+picker_core = CORE
+picker_no_cores = NO CORES FOUND
+picker_nothing_here = NOTHING THIS CORE LOADS HERE
+picker_show_all = SHOW ALL FILES
+picker_start_without_game = START WITHOUT GAME
+picker_load = LOAD
+
+# SETTINGS window
+settings_title = SETTINGS
+tab_general = GENERAL
+tab_video = VIDEO
+tab_picture = PICTURE
+tab_display = DISPLAY
+tab_sync = SYNC
+scope = SCOPE
+scope_help = WHERE CHANGES GO. A CORE OR GAME SETTING WINS OVER THE GLOBAL ONE.
+scope_start_game_help = START A GAME TO CHANGE SETTINGS FOR ONE CORE OR ONE GAME
+scope_global = GLOBAL
+scope_core = THIS CORE
+scope_game = THIS GAME
+marker_core_help = SET FOR THIS CORE
+marker_game_help = SET FOR THIS GAME
+reset = RESET
+reset_help_global = BACK TO THE DEFAULT
+reset_help_override = BACK TO THE VALUE BELOW (STOP OVERRIDING)
+global_only_help = GLOBAL ONLY: SWITCH THE SCOPE TO GLOBAL TO CHANGE IT
+section_folders = FOLDERS
+folders_next_game = FOLDER CHANGES APPLY TO THE NEXT GAME
+image_settings_button = IMAGE SETTINGS...
+image_settings_button_help = BEST WITH A GAME RUNNING: IT SHOWS THE PICTURE
+crop_summary = CROP (TOP, BOTTOM, LEFT, RIGHT)
+section_window = WINDOW
+window_sized_when_running = SIZED TO THE GAME WHEN ONE RUNS
+section_low_latency = LOW LATENCY
+latency_preset = PRESET
+latency_preset_help = Sets the three settings below. Change them one by one for anything in between.
+preset_off = OFF
+preset_low = LOW
+preset_lowest = LOWEST
+preset_custom = CUSTOM
+present_wait_screen = THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN
+present_wait_gpu = THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD
+
+# IMAGE SETTINGS window
+image_title = IMAGE SETTINGS
+image_editing = EDITING
+image_no_picture = START A GAME TO\nSEE ITS PICTURE HERE
+image_section_crop = OVERSCAN CROP
+
+# Settings: General
+setting_language = LANGUAGE
+setting_language_help = The language of piccolo's menus. Cores are told it too when they start.
+setting_pause_in_menu = PAUSE WHILE THE MENU IS OPEN
+setting_pause_in_menu_help = Off: the game keeps running behind the menu.
+setting_pause_on_focus_loss = PAUSE WHEN THE WINDOW LOSES FOCUS
+setting_pause_on_focus_loss_help = Pause while another window is active.
+setting_screensaver = ALLOW SCREENSAVER WHILE PAUSED
+setting_screensaver_help = While a game runs the screensaver is always blocked. On: it may start while paused or in the menu.
+setting_path_cores = CORES
+setting_path_cores_help = Folder with the cores. Empty: the cores folder in piccolo's folder.
+setting_path_system = SYSTEM / BIOS
+setting_path_system_help = Folder for BIOS and other files cores ask for. Empty: the system folder in piccolo's folder.
+setting_path_saves = SAVES
+setting_path_saves_help = Folder for save RAM. Empty: the saves folder in piccolo's folder.
+setting_path_states = STATES
+setting_path_states_help = Folder for savestates. Empty: the states folder in piccolo's folder.
+
+# Settings: Picture
+setting_aspect = ASPECT RATIO
+setting_aspect_help = The shape of the whole picture. Square pixels: the frame's own width / height.
+setting_scaling = SCALING
+setting_scaling_help = Integer sizes keep every pixel the same size. Auto: one size up if it goes past the window by at most the % below.
+setting_max_offscreen = AUTO: MAX OFFSCREEN
+setting_max_offscreen_help = How much of the picture Auto may push past the window edges.
+setting_filter = FILTER
+setting_filter_help = Sharp bilinear: sharp pixels, soft only where a pixel lands between two screen pixels.
+setting_position = POSITION
+setting_position_help = Where the picture sits when it doesn't fill the window.
+setting_crop_top = CROP TOP
+setting_crop_top_help = Core pixels cut from the top edge.
+setting_crop_bottom = CROP BOTTOM
+setting_crop_bottom_help = Core pixels cut from the bottom edge.
+setting_crop_left = CROP LEFT
+setting_crop_left_help = Core pixels cut from the left edge.
+setting_crop_right = CROP RIGHT
+setting_crop_right_help = Core pixels cut from the right edge.
+
+# Settings: Sync
+setting_timing = TIMING
+setting_timing_help = Vsync: one frame per display refresh (smooth; falls back to Exact when the rates are too far apart). Exact: the core's own speed.
+setting_frames_in_flight = FRAMES IN FLIGHT
+setting_frames_in_flight_help = How many frames the CPU may prepare ahead of the GPU. 1: less delay, but a slow frame shows.
+setting_wait_for_present = WAIT FOR PRESENT
+setting_wait_for_present_help = Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU has finished it).
+setting_frame_delay = FRAME DELAY (MS)
+setting_frame_delay_help = Vsync timing: wait this long before running each frame, so input is read later. Too much and frames are missed: raise it slowly.
+
+# Settings: Display
+setting_fullscreen = FULLSCREEN
+setting_fullscreen_help = F11 or Alt+Enter switch it too.
+setting_fullscreen_type = FULLSCREEN TYPE
+setting_fullscreen_type_help = Borderless: a window covering the screen (quick to switch). Exclusive: the display is piccolo's, at its current resolution.
+setting_window_mode = WINDOW MODE
+setting_window_mode_help = Fixed size: the window keeps its own shape and size. Dynamic: the window is the game's picture, resized when the game changes size.
+setting_window_aspect = WINDOW ASPECT
+setting_window_aspect_help = Fixed size: the window's shape.
+setting_window_height = WINDOW HEIGHT (LINES)
+setting_window_height_help = Fixed size: the window's height. Smaller if the screen has less room.
+setting_window_scale = WINDOW SCALE
+setting_window_scale_help = Dynamic: the window is the game's picture times this. Lowered when the screen has less room.
+setting_window_remember = REMEMBER WINDOW SIZE AND POSITION
+setting_window_remember_help = Start where and how big the window was last time. (Some desktops, like Wayland ones, place windows themselves.)
+
+# Setting values
+value_language_auto = AUTOMATIC (SYSTEM)
+value_language_english = ENGLISH
+value_language_spanish = ESPAÑOL
+value_aspect_core = CORE PROVIDED
+value_aspect_square_pixels = SQUARE PIXELS (1:1 PAR)
+value_aspect_stretch = STRETCH
+value_scaling_full = FULL
+value_scaling_integer_under = INTEGER (UNDER)
+value_scaling_integer_over = INTEGER (OVER)
+value_scaling_auto = AUTO
+value_filter_nearest = NEAREST
+value_filter_bilinear = BILINEAR
+value_filter_sharp_bilinear = SHARP BILINEAR
+value_position_top_left = TOP LEFT
+value_position_top = TOP
+value_position_top_right = TOP RIGHT
+value_position_left = LEFT
+value_position_center = CENTER
+value_position_right = RIGHT
+value_position_bottom_left = BOTTOM LEFT
+value_position_bottom = BOTTOM
+value_position_bottom_right = BOTTOM RIGHT
+value_timing_vsync = VSYNC
+value_timing_exact = EXACT
+value_frames_2 = 2 (SMOOTHER)
+value_frames_1 = 1 (LOWER LATENCY)
+value_fullscreen_borderless = BORDERLESS
+value_fullscreen_exclusive = EXCLUSIVE
+value_window_fixed = FIXED SIZE
+value_window_dynamic = DYNAMIC (FOLLOWS THE GAME)

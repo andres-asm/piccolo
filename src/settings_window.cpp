@@ -2,10 +2,12 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "imgui.h"
 
 #include "piccolo_settings.h"
+#include "piccolo_text.h"
 #include "retro_ui.h"
 #include "settings_ui.h"
 
@@ -20,26 +22,18 @@ void settings_window_open(SettingsWindow* window, SettingsTab tab)
     window->select_tab = true;
 }
 
-// The widest label of the rows with a label column (not checkboxes).
-static float label_column_width(const Settings* settings)
+// A label in the current language with a fixed ImGui ID ("###"), so a
+// window or tab keeps its state when the language changes.
+static const char* with_id(char* buffer, size_t size, const char* text, const char* id)
 {
-    float widest = 0.0f;
-    for (uint32_t i = 0; i < settings->descriptor_count; i++)
-    {
-        const SettingDescriptor* descriptor = &settings->descriptors[i];
-        if (descriptor->type == SettingType::boolean || descriptor->label == nullptr)
-        {
-            continue;
-        }
-        float width = ImGui::CalcTextSize(descriptor->label).x;
-        widest = width > widest ? width : widest;
-    }
-    return widest + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+    std::snprintf(buffer, size, "%s###%s", text, id);
+    return buffer;
 }
 
 // GLOBAL / THIS CORE / THIS GAME, only the ones that exist right now.
 static void draw_scope(SettingsWindow* window, const SettingsWindowContext* context)
 {
+    const Localization* strings = context->strings;
     bool has_core = context->core_name[0] != '\0';
     bool has_game = has_core && context->game_name[0] != '\0';
     if (window->choose_scope)
@@ -62,26 +56,39 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
     }
     if (!has_core)
     {
-        ImGui::TextDisabled("SCOPE: GLOBAL");
-        ImGui::SetItemTooltip("START A GAME TO CHANGE SETTINGS FOR ONE CORE OR ONE GAME");
+        ImGui::TextDisabled("%s: %s", piccolo_text(strings, Str::scope), piccolo_text(strings, Str::scope_global));
+        ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::scope_start_game_help));
         return;
     }
 
-    char core_label[160] = {};
-    char game_label[400] = {};
-    std::snprintf(core_label, sizeof(core_label), "THIS CORE (%s)", context->core_name);
-    std::snprintf(game_label, sizeof(game_label), "THIS GAME (%s)", context->game_name);
+    char core_label[400] = {};
+    char game_label[600] = {};
+    std::snprintf(core_label, sizeof(core_label), "%s (%s)###core", piccolo_text(strings, Str::scope_core),
+                  context->core_name);
+    std::snprintf(game_label, sizeof(game_label), "%s (%s)###game", piccolo_text(strings, Str::scope_game),
+                  context->game_name);
+    char global_label[200] = {};
+    with_id(global_label, sizeof(global_label), piccolo_text(strings, Str::scope_global), "global");
+    // The combo shows the label without its "###" part.
     const char* preview = window->scope == SettingLayer::core   ? core_label
                           : window->scope == SettingLayer::game ? game_label
-                                                                : "GLOBAL";
+                                                                : global_label;
+    char preview_text[600] = {};
+    std::snprintf(preview_text, sizeof(preview_text), "%s", preview);
+    char* hidden = std::strstr(preview_text, "###");
+    if (hidden != nullptr)
+    {
+        *hidden = '\0';
+    }
+
     ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("SCOPE");
-    ImGui::SetItemTooltip("WHERE CHANGES GO. A CORE OR GAME SETTING WINS OVER THE GLOBAL ONE.");
+    ImGui::TextUnformatted(piccolo_text(strings, Str::scope));
+    ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::scope_help));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (retro_ui_begin_combo("##scope", preview))
+    if (retro_ui_begin_combo("##scope", preview_text))
     {
-        if (ImGui::Selectable("GLOBAL", window->scope == SettingLayer::global))
+        if (ImGui::Selectable(global_label, window->scope == SettingLayer::global))
         {
             window->scope = SettingLayer::global;
         }
@@ -99,15 +106,21 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
 
 static void draw_general(const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
+    settings_ui_row(ui, PICCOLO_LANGUAGE, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_ON_FOCUS_LOSS, nullptr);
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
-    ImGui::SeparatorText("FOLDERS");
+    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_folders));
     settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SAVES, context->paths->saves.c_str());
     settings_ui_row(ui, PICCOLO_PATH_STATES, context->paths->states.c_str());
-    ImGui::TextDisabled("FOLDER CHANGES APPLY TO THE NEXT GAME");
+    ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+}
+
+static long crop_at_scope(const SettingsUiContext* ui, const char* key)
+{
+    return std::strtol(settings_get_at(ui->settings, ui->scope, key, nullptr), nullptr, 10);
 }
 
 static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
@@ -119,23 +132,20 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     settings_ui_row(ui, PICCOLO_VIDEO_POSITION, nullptr);
 
     // The crop (and more image settings later) live in their own window.
-    char crop[96] = {};
-    std::snprintf(crop, sizeof(crop), "CROP: T %ld  B %ld  L %ld  R %ld",
-                  std::strtol(settings_get_at(ui->settings, ui->scope, PICCOLO_VIDEO_CROP_TOP, nullptr), nullptr, 10),
-                  std::strtol(settings_get_at(ui->settings, ui->scope, PICCOLO_VIDEO_CROP_BOTTOM, nullptr), nullptr, 10),
-                  std::strtol(settings_get_at(ui->settings, ui->scope, PICCOLO_VIDEO_CROP_LEFT, nullptr), nullptr, 10),
-                  std::strtol(settings_get_at(ui->settings, ui->scope, PICCOLO_VIDEO_CROP_RIGHT, nullptr), nullptr, 10));
+    char crop[200] = {};
+    std::snprintf(crop, sizeof(crop), "%s: %ld, %ld, %ld, %ld", piccolo_text(ui->strings, Str::crop_summary),
+                  crop_at_scope(ui, PICCOLO_VIDEO_CROP_TOP), crop_at_scope(ui, PICCOLO_VIDEO_CROP_BOTTOM),
+                  crop_at_scope(ui, PICCOLO_VIDEO_CROP_LEFT), crop_at_scope(ui, PICCOLO_VIDEO_CROP_RIGHT));
     ImGui::Spacing();
-    if (ImGui::Button("IMAGE SETTINGS..."))
+    char button[200] = {};
+    if (ImGui::Button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::image_settings_button), "image")))
     {
         window->image_open = true;
     }
     if (context->image == nullptr || context->image->texture_id == 0)
     {
-        ImGui::SetItemTooltip("BEST WITH A GAME RUNNING: IT SHOWS THE PICTURE");
+        ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::image_settings_button_help));
     }
-    ImGui::SameLine();
-    ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("%s", crop);
 }
 
@@ -143,7 +153,7 @@ static void draw_display(const SettingsUiContext* ui, const SettingsWindowContex
 {
     settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN, nullptr);
     settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN_TYPE, nullptr);
-    ImGui::SeparatorText("WINDOW");
+    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_window));
     settings_ui_row(ui, PICCOLO_WINDOW_MODE, nullptr);
     if (settings_get_enum(ui->settings, PICCOLO_WINDOW_MODE) == PICCOLO_WINDOW_FIXED)
     {
@@ -168,15 +178,19 @@ static void draw_latency_preset(const SettingsUiContext* ui)
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
     float start = ImGui::GetCursorPosX();
-    ImGui::TextUnformatted("PRESET");
-    ImGui::SetItemTooltip("Sets the three settings below. Change them one by one for anything in between.");
+    ImGui::TextUnformatted(piccolo_text(ui->strings, Str::latency_preset));
+    ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::latency_preset_help));
     ImGui::SameLine(start + ui->label_width);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    if (retro_ui_begin_combo("##preset", piccolo_settings_latency_preset_name(current)))
+    if (retro_ui_begin_combo("##preset", piccolo_text(ui->strings, piccolo_settings_latency_preset_name(current))))
     {
         for (uint32_t i = 0; i < PICCOLO_LATENCY_PRESET_COUNT; i++)
         {
-            if (ImGui::Selectable(piccolo_settings_latency_preset_name(i), i == current))
+            ImGui::PushID(static_cast<int>(i));
+            bool picked = ImGui::Selectable(piccolo_text(ui->strings, piccolo_settings_latency_preset_name(i)),
+                                            i == current);
+            ImGui::PopID();
+            if (picked)
             {
                 piccolo_settings_apply_latency_preset(ui->settings, ui->scope, i);
             }
@@ -189,12 +203,60 @@ static void draw_latency_preset(const SettingsUiContext* ui)
 static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
-    ImGui::SeparatorText("LOW LATENCY");
+    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_low_latency));
     draw_latency_preset(ui);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
     settings_ui_row(ui, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
     ImGui::TextDisabled("%s", context->present_wait);
+}
+
+static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
+{
+    const Localization* strings = context->strings;
+    char label[200] = {};
+    if (!ImGui::BeginTabBar("tabs"))
+    {
+        return;
+    }
+    ImGuiTabItemFlags general_flags =
+        window->select_tab && window->tab == SettingsTab::general ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags video_flags =
+        window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
+    window->select_tab = false;
+    if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_general), "general"), nullptr,
+                            general_flags))
+    {
+        window->tab = SettingsTab::general;
+        draw_general(ui, context);
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_video), "video"), nullptr,
+                            video_flags))
+    {
+        window->tab = SettingsTab::video;
+        if (ImGui::BeginTabBar("video_tabs"))
+        {
+            if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_picture), "picture")))
+            {
+                draw_picture(window, ui, context);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_display), "display")))
+            {
+                draw_display(ui, context);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_sync), "sync")))
+            {
+                draw_sync(ui, context);
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
+        ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
 }
 
 void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* context, ImFont* pixel_font,
@@ -210,8 +272,8 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
     if (window->open)
     {
         retro_ui_push_theme(pixel_font, scale);
-        // 360 x 230 retro pixels, never bigger than the window.
-        ImVec2 size(360.0f * block, 230.0f * block);
+        // 360 x 240 retro pixels, never bigger than the window.
+        ImVec2 size(360.0f * block, 240.0f * block);
         size.x = size.x < io.DisplaySize.x - 8.0f * block ? size.x : io.DisplaySize.x - 8.0f * block;
         size.y = size.y < io.DisplaySize.y - 24.0f * block ? size.y : io.DisplaySize.y - 24.0f * block;
         ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -220,7 +282,9 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
 
         ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-        if (ImGui::Begin("SETTINGS", nullptr, flags))
+        char title[200] = {};
+        if (ImGui::Begin(with_id(title, sizeof(title), piccolo_text(context->strings, Str::settings_title), "settings"),
+                         nullptr, flags))
         {
             retro_ui_begin_window(scale);
             if (retro_ui_close_button())
@@ -231,48 +295,10 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
 
             SettingsUiContext ui = {};
             ui.settings = context->settings;
+            ui.strings = context->strings;
             ui.scope = window->scope;
-            ui.label_width = label_column_width(context->settings);
-
-            if (ImGui::BeginTabBar("tabs"))
-            {
-                ImGuiTabItemFlags general_flags =
-                    window->select_tab && window->tab == SettingsTab::general ? ImGuiTabItemFlags_SetSelected : 0;
-                ImGuiTabItemFlags video_flags =
-                    window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
-                window->select_tab = false;
-                if (ImGui::BeginTabItem("GENERAL", nullptr, general_flags))
-                {
-                    window->tab = SettingsTab::general;
-                    draw_general(&ui, context);
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("VIDEO", nullptr, video_flags))
-                {
-                    window->tab = SettingsTab::video;
-                    if (ImGui::BeginTabBar("video_tabs"))
-                    {
-                        if (ImGui::BeginTabItem("PICTURE"))
-                        {
-                            draw_picture(window, &ui, context);
-                            ImGui::EndTabItem();
-                        }
-                        if (ImGui::BeginTabItem("DISPLAY"))
-                        {
-                            draw_display(&ui, context);
-                            ImGui::EndTabItem();
-                        }
-                        if (ImGui::BeginTabItem("SYNC"))
-                        {
-                            draw_sync(&ui, context);
-                            ImGui::EndTabItem();
-                        }
-                        ImGui::EndTabBar();
-                    }
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            }
+            ui.label_width = settings_ui_label_width(context->settings, context->strings);
+            draw_tabs(window, &ui, context);
             retro_ui_end_window();
         }
         ImGui::End();
@@ -283,9 +309,10 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
     {
         SettingsUiContext ui = {};
         ui.settings = context->settings;
+        ui.strings = context->strings;
         ui.scope = window->scope;
         retro_ui_push_theme(pixel_font, scale);
-        ui.label_width = label_column_width(context->settings);
+        ui.label_width = settings_ui_label_width(context->settings, context->strings);
         retro_ui_pop_theme();
         ImageWindowSource no_picture = {};
         image_window_draw(&window->image_open, &ui, context->image != nullptr ? context->image : &no_picture,

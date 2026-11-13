@@ -1,0 +1,591 @@
+# piccolo: Spanish translation.
+# msgctxt = the string key from src/strings.txt; msgid = the English text.
+# Language names (ENGLISH, ESPAÑOL) stay as they are on purpose.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: es\n"
+
+msgctxt "menu_game"
+msgid "GAME"
+msgstr "JUEGO"
+
+msgctxt "menu_config"
+msgid "CONFIG"
+msgstr "CONFIG"
+
+msgctxt "menu_misc"
+msgid "MISC"
+msgstr "VARIOS"
+
+msgctxt "menu_load_game"
+msgid "LOAD GAME..."
+msgstr "CARGAR JUEGO..."
+
+msgctxt "menu_reset"
+msgid "RESET"
+msgstr "REINICIAR"
+
+msgctxt "menu_save_state"
+msgid "SAVE STATE"
+msgstr "GUARDAR ESTADO"
+
+msgctxt "menu_load_state"
+msgid "LOAD STATE"
+msgstr "CARGAR ESTADO"
+
+msgctxt "menu_quit"
+msgid "QUIT"
+msgstr "SALIR"
+
+msgctxt "menu_general"
+msgid "GENERAL..."
+msgstr "GENERAL..."
+
+msgctxt "menu_video"
+msgid "VIDEO..."
+msgstr "VIDEO..."
+
+msgctxt "menu_input"
+msgid "INPUT..."
+msgstr "CONTROLES..."
+
+msgctxt "menu_sound"
+msgid "SOUND..."
+msgstr "SONIDO..."
+
+msgctxt "menu_debug_window"
+msgid "DEBUG WINDOW"
+msgstr "VENTANA DE DEPURACIÓN"
+
+msgctxt "menu_about"
+msgid "ABOUT PICCOLO"
+msgstr "ACERCA DE PICCOLO"
+
+msgctxt "status_start"
+msgid "GAME > LOAD GAME TO START"
+msgstr "JUEGO > CARGAR JUEGO PARA EMPEZAR"
+
+msgctxt "status_reset"
+msgid "RESET"
+msgstr "REINICIADO"
+
+msgctxt "status_not_there_yet"
+msgid "NOT THERE YET"
+msgstr "TODAVÍA NO ESTÁ"
+
+msgctxt "picker_title"
+msgid "LOAD GAME"
+msgstr "CARGAR JUEGO"
+
+msgctxt "picker_core"
+msgid "CORE"
+msgstr "CORE"
+
+msgctxt "picker_no_cores"
+msgid "NO CORES FOUND"
+msgstr "NO HAY CORES"
+
+msgctxt "picker_nothing_here"
+msgid "NOTHING THIS CORE LOADS HERE"
+msgstr "NADA QUE ESTE CORE CARGUE AQUÍ"
+
+msgctxt "picker_show_all"
+msgid "SHOW ALL FILES"
+msgstr "MOSTRAR TODOS LOS ARCHIVOS"
+
+msgctxt "picker_start_without_game"
+msgid "START WITHOUT GAME"
+msgstr "INICIAR SIN JUEGO"
+
+msgctxt "picker_load"
+msgid "LOAD"
+msgstr "CARGAR"
+
+msgctxt "settings_title"
+msgid "SETTINGS"
+msgstr "AJUSTES"
+
+msgctxt "tab_general"
+msgid "GENERAL"
+msgstr "GENERAL"
+
+msgctxt "tab_video"
+msgid "VIDEO"
+msgstr "VIDEO"
+
+msgctxt "tab_picture"
+msgid "PICTURE"
+msgstr "IMAGEN"
+
+msgctxt "tab_display"
+msgid "DISPLAY"
+msgstr "PANTALLA"
+
+msgctxt "tab_sync"
+msgid "SYNC"
+msgstr "SINCRONÍA"
+
+msgctxt "scope"
+msgid "SCOPE"
+msgstr "ALCANCE"
+
+msgctxt "scope_help"
+msgid "WHERE CHANGES GO. A CORE OR GAME SETTING WINS OVER THE GLOBAL ONE."
+msgstr "DÓNDE VAN LOS CAMBIOS. UN AJUSTE DEL CORE O DEL JUEGO GANA SOBRE EL GLOBAL."
+
+msgctxt "scope_start_game_help"
+msgid "START A GAME TO CHANGE SETTINGS FOR ONE CORE OR ONE GAME"
+msgstr "INICIA UN JUEGO PARA CAMBIAR AJUSTES DE UN CORE O DE UN JUEGO"
+
+msgctxt "scope_global"
+msgid "GLOBAL"
+msgstr "GLOBAL"
+
+msgctxt "scope_core"
+msgid "THIS CORE"
+msgstr "ESTE CORE"
+
+msgctxt "scope_game"
+msgid "THIS GAME"
+msgstr "ESTE JUEGO"
+
+msgctxt "marker_core_help"
+msgid "SET FOR THIS CORE"
+msgstr "DEFINIDO PARA ESTE CORE"
+
+msgctxt "marker_game_help"
+msgid "SET FOR THIS GAME"
+msgstr "DEFINIDO PARA ESTE JUEGO"
+
+msgctxt "reset"
+msgid "RESET"
+msgstr "RESTABLECER"
+
+msgctxt "reset_help_global"
+msgid "BACK TO THE DEFAULT"
+msgstr "VOLVER AL VALOR POR DEFECTO"
+
+msgctxt "reset_help_override"
+msgid "BACK TO THE VALUE BELOW (STOP OVERRIDING)"
+msgstr "VOLVER AL VALOR DE ABAJO (DEJAR DE SOBRESCRIBIR)"
+
+msgctxt "global_only_help"
+msgid "GLOBAL ONLY: SWITCH THE SCOPE TO GLOBAL TO CHANGE IT"
+msgstr "SOLO GLOBAL: CAMBIA EL ALCANCE A GLOBAL PARA MODIFICARLO"
+
+msgctxt "section_folders"
+msgid "FOLDERS"
+msgstr "CARPETAS"
+
+msgctxt "folders_next_game"
+msgid "FOLDER CHANGES APPLY TO THE NEXT GAME"
+msgstr "LOS CAMBIOS DE CARPETA SE APLICAN AL PRÓXIMO JUEGO"
+
+msgctxt "image_settings_button"
+msgid "IMAGE SETTINGS..."
+msgstr "AJUSTES DE IMAGEN..."
+
+msgctxt "image_settings_button_help"
+msgid "BEST WITH A GAME RUNNING: IT SHOWS THE PICTURE"
+msgstr "MEJOR CON UN JUEGO EN MARCHA: MUESTRA LA IMAGEN"
+
+msgctxt "crop_summary"
+msgid "CROP (TOP, BOTTOM, LEFT, RIGHT)"
+msgstr "RECORTE (ARRIBA, ABAJO, IZQUIERDA, DERECHA)"
+
+msgctxt "section_window"
+msgid "WINDOW"
+msgstr "VENTANA"
+
+msgctxt "window_sized_when_running"
+msgid "SIZED TO THE GAME WHEN ONE RUNS"
+msgstr "TOMA EL TAMAÑO DEL JUEGO CUANDO HAY UNO EN MARCHA"
+
+msgctxt "section_low_latency"
+msgid "LOW LATENCY"
+msgstr "BAJA LATENCIA"
+
+msgctxt "latency_preset"
+msgid "PRESET"
+msgstr "PERFIL"
+
+msgctxt "latency_preset_help"
+msgid "Sets the three settings below. Change them one by one for anything in between."
+msgstr "Fija los tres ajustes de abajo. Cámbialos uno por uno para algo intermedio."
+
+msgctxt "preset_off"
+msgid "OFF"
+msgstr "APAGADO"
+
+msgctxt "preset_low"
+msgid "LOW"
+msgstr "BAJA"
+
+msgctxt "preset_lowest"
+msgid "LOWEST"
+msgstr "MÍNIMA"
+
+msgctxt "preset_custom"
+msgid "CUSTOM"
+msgstr "PERSONALIZADO"
+
+msgctxt "present_wait_screen"
+msgid "THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN"
+msgstr "ESTA GPU: ESPERA A QUE EL FRAME ESTÉ EN PANTALLA"
+
+msgctxt "present_wait_gpu"
+msgid "THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD"
+msgstr "ESTA GPU: SIN ESPERA DE PRESENTACIÓN, ESPERA A LA GPU"
+
+msgctxt "image_title"
+msgid "IMAGE SETTINGS"
+msgstr "AJUSTES DE IMAGEN"
+
+msgctxt "image_editing"
+msgid "EDITING"
+msgstr "EDITANDO"
+
+msgctxt "image_no_picture"
+msgid "START A GAME TO\nSEE ITS PICTURE HERE"
+msgstr "INICIA UN JUEGO PARA\nVER SU IMAGEN AQUÍ"
+
+msgctxt "image_section_crop"
+msgid "OVERSCAN CROP"
+msgstr "RECORTE DE OVERSCAN"
+
+msgctxt "setting_language"
+msgid "LANGUAGE"
+msgstr "IDIOMA"
+
+msgctxt "setting_language_help"
+msgid "The language of piccolo's menus. Cores are told it too when they start."
+msgstr "El idioma de los menús de piccolo. También se les avisa a los cores al iniciar."
+
+msgctxt "setting_pause_in_menu"
+msgid "PAUSE WHILE THE MENU IS OPEN"
+msgstr "PAUSAR CON EL MENÚ ABIERTO"
+
+msgctxt "setting_pause_in_menu_help"
+msgid "Off: the game keeps running behind the menu."
+msgstr "Apagado: el juego sigue corriendo detrás del menú."
+
+msgctxt "setting_pause_on_focus_loss"
+msgid "PAUSE WHEN THE WINDOW LOSES FOCUS"
+msgstr "PAUSAR AL PERDER EL FOCO"
+
+msgctxt "setting_pause_on_focus_loss_help"
+msgid "Pause while another window is active."
+msgstr "Pausa mientras otra ventana está activa."
+
+msgctxt "setting_screensaver"
+msgid "ALLOW SCREENSAVER WHILE PAUSED"
+msgstr "PERMITIR PROTECTOR DE PANTALLA EN PAUSA"
+
+msgctxt "setting_screensaver_help"
+msgid "While a game runs the screensaver is always blocked. On: it may start while paused or in the menu."
+msgstr "Con un juego corriendo el protector de pantalla siempre está bloqueado. Encendido: puede activarse en pausa o en el menú."
+
+msgctxt "setting_path_cores"
+msgid "CORES"
+msgstr "CORES"
+
+msgctxt "setting_path_cores_help"
+msgid "Folder with the cores. Empty: the cores folder in piccolo's folder."
+msgstr "Carpeta con los cores. Vacía: la carpeta cores dentro de la de piccolo."
+
+msgctxt "setting_path_system"
+msgid "SYSTEM / BIOS"
+msgstr "SISTEMA / BIOS"
+
+msgctxt "setting_path_system_help"
+msgid "Folder for BIOS and other files cores ask for. Empty: the system folder in piccolo's folder."
+msgstr "Carpeta para BIOS y otros archivos que piden los cores. Vacía: la carpeta system dentro de la de piccolo."
+
+msgctxt "setting_path_saves"
+msgid "SAVES"
+msgstr "PARTIDAS"
+
+msgctxt "setting_path_saves_help"
+msgid "Folder for save RAM. Empty: the saves folder in piccolo's folder."
+msgstr "Carpeta para la RAM de guardado. Vacía: la carpeta saves dentro de la de piccolo."
+
+msgctxt "setting_path_states"
+msgid "STATES"
+msgstr "ESTADOS"
+
+msgctxt "setting_path_states_help"
+msgid "Folder for savestates. Empty: the states folder in piccolo's folder."
+msgstr "Carpeta para los estados guardados. Vacía: la carpeta states dentro de la de piccolo."
+
+msgctxt "setting_aspect"
+msgid "ASPECT RATIO"
+msgstr "RELACIÓN DE ASPECTO"
+
+msgctxt "setting_aspect_help"
+msgid "The shape of the whole picture. Square pixels: the frame's own width / height."
+msgstr "La forma de la imagen completa. Píxeles cuadrados: el ancho / alto propio del frame."
+
+msgctxt "setting_scaling"
+msgid "SCALING"
+msgstr "ESCALA"
+
+msgctxt "setting_scaling_help"
+msgid "Integer sizes keep every pixel the same size. Auto: one size up if it goes past the window by at most the % below."
+msgstr "Los tamaños enteros dejan todos los píxeles del mismo tamaño. Auto: un tamaño más si se sale de la ventana como mucho el % de abajo."
+
+msgctxt "setting_max_offscreen"
+msgid "AUTO: MAX OFFSCREEN"
+msgstr "AUTO: MÁXIMO FUERA DE PANTALLA"
+
+msgctxt "setting_max_offscreen_help"
+msgid "How much of the picture Auto may push past the window edges."
+msgstr "Cuánto de la imagen puede sacar Auto fuera de los bordes de la ventana."
+
+msgctxt "setting_filter"
+msgid "FILTER"
+msgstr "FILTRO"
+
+msgctxt "setting_filter_help"
+msgid "Sharp bilinear: sharp pixels, soft only where a pixel lands between two screen pixels."
+msgstr "Bilineal nítido: píxeles nítidos, suaves solo donde un píxel cae entre dos de la pantalla."
+
+msgctxt "setting_position"
+msgid "POSITION"
+msgstr "POSICIÓN"
+
+msgctxt "setting_position_help"
+msgid "Where the picture sits when it doesn't fill the window."
+msgstr "Dónde queda la imagen cuando no llena la ventana."
+
+msgctxt "setting_crop_top"
+msgid "CROP TOP"
+msgstr "RECORTE ARRIBA"
+
+msgctxt "setting_crop_top_help"
+msgid "Core pixels cut from the top edge."
+msgstr "Píxeles del core que se cortan del borde de arriba."
+
+msgctxt "setting_crop_bottom"
+msgid "CROP BOTTOM"
+msgstr "RECORTE ABAJO"
+
+msgctxt "setting_crop_bottom_help"
+msgid "Core pixels cut from the bottom edge."
+msgstr "Píxeles del core que se cortan del borde de abajo."
+
+msgctxt "setting_crop_left"
+msgid "CROP LEFT"
+msgstr "RECORTE IZQUIERDA"
+
+msgctxt "setting_crop_left_help"
+msgid "Core pixels cut from the left edge."
+msgstr "Píxeles del core que se cortan del borde izquierdo."
+
+msgctxt "setting_crop_right"
+msgid "CROP RIGHT"
+msgstr "RECORTE DERECHA"
+
+msgctxt "setting_crop_right_help"
+msgid "Core pixels cut from the right edge."
+msgstr "Píxeles del core que se cortan del borde derecho."
+
+msgctxt "setting_timing"
+msgid "TIMING"
+msgstr "TIEMPOS"
+
+msgctxt "setting_timing_help"
+msgid "Vsync: one frame per display refresh (smooth; falls back to Exact when the rates are too far apart). Exact: the core's own speed."
+msgstr "Vsync: un frame por refresco de pantalla (fluido; pasa a Exacto si las frecuencias están muy lejos). Exacto: la velocidad propia del core."
+
+msgctxt "setting_frames_in_flight"
+msgid "FRAMES IN FLIGHT"
+msgstr "FRAMES EN VUELO"
+
+msgctxt "setting_frames_in_flight_help"
+msgid "How many frames the CPU may prepare ahead of the GPU. 1: less delay, but a slow frame shows."
+msgstr "Cuántos frames puede preparar la CPU por delante de la GPU. 1: menos demora, pero se nota un frame lento."
+
+msgctxt "setting_wait_for_present"
+msgid "WAIT FOR PRESENT"
+msgstr "ESPERAR LA PRESENTACIÓN"
+
+msgctxt "setting_wait_for_present_help"
+msgid "Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU has finished it)."
+msgstr "No empezar el frame siguiente hasta que este esté en pantalla (o, donde la GPU no puede saberlo, hasta que la GPU lo termine)."
+
+msgctxt "setting_frame_delay"
+msgid "FRAME DELAY (MS)"
+msgstr "RETARDO DE FRAME (MS)"
+
+msgctxt "setting_frame_delay_help"
+msgid "Vsync timing: wait this long before running each frame, so input is read later. Too much and frames are missed: raise it slowly."
+msgstr "Con Vsync: esperar esto antes de correr cada frame, así el control se lee más tarde. Demasiado y se pierden frames: súbelo de a poco."
+
+msgctxt "setting_fullscreen"
+msgid "FULLSCREEN"
+msgstr "PANTALLA COMPLETA"
+
+msgctxt "setting_fullscreen_help"
+msgid "F11 or Alt+Enter switch it too."
+msgstr "F11 o Alt+Enter también la activan."
+
+msgctxt "setting_fullscreen_type"
+msgid "FULLSCREEN TYPE"
+msgstr "TIPO DE PANTALLA COMPLETA"
+
+msgctxt "setting_fullscreen_type_help"
+msgid "Borderless: a window covering the screen (quick to switch). Exclusive: the display is piccolo's, at its current resolution."
+msgstr "Sin bordes: una ventana que cubre la pantalla (cambia rápido). Exclusiva: la pantalla es de piccolo, en su resolución actual."
+
+msgctxt "setting_window_mode"
+msgid "WINDOW MODE"
+msgstr "MODO DE VENTANA"
+
+msgctxt "setting_window_mode_help"
+msgid "Fixed size: the window keeps its own shape and size. Dynamic: the window is the game's picture, resized when the game changes size."
+msgstr "Tamaño fijo: la ventana mantiene su forma y tamaño. Dinámico: la ventana es la imagen del juego, y cambia cuando el juego cambia de tamaño."
+
+msgctxt "setting_window_aspect"
+msgid "WINDOW ASPECT"
+msgstr "ASPECTO DE VENTANA"
+
+msgctxt "setting_window_aspect_help"
+msgid "Fixed size: the window's shape."
+msgstr "Tamaño fijo: la forma de la ventana."
+
+msgctxt "setting_window_height"
+msgid "WINDOW HEIGHT (LINES)"
+msgstr "ALTO DE VENTANA (LÍNEAS)"
+
+msgctxt "setting_window_height_help"
+msgid "Fixed size: the window's height. Smaller if the screen has less room."
+msgstr "Tamaño fijo: el alto de la ventana. Menos si la pantalla no tiene lugar."
+
+msgctxt "setting_window_scale"
+msgid "WINDOW SCALE"
+msgstr "ESCALA DE VENTANA"
+
+msgctxt "setting_window_scale_help"
+msgid "Dynamic: the window is the game's picture times this. Lowered when the screen has less room."
+msgstr "Dinámico: la ventana es la imagen del juego por esto. Baja si la pantalla no tiene lugar."
+
+msgctxt "setting_window_remember"
+msgid "REMEMBER WINDOW SIZE AND POSITION"
+msgstr "RECORDAR TAMAÑO Y POSICIÓN DE LA VENTANA"
+
+msgctxt "setting_window_remember_help"
+msgid "Start where and how big the window was last time. (Some desktops, like Wayland ones, place windows themselves.)"
+msgstr "Empezar donde y del tamaño que tenía la ventana la última vez. (Algunos escritorios, como los de Wayland, ubican las ventanas ellos mismos.)"
+
+msgctxt "value_language_auto"
+msgid "AUTOMATIC (SYSTEM)"
+msgstr "AUTOMÁTICO (SISTEMA)"
+
+msgctxt "value_aspect_core"
+msgid "CORE PROVIDED"
+msgstr "LA DEL CORE"
+
+msgctxt "value_aspect_square_pixels"
+msgid "SQUARE PIXELS (1:1 PAR)"
+msgstr "PÍXELES CUADRADOS (PAR 1:1)"
+
+msgctxt "value_aspect_stretch"
+msgid "STRETCH"
+msgstr "ESTIRAR"
+
+msgctxt "value_scaling_full"
+msgid "FULL"
+msgstr "COMPLETA"
+
+msgctxt "value_scaling_integer_under"
+msgid "INTEGER (UNDER)"
+msgstr "ENTERA (POR DEBAJO)"
+
+msgctxt "value_scaling_integer_over"
+msgid "INTEGER (OVER)"
+msgstr "ENTERA (POR ENCIMA)"
+
+msgctxt "value_scaling_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_filter_nearest"
+msgid "NEAREST"
+msgstr "VECINO MÁS CERCANO"
+
+msgctxt "value_filter_bilinear"
+msgid "BILINEAR"
+msgstr "BILINEAL"
+
+msgctxt "value_filter_sharp_bilinear"
+msgid "SHARP BILINEAR"
+msgstr "BILINEAL NÍTIDO"
+
+msgctxt "value_position_top_left"
+msgid "TOP LEFT"
+msgstr "ARRIBA IZQUIERDA"
+
+msgctxt "value_position_top"
+msgid "TOP"
+msgstr "ARRIBA"
+
+msgctxt "value_position_top_right"
+msgid "TOP RIGHT"
+msgstr "ARRIBA DERECHA"
+
+msgctxt "value_position_left"
+msgid "LEFT"
+msgstr "IZQUIERDA"
+
+msgctxt "value_position_center"
+msgid "CENTER"
+msgstr "CENTRO"
+
+msgctxt "value_position_right"
+msgid "RIGHT"
+msgstr "DERECHA"
+
+msgctxt "value_position_bottom_left"
+msgid "BOTTOM LEFT"
+msgstr "ABAJO IZQUIERDA"
+
+msgctxt "value_position_bottom"
+msgid "BOTTOM"
+msgstr "ABAJO"
+
+msgctxt "value_position_bottom_right"
+msgid "BOTTOM RIGHT"
+msgstr "ABAJO DERECHA"
+
+msgctxt "value_timing_vsync"
+msgid "VSYNC"
+msgstr "VSYNC"
+
+msgctxt "value_timing_exact"
+msgid "EXACT"
+msgstr "EXACTO"
+
+msgctxt "value_frames_2"
+msgid "2 (SMOOTHER)"
+msgstr "2 (MÁS FLUIDO)"
+
+msgctxt "value_frames_1"
+msgid "1 (LOWER LATENCY)"
+msgstr "1 (MENOS LATENCIA)"
+
+msgctxt "value_fullscreen_borderless"
+msgid "BORDERLESS"
+msgstr "SIN BORDES"
+
+msgctxt "value_fullscreen_exclusive"
+msgid "EXCLUSIVE"
+msgstr "EXCLUSIVA"
+
+msgctxt "value_window_fixed"
+msgid "FIXED SIZE"
+msgstr "TAMAÑO FIJO"
+
+msgctxt "value_window_dynamic"
+msgid "DYNAMIC (FOLLOWS THE GAME)"
+msgstr "DINÁMICO (SIGUE AL JUEGO)"

@@ -1,77 +1,88 @@
 #include "piccolo_settings.h"
 
+#include "piccolo_text.h"
+
 #include <cstdlib>
 #include <cstring>
+
+#include <SDL3/SDL.h>
 
 // ---------------------------------------------------------------------------
 // Enum values (key in the file, label on screen)
 // ---------------------------------------------------------------------------
 
 static const SettingEnumValue ASPECT_VALUES[] = {
-    {"core", "CORE PROVIDED"},
-    {"square_pixels", "SQUARE PIXELS (1:1 PAR)"},
-    {"4:3", "4:3"},
-    {"16:9", "16:9"},
-    {"16:10", "16:10"},
-    {"8:7", "8:7"},
-    {"3:2", "3:2"},
-    {"5:4", "5:4"},
-    {"stretch", "STRETCH"},
+    {"core", text_id(Str::value_aspect_core)},
+    {"square_pixels", text_id(Str::value_aspect_square_pixels)},
+    {"4:3"},
+    {"16:9"},
+    {"16:10"},
+    {"8:7"},
+    {"3:2"},
+    {"5:4"},
+    {"stretch", text_id(Str::value_aspect_stretch)},
 };
 
 static const SettingEnumValue SCALING_VALUES[] = {
-    {"full", "FULL"},
-    {"integer_under", "INTEGER (UNDER)"},
-    {"integer_over", "INTEGER (OVER)"},
-    {"auto", "AUTO"},
+    {"full", text_id(Str::value_scaling_full)},
+    {"integer_under", text_id(Str::value_scaling_integer_under)},
+    {"integer_over", text_id(Str::value_scaling_integer_over)},
+    {"auto", text_id(Str::value_scaling_auto)},
 };
 
 static const SettingEnumValue FILTER_VALUES[] = {
-    {"nearest", "NEAREST"},
-    {"bilinear", "BILINEAR"},
-    {"sharp_bilinear", "SHARP BILINEAR"},
+    {"nearest", text_id(Str::value_filter_nearest)},
+    {"bilinear", text_id(Str::value_filter_bilinear)},
+    {"sharp_bilinear", text_id(Str::value_filter_sharp_bilinear)},
 };
 
 static const SettingEnumValue POSITION_VALUES[] = {
-    {"top_left", "TOP LEFT"},       {"top", "TOP"},       {"top_right", "TOP RIGHT"},
-    {"left", "LEFT"},               {"center", "CENTER"}, {"right", "RIGHT"},
-    {"bottom_left", "BOTTOM LEFT"}, {"bottom", "BOTTOM"}, {"bottom_right", "BOTTOM RIGHT"},
+    {"top_left", text_id(Str::value_position_top_left)},       {"top", text_id(Str::value_position_top)},       {"top_right", text_id(Str::value_position_top_right)},
+    {"left", text_id(Str::value_position_left)},               {"center", text_id(Str::value_position_center)}, {"right", text_id(Str::value_position_right)},
+    {"bottom_left", text_id(Str::value_position_bottom_left)}, {"bottom", text_id(Str::value_position_bottom)}, {"bottom_right", text_id(Str::value_position_bottom_right)},
 };
 
 static const SettingEnumValue TIMING_VALUES[] = {
-    {"vsync", "VSYNC"},
-    {"exact", "EXACT"},
+    {"vsync", text_id(Str::value_timing_vsync)},
+    {"exact", text_id(Str::value_timing_exact)},
 };
 
+static const SettingEnumValue LANGUAGE_VALUES[] = {
+    {"auto", text_id(Str::value_language_auto)},
+    {"en", text_id(Str::value_language_english)},
+    {"es", text_id(Str::value_language_spanish)},
+};
+constexpr uint32_t LANGUAGE_COUNT = sizeof(LANGUAGE_VALUES) / sizeof(LANGUAGE_VALUES[0]);
+
 static const SettingEnumValue FRAMES_IN_FLIGHT_VALUES[] = {
-    {"2", "2 (SMOOTHER)"},
-    {"1", "1 (LOWER LATENCY)"},
+    {"2", text_id(Str::value_frames_2)},
+    {"1", text_id(Str::value_frames_1)},
 };
 constexpr uint32_t FRAMES_IN_FLIGHT_COUNT = sizeof(FRAMES_IN_FLIGHT_VALUES) / sizeof(FRAMES_IN_FLIGHT_VALUES[0]);
 
 static const SettingEnumValue FULLSCREEN_TYPE_VALUES[] = {
-    {"borderless", "BORDERLESS"},
-    {"exclusive", "EXCLUSIVE"},
+    {"borderless", text_id(Str::value_fullscreen_borderless)},
+    {"exclusive", text_id(Str::value_fullscreen_exclusive)},
 };
 
 static const SettingEnumValue WINDOW_MODE_VALUES[] = {
-    {"fixed", "FIXED SIZE"},
-    {"dynamic", "DYNAMIC (FOLLOWS THE GAME)"},
+    {"fixed", text_id(Str::value_window_fixed)},
+    {"dynamic", text_id(Str::value_window_dynamic)},
 };
 
 static const SettingEnumValue WINDOW_ASPECT_VALUES[] = {
-    {"16:9", "16:9"},
-    {"16:10", "16:10"},
-    {"4:3", "4:3"},
+    {"16:9"},
+    {"16:10"},
+    {"4:3"},
 };
 static const double WINDOW_ASPECTS[] = {16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0};
 
 static const SettingEnumValue WINDOW_HEIGHT_VALUES[] = {
-    {"720", "720 LINES"},
-    {"900", "900 LINES"},
-    {"1080", "1080 LINES"},
-    {"1200", "1200 LINES"},
-    {"1440", "1440 LINES"},
+    {"720"},
+    {"900"},
+    {"1080"},
+    {"1200"},
+    {"1440"},
 };
 static const uint32_t WINDOW_HEIGHTS[] = {720, 900, 1080, 1200, 1440};
 
@@ -94,92 +105,87 @@ constexpr int32_t CROP_MAX = 128;   // core pixels per edge
 
 static const SettingDescriptor SETTINGS[] = {
     // General (global-only)
+    {.key = PICCOLO_LANGUAGE, .type = SettingType::enumeration, .default_value = "auto", .values = LANGUAGE_VALUES,
+     .value_count = LANGUAGE_COUNT, .label = text_id(Str::setting_language),
+     .help = text_id(Str::setting_language_help)},
     {.key = PICCOLO_PAUSE_IN_MENU, .type = SettingType::boolean, .default_value = "true",
-     .label = "PAUSE WHILE THE MENU IS OPEN", .help = "Off: the game keeps running behind the menu."},
+     .label = text_id(Str::setting_pause_in_menu), .help = text_id(Str::setting_pause_in_menu_help)},
     {.key = PICCOLO_PAUSE_ON_FOCUS_LOSS, .type = SettingType::boolean, .default_value = "true",
-     .label = "PAUSE WHEN THE WINDOW LOSES FOCUS", .help = "Pause while another window is active."},
+     .label = text_id(Str::setting_pause_on_focus_loss), .help = text_id(Str::setting_pause_on_focus_loss_help)},
     {.key = PICCOLO_SCREENSAVER_WHEN_PAUSED, .type = SettingType::boolean, .default_value = "true",
-     .label = "ALLOW SCREENSAVER WHILE PAUSED",
-     .help = "While a game runs the screensaver is always blocked. On: it may start while paused or in the menu."},
-    {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = "CORES",
-     .help = "Folder with the cores. Empty: the cores folder in piccolo's folder."},
-    {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = "SYSTEM / BIOS",
-     .help = "Folder for BIOS and other files cores ask for. Empty: the system folder in piccolo's folder."},
-    {.key = PICCOLO_PATH_SAVES, .type = SettingType::path, .default_value = "", .label = "SAVES",
-     .help = "Folder for save RAM. Empty: the saves folder in piccolo's folder."},
-    {.key = PICCOLO_PATH_STATES, .type = SettingType::path, .default_value = "", .label = "STATES",
-     .help = "Folder for savestates. Empty: the states folder in piccolo's folder."},
+     .label = text_id(Str::setting_screensaver),
+     .help = text_id(Str::setting_screensaver_help)},
+    {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
+     .help = text_id(Str::setting_path_cores_help)},
+    {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),
+     .help = text_id(Str::setting_path_system_help)},
+    {.key = PICCOLO_PATH_SAVES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_saves),
+     .help = text_id(Str::setting_path_saves_help)},
+    {.key = PICCOLO_PATH_STATES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_states),
+     .help = text_id(Str::setting_path_states_help)},
 
     // Video: Picture (overridable per core / game)
     {.key = PICCOLO_VIDEO_ASPECT, .type = SettingType::enumeration, .default_value = "core", .overridable = true,
-     .values = ASPECT_VALUES, .value_count = ASPECT_COUNT, .label = "ASPECT RATIO",
-     .help = "The shape of the whole picture. Square pixels: the frame's own width / height."},
+     .values = ASPECT_VALUES, .value_count = ASPECT_COUNT, .label = text_id(Str::setting_aspect),
+     .help = text_id(Str::setting_aspect_help)},
     {.key = PICCOLO_VIDEO_SCALING, .type = SettingType::enumeration, .default_value = "auto", .overridable = true,
-     .values = SCALING_VALUES, .value_count = SCALING_COUNT, .label = "SCALING",
-     .help = "Integer sizes keep every pixel the same size. Auto: one size up if it goes past the window by "
-             "at most the % below."},
+     .values = SCALING_VALUES, .value_count = SCALING_COUNT, .label = text_id(Str::setting_scaling),
+     .help = text_id(Str::setting_scaling_help)},
     {.key = PICCOLO_VIDEO_MAX_OFFSCREEN, .type = SettingType::real, .default_value = "5", .overridable = true,
-     .min_real = 0.0, .max_real = 50.0, .step_real = 0.5, .label = "AUTO: MAX OFFSCREEN",
-     .help = "How much of the picture Auto may push past the window edges."},
+     .min_real = 0.0, .max_real = 50.0, .step_real = 0.5, .label = text_id(Str::setting_max_offscreen),
+     .help = text_id(Str::setting_max_offscreen_help)},
     {.key = PICCOLO_VIDEO_FILTER, .type = SettingType::enumeration, .default_value = "nearest", .overridable = true,
-     .values = FILTER_VALUES, .value_count = FILTER_COUNT, .label = "FILTER",
-     .help = "Sharp bilinear: sharp pixels, soft only where a pixel lands between two screen pixels."},
+     .values = FILTER_VALUES, .value_count = FILTER_COUNT, .label = text_id(Str::setting_filter),
+     .help = text_id(Str::setting_filter_help)},
     {.key = PICCOLO_VIDEO_POSITION, .type = SettingType::enumeration, .default_value = "center", .overridable = true,
-     .values = POSITION_VALUES, .value_count = POSITION_COUNT, .label = "POSITION",
-     .help = "Where the picture sits when it doesn't fill the window."},
+     .values = POSITION_VALUES, .value_count = POSITION_COUNT, .label = text_id(Str::setting_position),
+     .help = text_id(Str::setting_position_help)},
     {.key = PICCOLO_VIDEO_CROP_TOP, .type = SettingType::integer, .default_value = "0", .overridable = true,
-     .min = 0, .max = CROP_MAX, .label = "CROP TOP", .help = "Core pixels cut from the top edge."},
+     .min = 0, .max = CROP_MAX, .label = text_id(Str::setting_crop_top), .help = text_id(Str::setting_crop_top_help)},
     {.key = PICCOLO_VIDEO_CROP_BOTTOM, .type = SettingType::integer, .default_value = "0", .overridable = true,
-     .min = 0, .max = CROP_MAX, .label = "CROP BOTTOM", .help = "Core pixels cut from the bottom edge."},
+     .min = 0, .max = CROP_MAX, .label = text_id(Str::setting_crop_bottom), .help = text_id(Str::setting_crop_bottom_help)},
     {.key = PICCOLO_VIDEO_CROP_LEFT, .type = SettingType::integer, .default_value = "0", .overridable = true,
-     .min = 0, .max = CROP_MAX, .label = "CROP LEFT", .help = "Core pixels cut from the left edge."},
+     .min = 0, .max = CROP_MAX, .label = text_id(Str::setting_crop_left), .help = text_id(Str::setting_crop_left_help)},
     {.key = PICCOLO_VIDEO_CROP_RIGHT, .type = SettingType::integer, .default_value = "0", .overridable = true,
-     .min = 0, .max = CROP_MAX, .label = "CROP RIGHT", .help = "Core pixels cut from the right edge."},
+     .min = 0, .max = CROP_MAX, .label = text_id(Str::setting_crop_right), .help = text_id(Str::setting_crop_right_help)},
 
     // Video: Sync
     {.key = PICCOLO_VIDEO_TIMING, .type = SettingType::enumeration, .default_value = "vsync", .overridable = true,
-     .values = TIMING_VALUES, .value_count = TIMING_COUNT, .label = "TIMING",
-     .help = "Vsync: one frame per display refresh (smooth; falls back to Exact when the rates are too far "
-             "apart). Exact: the core's own speed."},
+     .values = TIMING_VALUES, .value_count = TIMING_COUNT, .label = text_id(Str::setting_timing),
+     .help = text_id(Str::setting_timing_help)},
 
     // Video: Sync, low latency (overridable: a heavy core may not afford it)
     {.key = PICCOLO_LATENCY_FRAMES_IN_FLIGHT, .type = SettingType::enumeration, .default_value = "2",
      .overridable = true, .values = FRAMES_IN_FLIGHT_VALUES, .value_count = FRAMES_IN_FLIGHT_COUNT,
-     .label = "FRAMES IN FLIGHT",
-     .help = "How many frames the CPU may prepare ahead of the GPU. 1: less delay, but a slow frame shows."},
+     .label = text_id(Str::setting_frames_in_flight),
+     .help = text_id(Str::setting_frames_in_flight_help)},
     {.key = PICCOLO_LATENCY_WAIT_FOR_PRESENT, .type = SettingType::boolean, .default_value = "false",
-     .overridable = true, .label = "WAIT FOR PRESENT",
-     .help = "Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU "
-             "has finished it)."},
+     .overridable = true, .label = text_id(Str::setting_wait_for_present),
+     .help = text_id(Str::setting_wait_for_present_help)},
     {.key = PICCOLO_LATENCY_FRAME_DELAY, .type = SettingType::integer, .default_value = "0", .overridable = true,
-     .min = 0, .max = 12, .label = "FRAME DELAY (MS)",
-     .help = "Vsync timing: wait this long before running each frame, so input is read later. Too much and "
-             "frames are missed: raise it slowly."},
+     .min = 0, .max = 12, .label = text_id(Str::setting_frame_delay),
+     .help = text_id(Str::setting_frame_delay_help)},
 
     // Video: Display (global-only)
-    {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = "FULLSCREEN",
-     .help = "F11 or Alt+Enter switch it too."},
+    {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = text_id(Str::setting_fullscreen),
+     .help = text_id(Str::setting_fullscreen_help)},
     {.key = PICCOLO_DISPLAY_FULLSCREEN_TYPE, .type = SettingType::enumeration, .default_value = "borderless",
-     .values = FULLSCREEN_TYPE_VALUES, .value_count = FULLSCREEN_TYPE_COUNT, .label = "FULLSCREEN TYPE",
-     .help = "Borderless: a window covering the screen (quick to switch). Exclusive: the display is piccolo's, at "
-             "its current resolution."},
+     .values = FULLSCREEN_TYPE_VALUES, .value_count = FULLSCREEN_TYPE_COUNT, .label = text_id(Str::setting_fullscreen_type),
+     .help = text_id(Str::setting_fullscreen_type_help)},
     {.key = PICCOLO_WINDOW_MODE, .type = SettingType::enumeration, .default_value = "fixed",
-     .values = WINDOW_MODE_VALUES, .value_count = WINDOW_MODE_COUNT, .label = "WINDOW MODE",
-     .help = "Fixed size: the window keeps its own shape and size. Dynamic: the window is the game's picture, "
-             "resized when the game changes size."},
+     .values = WINDOW_MODE_VALUES, .value_count = WINDOW_MODE_COUNT, .label = text_id(Str::setting_window_mode),
+     .help = text_id(Str::setting_window_mode_help)},
     {.key = PICCOLO_WINDOW_ASPECT, .type = SettingType::enumeration, .default_value = "16:9",
-     .values = WINDOW_ASPECT_VALUES, .value_count = WINDOW_ASPECT_COUNT, .label = "WINDOW ASPECT",
-     .help = "Fixed size: the window's shape."},
+     .values = WINDOW_ASPECT_VALUES, .value_count = WINDOW_ASPECT_COUNT, .label = text_id(Str::setting_window_aspect),
+     .help = text_id(Str::setting_window_aspect_help)},
     {.key = PICCOLO_WINDOW_HEIGHT, .type = SettingType::enumeration, .default_value = "1080",
-     .values = WINDOW_HEIGHT_VALUES, .value_count = WINDOW_HEIGHT_COUNT, .label = "WINDOW HEIGHT",
-     .help = "Fixed size: the window's height. Smaller if the screen has less room."},
+     .values = WINDOW_HEIGHT_VALUES, .value_count = WINDOW_HEIGHT_COUNT, .label = text_id(Str::setting_window_height),
+     .help = text_id(Str::setting_window_height_help)},
     {.key = PICCOLO_WINDOW_SCALE, .type = SettingType::integer, .default_value = "3", .min = 1, .max = 10,
-     .label = "WINDOW SCALE", .help = "Dynamic: the window is the game's picture times this. Lowered when the "
-                                      "screen has less room."},
+     .label = text_id(Str::setting_window_scale), .help = text_id(Str::setting_window_scale_help)},
     {.key = PICCOLO_WINDOW_REMEMBER, .type = SettingType::boolean, .default_value = "true",
-     .label = "REMEMBER WINDOW SIZE AND POSITION",
-     .help = "Start where and how big the window was last time. (Some desktops, like Wayland ones, place windows "
-             "themselves.)"},
+     .label = text_id(Str::setting_window_remember),
+     .help = text_id(Str::setting_window_remember_help)},
 };
 
 const SettingDescriptor* piccolo_settings_table()
@@ -250,21 +256,21 @@ uint32_t piccolo_settings_frames_in_flight(const Settings* settings)
 // Frames in flight (enum index), wait for present, frame delay (ms).
 struct LatencyPreset
 {
-    const char* name;
+    Str         name;
     uint32_t    frames_in_flight_index;
     bool        wait_for_present;
     int32_t     frame_delay;
 };
 
 static const LatencyPreset LATENCY_PRESETS[PICCOLO_LATENCY_PRESET_COUNT] = {
-    {"OFF", 0, false, 0},
-    {"LOW", 1, true, 0},
-    {"LOWEST", 1, true, 4},
+    {Str::preset_off, 0, false, 0},
+    {Str::preset_low, 1, true, 0},
+    {Str::preset_lowest, 1, true, 4},
 };
 
-const char* piccolo_settings_latency_preset_name(uint32_t preset)
+Str piccolo_settings_latency_preset_name(uint32_t preset)
 {
-    return preset < PICCOLO_LATENCY_PRESET_COUNT ? LATENCY_PRESETS[preset].name : "CUSTOM";
+    return preset < PICCOLO_LATENCY_PRESET_COUNT ? LATENCY_PRESETS[preset].name : Str::preset_custom;
 }
 
 uint32_t piccolo_settings_latency_preset(const Settings* settings, SettingLayer layer)
@@ -297,4 +303,36 @@ bool piccolo_settings_apply_latency_preset(Settings* settings, SettingLayer laye
     return settings_set_enum(settings, layer, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, values->frames_in_flight_index) &&
            settings_set_bool(settings, layer, PICCOLO_LATENCY_WAIT_FOR_PRESENT, values->wait_for_present) &&
            settings_set_int(settings, layer, PICCOLO_LATENCY_FRAME_DELAY, values->frame_delay);
+}
+
+uint32_t piccolo_settings_language(const Settings* settings)
+{
+    uint32_t choice = settings_get_enum(settings, PICCOLO_LANGUAGE);   // 0 auto, 1 en, 2 es
+    if (choice > 0)
+    {
+        return choice - 1;
+    }
+    int count = 0;
+    SDL_Locale** locales = SDL_GetPreferredLocales(&count);
+    uint32_t language = 0;
+    for (int i = 0; locales != nullptr && i < count; i++)
+    {
+        const char* code = locales[i]->language;   // "es", "en", ...
+        bool found = false;
+        for (uint32_t j = 0; j < PICCOLO_LANGUAGE_COUNT; j++)
+        {
+            if (code != nullptr && std::strcmp(code, piccolo_language_code(j)) == 0)
+            {
+                language = j;
+                found = true;
+                break;
+            }
+        }
+        if (found)
+        {
+            break;
+        }
+    }
+    SDL_free(locales);
+    return language;
 }

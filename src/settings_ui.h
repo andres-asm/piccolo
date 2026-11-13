@@ -15,12 +15,14 @@
 //          from that scope (back to the layer below).
 // Global-only settings are greyed out while a core or game scope is edited.
 
+#include "localization.h"
 #include "settings.h"
 
 // Which layer edits go to: SettingLayer::global, ::core or ::game.
 struct SettingsUiContext
 {
-    Settings*    settings    = nullptr;
+    Settings*           settings    = nullptr;
+    const Localization* strings     = nullptr;   // UI text (piccolo_text.h)
     SettingLayer scope       = SettingLayer::global;
     float        label_width = 0.0f;   // width of the label column
 };
@@ -31,11 +33,14 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
 
 // Just the marker (for rows drawn by hand). Takes the space of one glyph
 // even when there's no marker, so rows line up.
-void settings_ui_marker(const Settings* settings, const char* key);
+void settings_ui_marker(const SettingsUiContext* context, const char* key);
 
 // Just the reset button at the right edge of the row, when the scope defines
 // the value. Returns true if it reset it.
 bool settings_ui_reset_button(const SettingsUiContext* context, const char* key);
 
-// "GLOBAL", "THIS CORE", "THIS GAME".
-const char* settings_ui_scope_name(SettingLayer scope);
+// "GLOBAL", "THIS CORE", "THIS GAME" in the current language.
+const char* settings_ui_scope_name(const Localization* strings, SettingLayer scope);
+
+// The label column's width: the widest label of the rows that have one.
+float settings_ui_label_width(const Settings* settings, const Localization* strings);

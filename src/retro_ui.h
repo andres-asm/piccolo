@@ -9,6 +9,7 @@
 
 #include <cstdint>
 
+#include "localization.h"
 #include "menus.h"
 
 struct ImFont;
@@ -18,7 +19,8 @@ int32_t retro_ui_scale_for_width(float window_width);
 
 // The menu bar at the top of the window. Call between ImGui::NewFrame() and
 // rendering. Returns the item picked this frame (MenuAction::none if none).
-MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale);
+// Labels in the language of `strings`.
+MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings);
 
 // One line of text at the bottom left of the window, behind other windows, in
 // the pixel font with a drop shadow.

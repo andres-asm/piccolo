@@ -22,6 +22,7 @@
 
 #include "app_paths.h"
 #include "image_window.h"
+#include "localization.h"
 #include "settings.h"
 
 struct ImFont;
@@ -46,6 +47,7 @@ struct SettingsWindow
 struct SettingsWindowContext
 {
     Settings*                settings = nullptr;
+    const Localization*      strings = nullptr;  // UI text (piccolo_text.h)
     const AppPaths*          paths = nullptr;    // the default folders, shown in empty path fields
     const char*              core_name = "";     // "" = no core running
     const char*              game_name = "";     // "" = no game (or running without content)

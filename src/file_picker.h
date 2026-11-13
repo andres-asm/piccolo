@@ -20,6 +20,7 @@
 #include <cstdint>
 
 #include "core_catalog.h"
+#include "localization.h"
 
 struct ImFont;
 
@@ -58,4 +59,4 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
 // Draws the window if open. Returns true on the frame the user picked
 // something; the picker closes itself then.
 bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pixel_font, int32_t scale,
-                      FilePickerChoice* choice);
+                      const Localization* strings, FilePickerChoice* choice);

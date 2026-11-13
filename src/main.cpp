@@ -22,6 +22,7 @@
 #include "app_shell.h"
 #include "picture.h"
 #include "piccolo_settings.h"
+#include "piccolo_text.h"
 #include "piccolo_window.h"
 #include "settings_window.h"
 #include "host_fs.h"
@@ -45,7 +46,7 @@ struct App
 
     ImFont* pixel_font = nullptr;   // piccolo's pixel font as an ImGui font
     int32_t ui_scale   = 1;         // window pixels per retro pixel
-    char    status[256] = "GAME > LOAD GAME TO START";
+    char    status[256] = "";   // set at startup, in the chosen language
 
     CoreSession session = {};
     CoreCatalog catalog = {};
@@ -72,6 +73,10 @@ struct App
     char           game_name[256] = {};
 
     PiccoloWindow window = {};   // Display settings applied to the window
+
+    // UI text (piccolo_text.h) and the language setting it was loaded for.
+    Localization strings = {};
+    uint32_t     language_setting = UINT32_MAX;
 
     bool window_focused     = true;
     bool screensaver_allowed = false;   // what we last told SDL
@@ -289,7 +294,7 @@ static void handle_menu_action(App* app, MenuAction action)
             if (game_running(app))
             {
                 libretro_host_reset(app->session.host);
-                set_status(app, "RESET");
+                set_status(app, piccolo_text(&app->strings, Str::status_reset));
                 app->menu_visible = false;
             }
             break;
@@ -320,7 +325,7 @@ static void handle_menu_action(App* app, MenuAction action)
             app->show_debug_window = !app->show_debug_window;
             break;
         default:
-            set_status(app, "NOT THERE YET");
+            set_status(app, piccolo_text(&app->strings, Str::status_not_there_yet));
             break;
     }
 }
@@ -369,6 +374,35 @@ static void frame_delay(const App* app)
         return;
     }
     SDL_DelayPrecise(static_cast<Uint64>(delay_ms) * 1000000u);
+}
+
+// The language setting -> the UI text and what cores are told (GET_LANGUAGE,
+// from the next core start). Only redone when the setting changes: "auto"
+// asks the system, which allocates.
+static void update_language(App* app)
+{
+    uint32_t setting = settings_get_enum(&app->settings, PICCOLO_LANGUAGE);
+    if (setting == app->language_setting)
+    {
+        return;
+    }
+    app->language_setting = setting;
+    uint32_t language = piccolo_settings_language(&app->settings);
+    app->session.language = piccolo_language_retro(language);
+    if (language == 0)
+    {
+        localization_use_english(&app->strings);
+        return;
+    }
+
+    // lang/<code>.po: the user's copy in piccolo's folder wins over the one
+    // that comes with piccolo (next to the program).
+    std::string file = std::string("lang/") + piccolo_language_code(language) + ".po";
+    std::string user_copy = app->paths.root.empty() ? std::string() : app->paths.root + "/" + file;
+    const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
+    std::string bundled = base != nullptr ? std::string(base) + file : file;
+    const std::string* path = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? &user_copy : &bundled;
+    localization_load_po(&app->strings, path->c_str(), piccolo_language_code(language));
 }
 
 static void update_window(App* app)
@@ -502,32 +536,29 @@ static void draw_settings(App* app)
     context.core_name = app->core_name;
     context.game_name = app->game_name;
     context.image = &image;
-    char window_size[96] = {};
+    context.strings = &app->strings;
+    // Text with numbers: the translated part, then the numbers (no formats in translations).
+    const char* window_label = piccolo_text(&app->strings, Str::section_window);
+    char window_size[200] = {};
     if (app->window.target_width == 0)
     {
-        std::snprintf(window_size, sizeof(window_size), "WINDOW: SIZED TO THE GAME WHEN ONE RUNS");
+        std::snprintf(window_size, sizeof(window_size), "%s: %s", window_label,
+                      piccolo_text(&app->strings, Str::window_sized_when_running));
     }
     else if (app->window.target_scale > 0)
     {
-        std::snprintf(window_size, sizeof(window_size), "WINDOW: %u X %u (X%u)", app->window.target_width,
+        std::snprintf(window_size, sizeof(window_size), "%s: %u X %u (X%u)", window_label, app->window.target_width,
                       app->window.target_height, app->window.target_scale);
     }
     else
     {
-        std::snprintf(window_size, sizeof(window_size), "WINDOW: %u X %u", app->window.target_width,
+        std::snprintf(window_size, sizeof(window_size), "%s: %u X %u", window_label, app->window.target_width,
                       app->window.target_height);
     }
     context.window_size = window_size;
-    switch (app->shell.vulkan.present_wait_version)
-    {
-    case 2:
-    case 1:
-        context.present_wait = "THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN";
-        break;
-    default:
-        context.present_wait = "THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD";
-        break;
-    }
+    context.present_wait = piccolo_text(&app->strings, app->shell.vulkan.present_wait_version > 0
+                                                           ? Str::present_wait_screen
+                                                           : Str::present_wait_gpu);
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -618,6 +649,10 @@ int main(int argc, char** argv)
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "piccolo's settings table is broken (see above)");
     }
+    if (!localization_init(&app->strings, piccolo_strings_table(), text_id(Str::count)))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "piccolo's strings table is broken (see above)");
+    }
 
     // Everything in piccolo's folder, migrated once from ~/.host-libretro.
     // Without it nothing is saved, but games still run.
@@ -636,6 +671,8 @@ int main(int argc, char** argv)
     {
         io.IniFilename = nullptr;
     }
+    update_language(app);
+    set_status(app, piccolo_text(&app->strings, Str::status_start));
 
     app->running = true;
     while (app->running)
@@ -649,6 +686,7 @@ int main(int argc, char** argv)
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
         update_window(app);
+        update_language(app);
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
@@ -670,10 +708,11 @@ int main(int argc, char** argv)
             {
                 // The status line's window goes first, so it stays behind the others.
                 retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
-                handle_menu_action(app, retro_ui_menu_bar(app->pixel_font, app->ui_scale));
+                handle_menu_action(app, retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings));
             }
 
-            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->pending_start))
+            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
+                                 &app->pending_start))
             {
                 app->has_pending_start = true;   // see pending_start
             }
