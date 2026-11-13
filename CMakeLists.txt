@@ -22,6 +22,7 @@ add_executable(piccolo
     src/image_window.cpp
     src/piccolo_window.cpp
     src/piccolo_text.cpp
+    src/recent_games.cpp
 )
 
 # UI text: src/strings.txt is the one English source. The build turns it into
@@ -76,4 +77,13 @@ if(MULTITAP_BUILD_TESTS)
     add_test(NAME piccolo_strings COMMAND piccolo_strings_check "${CMAKE_CURRENT_SOURCE_DIR}/lang" es)
     set_tests_properties(piccolo_strings PROPERTIES
         FAIL_REGULAR_EXPRESSION "some keys are unknown|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
+
+    add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)
+    target_include_directories(piccolo_recent_games_test PRIVATE src)
+    target_link_libraries(piccolo_recent_games_test PRIVATE frontend_libretro)
+    multitap_set_project_flags(piccolo_recent_games_test)
+    add_test(NAME piccolo_recent_games
+             COMMAND piccolo_recent_games_test "${CMAKE_CURRENT_BINARY_DIR}/recent_games_test")
+    set_tests_properties(piccolo_recent_games PROPERTIES
+        FAIL_REGULAR_EXPRESSION "ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 endif()

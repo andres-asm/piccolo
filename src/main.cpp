@@ -12,6 +12,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -24,6 +26,7 @@
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "piccolo_window.h"
+#include "recent_games.h"
 #include "settings_window.h"
 #include "host_fs.h"
 #include "settings_file.h"
@@ -73,6 +76,13 @@ struct App
     char           game_name[256] = {};
 
     PiccoloWindow window = {};   // Display settings applied to the window
+
+    // The RECENT menu: the games (<settings>/recent.cfg) and their labels,
+    // rebuilt when the list or the language changes (not every frame).
+    RecentGames              recent = {};
+    std::string              recent_path;
+    std::vector<std::string> recent_labels;
+    std::vector<const char*> recent_label_pointers;
 
     // UI text (piccolo_text.h) and the language setting it was loaded for.
     Localization strings = {};
@@ -214,6 +224,38 @@ static void update_settings_context(App* app)
 }
 
 // ---------------------------------------------------------------------------
+// Recent games
+// ---------------------------------------------------------------------------
+
+static void refresh_recent_labels(App* app)
+{
+    app->recent_labels.clear();
+    app->recent_label_pointers.clear();
+    const char* no_game = piccolo_text(&app->strings, Str::recent_no_game);
+    for (size_t i = 0; i < app->recent.games.size(); i++)
+    {
+        char label[600] = {};
+        recent_games_label(&app->recent.games[i], no_game, label, sizeof(label));
+        app->recent_labels.push_back(label);
+    }
+    // Pointers after all the strings exist (push_back may move them).
+    for (size_t i = 0; i < app->recent_labels.size(); i++)
+    {
+        app->recent_label_pointers.push_back(app->recent_labels[i].c_str());
+    }
+}
+
+static void remember_recent(App* app, const char* core_path, const char* content_path)
+{
+    recent_games_add(&app->recent, core_path, content_path);
+    if (!app->recent_path.empty())
+    {
+        recent_games_save(&app->recent, app->recent_path.c_str());
+    }
+    refresh_recent_labels(app);
+}
+
+// ---------------------------------------------------------------------------
 // Game control
 // ---------------------------------------------------------------------------
 
@@ -276,6 +318,7 @@ static void start_game(App* app, const FilePickerChoice* choice)
             }
         }
         save_last_used(app);
+        remember_recent(app, choice->core_path, choice->content_path);
     }
     set_status(app, app->session.message);
 }
@@ -315,6 +358,8 @@ static void handle_menu_action(App* app, MenuAction action)
         case MenuAction::quit:
             app->running = false;
             break;
+        case MenuAction::recent_game:
+            break;   // handled where the menu bar is drawn (it needs the index)
         case MenuAction::general:
             settings_window_open(&app->settings_window, SettingsTab::general);
             break;
@@ -392,6 +437,7 @@ static void update_language(App* app)
     if (language == 0)
     {
         localization_use_english(&app->strings);
+        refresh_recent_labels(app);
         return;
     }
 
@@ -403,6 +449,7 @@ static void update_language(App* app)
     std::string bundled = base != nullptr ? std::string(base) + file : file;
     const std::string* path = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? &user_copy : &bundled;
     localization_load_po(&app->strings, path->c_str(), piccolo_language_code(language));
+    refresh_recent_labels(app);
 }
 
 static void update_window(App* app)
@@ -665,6 +712,8 @@ int main(int argc, char** argv)
         settings_load(&app->settings, app->settings_path.c_str());
         apply_folders(app);
         load_last_used(app);
+        app->recent_path = app->paths.settings + "/recent.cfg";
+        recent_games_load(&app->recent, app->recent_path.c_str());
         piccolo_window_restore(&app->window, app->shell.window, &app->settings);
     }
     else
@@ -708,7 +757,23 @@ int main(int argc, char** argv)
             {
                 // The status line's window goes first, so it stays behind the others.
                 retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
-                handle_menu_action(app, retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings));
+                int32_t recent_picked = -1;
+                MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
+                                                      app->recent_label_pointers.data(),
+                                                      static_cast<int32_t>(app->recent_label_pointers.size()),
+                                                      &recent_picked);
+                if (action == MenuAction::recent_game && recent_picked >= 0)
+                {
+                    // Started at the top of the next loop, like LOAD GAME (see pending_start).
+                    const RecentGame* game = &app->recent.games[static_cast<size_t>(recent_picked)];
+                    app->pending_start = FilePickerChoice{};
+                    std::snprintf(app->pending_start.core_path, sizeof(app->pending_start.core_path), "%s",
+                                  game->core_path.c_str());
+                    std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s",
+                                  game->content_path.c_str());
+                    app->has_pending_start = true;
+                }
+                handle_menu_action(app, action);
             }
 
             if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,

@@ -124,6 +124,7 @@ static const GlyphPicture GLYPHS[] = {
     { PIXEL_FONT_ARROW_LEFT,  { "...#.", "..##.", ".###.", "..##.", "...#." } },
     { PIXEL_FONT_ARROW_RIGHT, { ".#...", ".##..", ".###.", ".##..", ".#..." } },
     { PIXEL_FONT_CHECK,       { "....#", "...##", "#.##.", "###..", ".#..." } },
+    { PIXEL_FONT_MENU,        { "#####", ".....", "#####", ".....", "#####" } },
 };
 
 constexpr uint32_t PICTURE_COUNT = sizeof(GLYPHS) / sizeof(GLYPHS[0]);

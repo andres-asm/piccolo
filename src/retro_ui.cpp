@@ -86,14 +86,65 @@ int32_t retro_ui_scale_for_width(float window_width)
     return scale < 1 ? 1 : scale;
 }
 
-MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings)
+// One dropdown item drawn our way (invisible ImGui text, our shadowed label).
+static bool menu_item(const char* label, float block)
+{
+    ImVec2 item_position = next_text_position(0.0f);
+    push_invisible_text();
+    bool clicked = ImGui::MenuItem(label);
+    ImGui::PopStyleColor();
+    draw_label(ImGui::GetWindowDrawList(), item_position, label, ImGui::IsItemHovered(), block);
+    return clicked;
+}
+
+// The RECENT menu: first on the bar, a hamburger glyph as its label.
+static bool recent_menu(const Localization* strings, const char* const* recent, int32_t recent_count,
+                        int32_t* recent_picked, float block)
+{
+    ImDrawList* bar_draw_list = ImGui::GetWindowDrawList();
+    ImVec2 label_position = next_text_position(IM_TRUNC(ImGui::GetStyle().ItemSpacing.x * 0.5f));
+    push_invisible_text();
+    bool open = ImGui::BeginMenu(PIXEL_FONT_UTF8_MENU);
+    ImGui::PopStyleColor();
+    draw_label(bar_draw_list, label_position, PIXEL_FONT_UTF8_MENU, open || ImGui::IsItemHovered(), block);
+    if (!open)
+    {
+        return false;
+    }
+    use_nearest_sampler();
+    draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_LIGHT, true);
+    bool picked = false;
+    if (recent_count == 0)
+    {
+        ImGui::BeginDisabled();
+        menu_item(piccolo_text(strings, Str::menu_recent_empty), block);
+        ImGui::EndDisabled();
+    }
+    for (int32_t i = 0; i < recent_count; i++)
+    {
+        ImGui::PushID(i);
+        if (menu_item(recent[i], block))
+        {
+            *recent_picked = i;
+            picked = true;
+        }
+        ImGui::PopID();
+    }
+    use_linear_sampler();
+    ImGui::EndMenu();
+    return picked;
+}
+
+MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings,
+                             const char* const* recent, int32_t recent_count, int32_t* recent_picked)
 {
     MenuAction picked = MenuAction::none;
     float block = static_cast<float>(scale);
+    *recent_picked = -1;
 
     // Metrics in retro pixels x scale:
-    //   bar  = 2 + 7 (font line) + 2 = 11, label padding 3,
-    //   item = 7 (font line) + 2 spacing = 9, panel padding 2 (+4 text indent).
+    //   bar  = 2 + 8 (font line) + 2 = 12, label padding 3,
+    //   item = 8 (font line) + 2 spacing = 10, panel padding 2 (+4 text indent).
     ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.0f * block, 2.0f * block));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f * block, 2.0f * block));
@@ -115,6 +166,11 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
     {
         use_nearest_sampler();
         draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, BAR_LIGHT, BAR_DARK, false);
+
+        if (recent_menu(strings, recent, recent_count, recent_picked, block))
+        {
+            picked = MenuAction::recent_game;
+        }
 
         ImDrawList* bar_draw_list = ImGui::GetWindowDrawList();
         for (int32_t menu = 0; menu < menus_count(); menu++)
@@ -139,15 +195,10 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
                 draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_LIGHT, true);
                 for (int32_t item = 0; item < menus_item_count(menu); item++)
                 {
-                    const char* item_label = piccolo_text(strings, menus_item_label(menu, item));
-                    ImVec2 item_position = next_text_position(0.0f);
-                    push_invisible_text();
-                    if (ImGui::MenuItem(item_label))
+                    if (menu_item(piccolo_text(strings, menus_item_label(menu, item)), block))
                     {
                         picked = menus_item_action(menu, item);
                     }
-                    ImGui::PopStyleColor();
-                    draw_label(ImGui::GetWindowDrawList(), item_position, item_label, ImGui::IsItemHovered(), block);
                 }
                 use_linear_sampler();
                 ImGui::EndMenu();

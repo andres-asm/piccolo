@@ -22,6 +22,7 @@ enum class MenuAction
     input,
     about,
     debug_window,
+    recent_game,   // from the RECENT menu (see retro_ui_menu_bar)
 };
 
 int32_t     menus_count();

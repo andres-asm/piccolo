@@ -20,7 +20,12 @@ int32_t retro_ui_scale_for_width(float window_width);
 // The menu bar at the top of the window. Call between ImGui::NewFrame() and
 // rendering. Returns the item picked this frame (MenuAction::none if none).
 // Labels in the language of `strings`.
-MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings);
+//
+// The first menu (a "hamburger" glyph) lists the recent games: `recent`
+// holds their labels, most recent first. Picking one returns
+// MenuAction::recent_game and its index in *recent_picked.
+MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings,
+                             const char* const* recent, int32_t recent_count, int32_t* recent_picked);
 
 // One line of text at the bottom left of the window, behind other windows, in
 // the pixel font with a drop shadow.

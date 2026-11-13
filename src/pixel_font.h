@@ -30,6 +30,7 @@ constexpr uint32_t PIXEL_FONT_ARROW_DOWN  = 0x25BC;   // BLACK DOWN-POINTING TRI
 constexpr uint32_t PIXEL_FONT_ARROW_LEFT  = 0x25C0;   // BLACK LEFT-POINTING TRIANGLE
 constexpr uint32_t PIXEL_FONT_ARROW_RIGHT = 0x25B6;   // BLACK RIGHT-POINTING TRIANGLE
 constexpr uint32_t PIXEL_FONT_CHECK       = 0x2714;   // HEAVY CHECK MARK
+constexpr uint32_t PIXEL_FONT_MENU        = 0x2630;   // TRIGRAM FOR HEAVEN (the "hamburger" menu)
 
 // One cell row as 5 bits: bit 4 = leftmost pixel, bit 0 = rightmost. Row 0 is
 // the top of the cell (accents), rows 2..6 the letter, row 7 below it.

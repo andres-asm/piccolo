@@ -82,6 +82,7 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::input:      return "INPUT";
         case MenuAction::about:      return "ABOUT";
         case MenuAction::debug_window: return "DEBUG WINDOW";
+        case MenuAction::recent_game:  return "RECENT GAME";
         default:                     return "?";
     }
 }

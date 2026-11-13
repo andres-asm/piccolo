@@ -26,6 +26,8 @@ menu_input = INPUT...
 menu_sound = SOUND...
 menu_debug_window = DEBUG WINDOW
 menu_about = ABOUT PICCOLO
+menu_recent_empty = NO RECENT GAMES
+recent_no_game = NO GAME
 
 # Status line
 status_start = GAME > LOAD GAME TO START

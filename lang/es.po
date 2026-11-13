@@ -62,6 +62,14 @@ msgctxt "menu_about"
 msgid "ABOUT PICCOLO"
 msgstr "ACERCA DE PICCOLO"
 
+msgctxt "menu_recent_empty"
+msgid "NO RECENT GAMES"
+msgstr "NO HAY JUEGOS RECIENTES"
+
+msgctxt "recent_no_game"
+msgid "NO GAME"
+msgstr "SIN JUEGO"
+
 msgctxt "status_start"
 msgid "GAME > LOAD GAME TO START"
 msgstr "JUEGO > CARGAR JUEGO PARA EMPEZAR"
