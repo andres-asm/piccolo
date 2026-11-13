@@ -358,6 +358,19 @@ static bool game_picture(const App* app, ViewportInput* picture)
     return true;
 }
 
+// Low latency: in Vsync timing the loop is paced by the display, so waiting
+// a few ms here (right after presenting) moves the next input read and core
+// frame closer to the next refresh.
+static void frame_delay(const App* app)
+{
+    int32_t delay_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
+    if (delay_ms <= 0 || !game_running(app) || app->session.paused || app->session.timing.effective != TimingMode::vsync)
+    {
+        return;
+    }
+    SDL_DelayPrecise(static_cast<Uint64>(delay_ms) * 1000000u);
+}
+
 static void update_window(App* app)
 {
     ViewportInput picture = {};
@@ -505,6 +518,16 @@ static void draw_settings(App* app)
                       app->window.target_height);
     }
     context.window_size = window_size;
+    switch (app->shell.vulkan.present_wait_version)
+    {
+    case 2:
+    case 1:
+        context.present_wait = "THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN";
+        break;
+    default:
+        context.present_wait = "THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD";
+        break;
+    }
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -626,6 +649,9 @@ int main(int argc, char** argv)
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
         update_window(app);
+        renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
+                                      piccolo_settings_frames_in_flight(&app->settings));
+        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
         core_session_update(&app->session, &app->shell);
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
@@ -667,6 +693,7 @@ int main(int argc, char** argv)
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
                 break;
             }
+            frame_delay(app);
         }
         core_session_wait(&app->session);
     }

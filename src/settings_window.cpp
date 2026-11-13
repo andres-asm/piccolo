@@ -144,9 +144,43 @@ static void draw_display(const SettingsUiContext* ui, const SettingsWindowContex
     settings_ui_row(ui, PICCOLO_WINDOW_REMEMBER, nullptr);
 }
 
-static void draw_sync(const SettingsUiContext* ui)
+// PRESET: sets the three latency settings below at the edited scope. Not a
+// setting itself: it shows the preset the values match, or CUSTOM.
+static void draw_latency_preset(const SettingsUiContext* ui)
+{
+    uint32_t current = piccolo_settings_latency_preset(ui->settings, ui->scope);
+    ImGui::PushID("latency_preset");
+    ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted("PRESET");
+    ImGui::SetItemTooltip("Sets the three settings below. Change them one by one for anything in between.");
+    ImGui::SameLine(start + ui->label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (retro_ui_begin_combo("##preset", piccolo_settings_latency_preset_name(current)))
+    {
+        for (uint32_t i = 0; i < PICCOLO_LATENCY_PRESET_COUNT; i++)
+        {
+            if (ImGui::Selectable(piccolo_settings_latency_preset_name(i), i == current))
+            {
+                piccolo_settings_apply_latency_preset(ui->settings, ui->scope, i);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::PopID();
+}
+
+static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
+    ImGui::SeparatorText("LOW LATENCY");
+    draw_latency_preset(ui);
+    settings_ui_row(ui, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
+    settings_ui_row(ui, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
+    settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
+    ImGui::TextDisabled("%s", context->present_wait);
 }
 
 void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* context, ImFont* pixel_font,
@@ -216,7 +250,7 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
                         }
                         if (ImGui::BeginTabItem("SYNC"))
                         {
-                            draw_sync(&ui);
+                            draw_sync(&ui, context);
                             ImGui::EndTabItem();
                         }
                         ImGui::EndTabBar();

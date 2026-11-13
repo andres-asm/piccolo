@@ -1,5 +1,6 @@
 #include "piccolo_settings.h"
 
+#include <cstdlib>
 #include <cstring>
 
 // ---------------------------------------------------------------------------
@@ -41,6 +42,12 @@ static const SettingEnumValue TIMING_VALUES[] = {
     {"vsync", "VSYNC"},
     {"exact", "EXACT"},
 };
+
+static const SettingEnumValue FRAMES_IN_FLIGHT_VALUES[] = {
+    {"2", "2 (SMOOTHER)"},
+    {"1", "1 (LOWER LATENCY)"},
+};
+constexpr uint32_t FRAMES_IN_FLIGHT_COUNT = sizeof(FRAMES_IN_FLIGHT_VALUES) / sizeof(FRAMES_IN_FLIGHT_VALUES[0]);
 
 static const SettingEnumValue FULLSCREEN_TYPE_VALUES[] = {
     {"borderless", "BORDERLESS"},
@@ -135,6 +142,20 @@ static const SettingDescriptor SETTINGS[] = {
      .help = "Vsync: one frame per display refresh (smooth; falls back to Exact when the rates are too far "
              "apart). Exact: the core's own speed."},
 
+    // Video: Sync, low latency (overridable: a heavy core may not afford it)
+    {.key = PICCOLO_LATENCY_FRAMES_IN_FLIGHT, .type = SettingType::enumeration, .default_value = "2",
+     .overridable = true, .values = FRAMES_IN_FLIGHT_VALUES, .value_count = FRAMES_IN_FLIGHT_COUNT,
+     .label = "FRAMES IN FLIGHT",
+     .help = "How many frames the CPU may prepare ahead of the GPU. 1: less delay, but a slow frame shows."},
+    {.key = PICCOLO_LATENCY_WAIT_FOR_PRESENT, .type = SettingType::boolean, .default_value = "false",
+     .overridable = true, .label = "WAIT FOR PRESENT",
+     .help = "Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU "
+             "has finished it)."},
+    {.key = PICCOLO_LATENCY_FRAME_DELAY, .type = SettingType::integer, .default_value = "0", .overridable = true,
+     .min = 0, .max = 12, .label = "FRAME DELAY (MS)",
+     .help = "Vsync timing: wait this long before running each frame, so input is read later. Too much and "
+             "frames are missed: raise it slowly."},
+
     // Video: Display (global-only)
     {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = "FULLSCREEN",
      .help = "F11 or Alt+Enter switch it too."},
@@ -219,4 +240,61 @@ double piccolo_settings_window_aspect(const Settings* settings)
 uint32_t piccolo_settings_window_height(const Settings* settings)
 {
     return WINDOW_HEIGHTS[settings_get_enum(settings, PICCOLO_WINDOW_HEIGHT)];
+}
+
+uint32_t piccolo_settings_frames_in_flight(const Settings* settings)
+{
+    return settings_get_enum(settings, PICCOLO_LATENCY_FRAMES_IN_FLIGHT) == 1 ? 1u : 2u;
+}
+
+// Frames in flight (enum index), wait for present, frame delay (ms).
+struct LatencyPreset
+{
+    const char* name;
+    uint32_t    frames_in_flight_index;
+    bool        wait_for_present;
+    int32_t     frame_delay;
+};
+
+static const LatencyPreset LATENCY_PRESETS[PICCOLO_LATENCY_PRESET_COUNT] = {
+    {"OFF", 0, false, 0},
+    {"LOW", 1, true, 0},
+    {"LOWEST", 1, true, 4},
+};
+
+const char* piccolo_settings_latency_preset_name(uint32_t preset)
+{
+    return preset < PICCOLO_LATENCY_PRESET_COUNT ? LATENCY_PRESETS[preset].name : "CUSTOM";
+}
+
+uint32_t piccolo_settings_latency_preset(const Settings* settings, SettingLayer layer)
+{
+    const char* frames = settings_get_at(settings, layer, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
+    const char* wait = settings_get_at(settings, layer, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
+    const char* delay = settings_get_at(settings, layer, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
+    uint32_t frames_index = frames != nullptr && std::strcmp(frames, "1") == 0 ? 1u : 0u;
+    bool waits = wait != nullptr && std::strcmp(wait, "true") == 0;
+    int32_t delay_ms = delay != nullptr ? static_cast<int32_t>(std::strtol(delay, nullptr, 10)) : 0;
+    for (uint32_t i = 0; i < PICCOLO_LATENCY_PRESET_COUNT; i++)
+    {
+        const LatencyPreset* preset = &LATENCY_PRESETS[i];
+        if (preset->frames_in_flight_index == frames_index && preset->wait_for_present == waits &&
+            preset->frame_delay == delay_ms)
+        {
+            return i;
+        }
+    }
+    return PICCOLO_LATENCY_PRESET_COUNT;
+}
+
+bool piccolo_settings_apply_latency_preset(Settings* settings, SettingLayer layer, uint32_t preset)
+{
+    if (preset >= PICCOLO_LATENCY_PRESET_COUNT)
+    {
+        return false;
+    }
+    const LatencyPreset* values = &LATENCY_PRESETS[preset];
+    return settings_set_enum(settings, layer, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, values->frames_in_flight_index) &&
+           settings_set_bool(settings, layer, PICCOLO_LATENCY_WAIT_FOR_PRESENT, values->wait_for_present) &&
+           settings_set_int(settings, layer, PICCOLO_LATENCY_FRAME_DELAY, values->frame_delay);
 }

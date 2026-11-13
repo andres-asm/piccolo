@@ -30,6 +30,9 @@ constexpr const char* PICCOLO_VIDEO_CROP_BOTTOM = "video_crop_bottom";
 constexpr const char* PICCOLO_VIDEO_CROP_LEFT = "video_crop_left";
 constexpr const char* PICCOLO_VIDEO_CROP_RIGHT = "video_crop_right";
 constexpr const char* PICCOLO_VIDEO_TIMING = "video_timing";
+constexpr const char* PICCOLO_LATENCY_FRAMES_IN_FLIGHT = "latency_frames_in_flight";
+constexpr const char* PICCOLO_LATENCY_WAIT_FOR_PRESENT = "latency_wait_for_present";
+constexpr const char* PICCOLO_LATENCY_FRAME_DELAY = "latency_frame_delay";
 constexpr const char* PICCOLO_DISPLAY_FULLSCREEN = "display_fullscreen";
 constexpr const char* PICCOLO_DISPLAY_FULLSCREEN_TYPE = "display_fullscreen_type";
 constexpr const char* PICCOLO_WINDOW_MODE = "window_mode";
@@ -51,6 +54,17 @@ uint32_t piccolo_settings_count();
 void piccolo_settings_viewport(const Settings* settings, ViewportInput* input);
 
 TimingMode piccolo_settings_timing(const Settings* settings);
+
+// Low latency: frames in flight (1 or 2).
+uint32_t piccolo_settings_frames_in_flight(const Settings* settings);
+
+// The low latency presets: they set the three latency settings at once.
+// Index 0..2 = OFF, LOW, LOWEST; piccolo_settings_latency_preset() gives the
+// one the current values (at `layer`) match, or 3 (CUSTOM).
+constexpr uint32_t PICCOLO_LATENCY_PRESET_COUNT = 3;
+const char* piccolo_settings_latency_preset_name(uint32_t preset);
+uint32_t piccolo_settings_latency_preset(const Settings* settings, SettingLayer layer);
+bool piccolo_settings_apply_latency_preset(Settings* settings, SettingLayer layer, uint32_t preset);
 
 // Fixed window mode: the window's aspect and height from the settings.
 double piccolo_settings_window_aspect(const Settings* settings);

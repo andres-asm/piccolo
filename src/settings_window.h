@@ -14,8 +14,7 @@
 //
 // The scope says which layer changes go to: GLOBAL, THIS CORE or THIS GAME
 // (plan-settings: avoids "which layer did my change go to"). It starts at
-// GLOBAL every time the window opens. The low latency group arrives with
-// plan-settings step 8.
+// GLOBAL every time the window opens.
 
 #include <cstdint>
 
@@ -49,6 +48,7 @@ struct SettingsWindowContext
     const char*              game_name = "";     // "" = no game (or running without content)
     const ImageWindowSource* image = nullptr;    // the game picture for IMAGE SETTINGS
     const char*              window_size = "";   // what the window mode gives, for the Display tab
+    const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);
