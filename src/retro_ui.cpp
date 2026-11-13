@@ -274,35 +274,6 @@ void retro_ui_end_window()
 }
 
 // ---------------------------------------------------------------------------
-// Game picture
-// ---------------------------------------------------------------------------
-
-void retro_ui_game_picture(uint64_t texture_id, float uv_max_x, float uv_max_y, float aspect)
-{
-    const ImGuiIO& io = ImGui::GetIO();
-    float width = io.DisplaySize.x;
-    float height = width / aspect;
-    if (height > io.DisplaySize.y)
-    {
-        height = io.DisplaySize.y;
-        width = height * aspect;
-    }
-    // Whole pixels, so the edges don't land between two screen pixels.
-    width = static_cast<float>(static_cast<int32_t>(width));
-    height = static_cast<float>(static_cast<int32_t>(height));
-    ImVec2 position((io.DisplaySize.x - width) * 0.5f, (io.DisplaySize.y - height) * 0.5f);
-    position.x = static_cast<float>(static_cast<int32_t>(position.x));
-    position.y = static_cast<float>(static_cast<int32_t>(position.y));
-
-    // The background draw list is behind every window, menu bar included.
-    ImDrawList* draw_list = ImGui::GetBackgroundDrawList();
-    draw_list->AddCallback(ImGui::GetPlatformIO().DrawCallback_SetSamplerNearest, nullptr);
-    draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(texture_id)), position,
-                        ImVec2(position.x + width, position.y + height), ImVec2(0.0f, 0.0f), ImVec2(uv_max_x, uv_max_y));
-    draw_list->AddCallback(ImGui::GetPlatformIO().DrawCallback_SetSamplerLinear, nullptr);
-}
-
-// ---------------------------------------------------------------------------
 // Combo with the font's arrow
 // ---------------------------------------------------------------------------
 

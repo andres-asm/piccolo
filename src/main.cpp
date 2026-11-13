@@ -19,6 +19,7 @@
 
 #include "app_paths.h"
 #include "app_shell.h"
+#include "picture.h"
 #include "settings_file.h"
 #include "core_catalog.h"
 #include "core_session.h"
@@ -54,6 +55,7 @@ struct App
 
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
+    Picture     picture = {};   // the game on screen (viewport + filter)
     std::string imgui_ini;   // <settings>/imgui.ini; ImGui keeps a pointer to it
     char last_core[LIBRETRO_PATH_MAX]      = {};
     char last_folder[LIBRETRO_PATH_MAX]    = {};
@@ -255,20 +257,32 @@ static void app_handle_events(App* app)
 
 static void draw_game(App* app)
 {
-    const CoreSession* session = &app->session;
+    CoreSession* session = &app->session;
+    app->picture.ready = false;
     if (!game_running(app) || !session->texture.has_content || session->texture_id == 0)
     {
         return;
     }
-    float u = 0.0f;
-    float v = 0.0f;
-    streaming_texture_uv_max(&session->texture, &u, &v);
-    float aspect = session->host->av_info.geometry.aspect_ratio;
-    if (aspect <= 0.0f && session->texture.content_height > 0)
+    // Picture settings come in plan-settings step 6; until then: the core's
+    // aspect, as big as fits, sharp pixels, centered (what piccolo did before).
+    const ImGuiIO& io = ImGui::GetIO();
+    ViewportInput input = {};
+    input.frame_width = session->texture.content_width;
+    input.frame_height = session->texture.content_height;
+    input.core_aspect = static_cast<double>(session->host->av_info.geometry.aspect_ratio);
+    input.window_width = static_cast<uint32_t>(io.DisplaySize.x);
+    input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
+    input.aspect = ViewportAspect::core;
+    input.scaling = ViewportScaling::full;
+    input.filter = ViewportFilter::nearest;
+
+    ViewportResult viewport = {};
+    if (viewport_compute(&input, &viewport) &&
+        picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport))
     {
-        aspect = static_cast<float>(session->texture.content_width) / static_cast<float>(session->texture.content_height);
+        // The background draw list is behind every window, menu bar included.
+        picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f, 0.0f);
     }
-    retro_ui_game_picture(session->texture_id, u, v, aspect > 0.0f ? aspect : 4.0f / 3.0f);
 }
 
 static void app_draw_debug_ui(App* app)
@@ -405,6 +419,10 @@ int main(int argc, char** argv)
             }
 
             core_session_upload_video(&app->session, &app->shell);
+            if (app_shell_acquire(&app->shell))
+            {
+                picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
+            }
             if (!app_shell_present(&app->shell, CLEAR_COLOR))
             {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
@@ -415,6 +433,7 @@ int main(int argc, char** argv)
     }
 
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
+    picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);
     delete app;
     return 0;
