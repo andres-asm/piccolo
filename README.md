@@ -26,16 +26,23 @@ state slots, scaling options, shaders, archives.
 
 ## Where things go
 
-Cores, saves, savestates and settings live in `~/.host-libretro/`, shared with
-Multitap's libretro test frontend:
+Everything piccolo keeps is in one folder, so moving it to another machine is
+moving that folder: `~/.local/share/piccolo/` on Linux (or
+`$XDG_DATA_HOME/piccolo`), `~/Library/Application Support/piccolo/` on macOS,
+and next to `piccolo.exe` on Windows.
 
 | Path | What |
 |------|------|
 | `cores/` | the cores piccolo offers (drop `*_libretro.so` files here) |
 | `saves/<core>/<game>.srm` | save RAM |
 | `states/<core>/<game>.state<N>` | savestates |
-| `piccolo.cfg` | last core and folder |
+| `system/` | BIOS and other files cores ask for |
+| `settings/last_used.cfg` | last core and folder |
+| `settings/imgui.ini` | window layout |
 | `core_info_cache.cfg` | what each core said about itself (refreshed when a core file changes) |
+
+The first time it runs, piccolo copies `cores/`, `saves/` and `states/` from the
+old `~/.host-libretro/` folder if there is one. The old folder is left as it is.
 
 ## Building
 
@@ -46,7 +53,7 @@ git clone --recursive https://github.com/andres-asm/multitap.git
 cd multitap
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
-~/.host-libretro/piccolo     # normal builds copy it there
+~/.local/share/piccolo/piccolo     # normal builds copy it there
 ```
 
 ## Layout

@@ -6,8 +6,8 @@
 // pauses while it's shown (or while the LOAD GAME window is open).
 //
 // Running the core is frontend_libretro's core session, shared with the
-// host-libretro test frontend. Cores, saves and states live in
-// ~/.host-libretro (cores/, saves/, states/), shared with it too.
+// host-libretro test frontend. Cores, saves, states and settings live in
+// piccolo's own folder (app_paths.h: ~/.local/share/piccolo on Linux).
 
 #include <cstdio>
 #include <cstring>
@@ -17,11 +17,12 @@
 
 #include "imgui.h"
 
+#include "app_paths.h"
 #include "app_shell.h"
+#include "settings_file.h"
 #include "core_catalog.h"
 #include "core_session.h"
 #include "file_picker.h"
-#include "host_fs.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
@@ -51,66 +52,52 @@ struct App
     FilePickerChoice pending_start = {};
     bool             has_pending_start = false;
 
-    // ~/.host-libretro, and what was used last (piccolo.cfg).
-    char data_directory[LIBRETRO_PATH_MAX] = {};
+    // piccolo's folder, and what was used last (<settings>/last_used.cfg).
+    AppPaths    paths = {};
+    std::string imgui_ini;   // <settings>/imgui.ini; ImGui keeps a pointer to it
     char last_core[LIBRETRO_PATH_MAX]      = {};
     char last_folder[LIBRETRO_PATH_MAX]    = {};
 };
 
 // ---------------------------------------------------------------------------
-// Last used core and folder (<data>/piccolo.cfg)
+// Last used core and folder (<settings>/last_used.cfg)
 // ---------------------------------------------------------------------------
 
-static bool settings_file(const App* app, char* out, size_t out_size)
+static std::string last_used_file(const App* app)
 {
-    int written = std::snprintf(out, out_size, "%s/piccolo.cfg", app->data_directory);
-    return written > 0 && static_cast<size_t>(written) < out_size;
+    return app->paths.settings + "/last_used.cfg";
 }
 
-static void save_settings(const App* app)
+static void save_last_used(const App* app)
 {
-    char path[LIBRETRO_PATH_MAX] = {};
-    char text[LIBRETRO_PATH_MAX * 2 + 32] = {};
-    int length = std::snprintf(text, sizeof(text), "core=%s\nfolder=%s\n", app->last_core, app->last_folder);
-    if (settings_file(app, path, sizeof(path)) && length > 0 && static_cast<size_t>(length) < sizeof(text))
-    {
-        host_fs_write_file(path, text, static_cast<size_t>(length));
-    }
-}
-
-static void read_setting(const char* line, size_t length, const char* key, char* out, size_t out_size)
-{
-    size_t key_length = std::strlen(key);
-    if (length >= key_length && std::strncmp(line, key, key_length) == 0 && length - key_length < out_size)
-    {
-        std::memcpy(out, line + key_length, length - key_length);
-        out[length - key_length] = '\0';
-    }
-}
-
-static void load_settings(App* app)
-{
-    char path[LIBRETRO_PATH_MAX] = {};
-    uint8_t* data = nullptr;
-    size_t size = 0;
-    if (!settings_file(app, path, sizeof(path)) || !host_fs_exists(path) || !host_fs_read_file(path, &data, &size))
+    if (app->paths.settings.empty())
     {
         return;
     }
-    const char* text = static_cast<const char*>(static_cast<const void*>(data));
-    size_t start = 0;
-    while (start < size)
+    SettingsFile file = {};
+    if (settings_file_set(&file, "", "core", app->last_core) && settings_file_set(&file, "", "folder", app->last_folder))
     {
-        size_t end = start;
-        while (end < size && text[end] != '\n')
-        {
-            end++;
-        }
-        read_setting(text + start, end - start, "core=", app->last_core, sizeof(app->last_core));
-        read_setting(text + start, end - start, "folder=", app->last_folder, sizeof(app->last_folder));
-        start = end + 1;
+        settings_file_save(&file, last_used_file(app).c_str(), "piccolo: last used core and folder");
     }
-    delete[] data;
+}
+
+static void load_last_used(App* app)
+{
+    SettingsFile file = {};
+    if (app->paths.settings.empty() || !settings_file_load(&file, last_used_file(app).c_str()))
+    {
+        return;
+    }
+    const char* core = settings_file_get(&file, "", "core");
+    const char* folder = settings_file_get(&file, "", "folder");
+    if (core != nullptr)
+    {
+        std::snprintf(app->last_core, sizeof(app->last_core), "%s", core);
+    }
+    if (folder != nullptr)
+    {
+        std::snprintf(app->last_folder, sizeof(app->last_folder), "%s", folder);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -155,7 +142,7 @@ static void start_game(App* app, const FilePickerChoice* choice)
                 *slash = '\0';
             }
         }
-        save_settings(app);
+        save_last_used(app);
     }
     set_status(app, app->session.message);
 }
@@ -325,16 +312,6 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
-static bool make_data_paths(App* app, char* cores, size_t cores_size, char* cache, size_t cache_size)
-{
-    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);   // ends with a separator
-    int data = std::snprintf(app->data_directory, sizeof(app->data_directory), "%s.host-libretro", home != nullptr ? home : "");
-    int cores_written = std::snprintf(cores, cores_size, "%s/cores", app->data_directory);
-    int cache_written = std::snprintf(cache, cache_size, "%s/core_info_cache.cfg", app->data_directory);
-    return home != nullptr && data > 0 && static_cast<size_t>(data) < sizeof(app->data_directory) && cores_written > 0 &&
-           static_cast<size_t>(cores_written) < cores_size && cache_written > 0 && static_cast<size_t>(cache_written) < cache_size;
-}
-
 int main(int argc, char** argv)
 {
     (void)argc;
@@ -368,15 +345,24 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    char cores_directory[LIBRETRO_PATH_MAX] = {};
-    char cache_path[LIBRETRO_PATH_MAX] = {};
-    if (make_data_paths(app, cores_directory, sizeof(cores_directory), cache_path, sizeof(cache_path)))
+    // Everything in piccolo's folder, migrated once from ~/.host-libretro.
+    // Without it nothing is saved, but games still run.
+    ImGuiIO& io = ImGui::GetIO();
+    if (app_paths_init(&app->paths, "piccolo", "piccolo.cfg"))
     {
-        SDL_CreateDirectory(cores_directory);
-        std::snprintf(app->session.data_directory, sizeof(app->session.data_directory), "%s", app->data_directory);
-        core_catalog_init(&app->catalog, cores_directory, cache_path);
+        app->imgui_ini = app->paths.settings + "/imgui.ini";
+        io.IniFilename = app->imgui_ini.c_str();
+        std::snprintf(app->session.data_directory, sizeof(app->session.data_directory), "%s", app->paths.root.c_str());
+        std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s",
+                      app->paths.system.c_str());
+        std::string cache_path = app->paths.root + "/core_info_cache.cfg";
+        core_catalog_init(&app->catalog, app->paths.cores.c_str(), cache_path.c_str());
         core_catalog_scan(&app->catalog, nullptr);
-        load_settings(app);
+        load_last_used(app);
+    }
+    else
+    {
+        io.IniFilename = nullptr;
     }
 
     app->running = true;
