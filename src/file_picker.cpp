@@ -201,9 +201,13 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
 
     bool keep_open = true;
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-    if (ImGui::Begin("LOAD GAME", &keep_open, flags))
+    if (ImGui::Begin("LOAD GAME", nullptr, flags))
     {
         retro_ui_begin_window(scale);
+        if (retro_ui_close_button())
+        {
+            keep_open = false;
+        }
 
         // Core first: it decides which files are shown.
         const LibretroCoreInfo* core = selected_core(picker, catalog);

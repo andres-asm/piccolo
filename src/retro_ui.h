@@ -29,9 +29,14 @@ void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text);
 void retro_ui_push_theme(ImFont* pixel_font, int32_t scale);
 void retro_ui_pop_theme();
 
-// Call right after ImGui::Begin() of a themed window: raised edges and
+// Call right after ImGui::Begin() of a themed window: a light edge on all four sides and
 // nearest-filtered text for that window. Call retro_ui_end_window() before End().
 void retro_ui_begin_window(int32_t scale);
+
+// The close button in the title bar, drawn with the pixel font's X instead of
+// ImGui's line-drawn one. Begin() the window WITHOUT ImGui's (p_open =
+// nullptr) and call this right after retro_ui_begin_window(). True when clicked.
+bool retro_ui_close_button();
 void retro_ui_end_window();
 
 // ImGui::BeginCombo with the pixel font's down arrow instead of ImGui's own

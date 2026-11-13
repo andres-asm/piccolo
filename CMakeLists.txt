@@ -16,6 +16,10 @@ add_executable(piccolo
     src/retro_ui.cpp
     src/pixel_font_imgui.cpp
     src/file_picker.cpp
+    src/piccolo_settings.cpp
+    src/settings_ui.cpp
+    src/settings_window.cpp
+    src/image_window.cpp
 )
 
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)

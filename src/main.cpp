@@ -20,6 +20,9 @@
 #include "app_paths.h"
 #include "app_shell.h"
 #include "picture.h"
+#include "piccolo_settings.h"
+#include "settings_window.h"
+#include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
 #include "core_session.h"
@@ -56,6 +59,18 @@ struct App
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
     Picture     picture = {};   // the game on screen (viewport + filter)
+
+    // Settings (piccolo_settings.h) in <settings>/piccolo.cfg, and their window.
+    Settings       settings = {};
+    std::string    settings_path;
+    SettingsWindow settings_window = {};
+    bool           settings_window_was_open = false;
+    std::string    cores_directory;   // the one the catalog lists now
+    char           core_name[256] = {};   // for the core/game settings layers ("" = none)
+    char           game_name[256] = {};
+
+    bool window_focused     = true;
+    bool screensaver_allowed = false;   // what we last told SDL
     std::string imgui_ini;   // <settings>/imgui.ini; ImGui keeps a pointer to it
     char last_core[LIBRETRO_PATH_MAX]      = {};
     char last_folder[LIBRETRO_PATH_MAX]    = {};
@@ -103,6 +118,68 @@ static void load_last_used(App* app)
 }
 
 // ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+// A folder setting, or the program folder's own when it's empty.
+static std::string folder_setting(const App* app, const char* key, const std::string& default_folder)
+{
+    const char* value = settings_get_text(&app->settings, key);
+    return value[0] != '\0' ? std::string(value) : default_folder;
+}
+
+// Folders from the settings: the catalog's cores folder now, the others for
+// the next game the session starts.
+static void apply_folders(App* app)
+{
+    if (app->paths.root.empty())
+    {
+        return;
+    }
+    std::string saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
+    std::string states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+    std::string system = folder_setting(app, PICCOLO_PATH_SYSTEM, app->paths.system);
+    std::snprintf(app->session.saves_directory, sizeof(app->session.saves_directory), "%s", saves.c_str());
+    std::snprintf(app->session.states_directory, sizeof(app->session.states_directory), "%s", states.c_str());
+    std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s", system.c_str());
+
+    std::string cores = folder_setting(app, PICCOLO_PATH_CORES, app->paths.cores);
+    if (cores != app->cores_directory)
+    {
+        app->cores_directory = cores;
+        std::string cache_path = app->paths.root + "/core_info_cache.cfg";
+        core_catalog_init(&app->catalog, cores.c_str(), cache_path.c_str());
+        core_catalog_scan(&app->catalog, nullptr);
+    }
+}
+
+static void save_settings(App* app)
+{
+    if (app->settings.dirty && !app->settings_path.empty())
+    {
+        settings_save(&app->settings, app->settings_path.c_str(), "piccolo settings");
+    }
+}
+
+// The core/game layers follow what runs: core = the core's short name,
+// game = the content file's name (the same names the save files use).
+static void update_settings_context(App* app)
+{
+    app->core_name[0] = '\0';
+    app->game_name[0] = '\0';
+    const LibretroHost* host = app->session.host;
+    if (core_session_running(&app->session))
+    {
+        libretro_core_short_name(host->core_path, app->core_name, sizeof(app->core_name));
+        if (host->content_path[0] != '\0')
+        {
+            host_fs_stem(host->content_path, app->game_name, sizeof(app->game_name));
+        }
+    }
+    settings_set_context(&app->settings, app->core_name, app->game_name);
+}
+
+// ---------------------------------------------------------------------------
 // Game control
 // ---------------------------------------------------------------------------
 
@@ -120,17 +197,37 @@ static void set_status(App* app, const char* text)
 // queued audio is dropped so resuming doesn't play stale sound.
 static void update_pause(App* app)
 {
-    bool pause = game_running(app) && (app->menu_visible || app->picker.open);
+    bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open || app->settings_window.image_open;
+    bool pause_for_menu = menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU);
+    bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
+    bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
     }
     app->session.paused = pause;
+
+    // SDL blocks the screensaver; let it through while nothing plays, if allowed.
+    bool allow = settings_get_bool(&app->settings, PICCOLO_SCREENSAVER_WHEN_PAUSED) && (!game_running(app) || pause);
+    if (allow != app->screensaver_allowed)
+    {
+        app->screensaver_allowed = allow;
+        if (allow)
+        {
+            SDL_EnableScreenSaver();
+        }
+        else
+        {
+            SDL_DisableScreenSaver();
+        }
+    }
 }
 
 static void start_game(App* app, const FilePickerChoice* choice)
 {
-    if (core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path))
+    bool started = core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path);
+    update_settings_context(app);
+    if (started)
     {
         app->menu_visible = false;   // straight into the game
         std::snprintf(app->last_core, sizeof(app->last_core), "%s", choice->core_path);
@@ -184,6 +281,12 @@ static void handle_menu_action(App* app, MenuAction action)
         case MenuAction::quit:
             app->running = false;
             break;
+        case MenuAction::general:
+            settings_window_open(&app->settings_window, SettingsTab::general);
+            break;
+        case MenuAction::video:
+            settings_window_open(&app->settings_window, SettingsTab::video);
+            break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
             break;
@@ -200,7 +303,8 @@ static void handle_menu_action(App* app, MenuAction action)
 // Keyboard as the game's joypad only while the game has the screen.
 static bool game_has_keyboard(const App* app)
 {
-    return game_running(app) && !app->menu_visible && !app->picker.open;
+    return game_running(app) && !app->menu_visible && !app->picker.open && !app->settings_window.open &&
+           !app->settings_window.image_open;
 }
 
 static void app_handle_events(App* app)
@@ -218,6 +322,10 @@ static void app_handle_events(App* app)
         {
             app->running = false;
         }
+        if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED || event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
+        {
+            app->window_focused = event.type == SDL_EVENT_WINDOW_FOCUS_GAINED;
+        }
         if (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && event.window.windowID == SDL_GetWindowID(app->shell.window))
         {
             app->running = false;
@@ -227,9 +335,18 @@ static void app_handle_events(App* app)
             switch (event.key.key)
             {
                 case SDLK_ESCAPE:
-                    // Close the LOAD GAME window first; otherwise show/hide the
-                    // menu (it stays up when nothing runs).
-                    if (app->picker.open)
+                    // Close the topmost window first (IMAGE SETTINGS, SETTINGS,
+                    // LOAD GAME); otherwise show/hide the menu (it stays up when
+                    // nothing runs).
+                    if (app->settings_window.image_open)
+                    {
+                        app->settings_window.image_open = false;
+                    }
+                    else if (app->settings_window.open)
+                    {
+                        app->settings_window.open = false;
+                    }
+                    else if (app->picker.open)
                     {
                         app->picker.open = false;
                     }
@@ -263,8 +380,6 @@ static void draw_game(App* app)
     {
         return;
     }
-    // Picture settings come in plan-settings step 6; until then: the core's
-    // aspect, as big as fits, sharp pixels, centered (what piccolo did before).
     const ImGuiIO& io = ImGui::GetIO();
     ViewportInput input = {};
     input.frame_width = session->texture.content_width;
@@ -272,9 +387,7 @@ static void draw_game(App* app)
     input.core_aspect = static_cast<double>(session->host->av_info.geometry.aspect_ratio);
     input.window_width = static_cast<uint32_t>(io.DisplaySize.x);
     input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
-    input.aspect = ViewportAspect::core;
-    input.scaling = ViewportScaling::full;
-    input.filter = ViewportFilter::nearest;
+    piccolo_settings_viewport(&app->settings, &input);
 
     ViewportResult viewport = {};
     if (viewport_compute(&input, &viewport) &&
@@ -283,6 +396,35 @@ static void draw_game(App* app)
         // The background draw list is behind every window, menu bar included.
         picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f, 0.0f);
     }
+}
+
+static void draw_settings(App* app)
+{
+    const CoreSession* session = &app->session;
+    ImageWindowSource image = {};
+    if (game_running(app) && session->texture.has_content && session->texture_id != 0)
+    {
+        image.texture_id = session->texture_id;
+        streaming_texture_uv_max(&session->texture, &image.uv_max_x, &image.uv_max_y);
+        image.frame_width = session->texture.content_width;
+        image.frame_height = session->texture.content_height;
+    }
+    SettingsWindowContext context = {};
+    context.settings = &app->settings;
+    context.paths = &app->paths;
+    context.core_name = app->core_name;
+    context.game_name = app->game_name;
+    context.image = &image;
+    settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
+
+    // Closed (by its button or Esc): apply the folders and save.
+    bool open = app->settings_window.open || app->settings_window.image_open;
+    if (app->settings_window_was_open && !open)
+    {
+        apply_folders(app);
+        save_settings(app);
+    }
+    app->settings_window_was_open = open;
 }
 
 static void app_draw_debug_ui(App* app)
@@ -359,6 +501,11 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (!settings_init(&app->settings, piccolo_settings_table(), piccolo_settings_count()))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "piccolo's settings table is broken (see above)");
+    }
+
     // Everything in piccolo's folder, migrated once from ~/.host-libretro.
     // Without it nothing is saved, but games still run.
     ImGuiIO& io = ImGui::GetIO();
@@ -366,14 +513,9 @@ int main(int argc, char** argv)
     {
         app->imgui_ini = app->paths.settings + "/imgui.ini";
         io.IniFilename = app->imgui_ini.c_str();
-        std::snprintf(app->session.saves_directory, sizeof(app->session.saves_directory), "%s", app->paths.saves.c_str());
-        std::snprintf(app->session.states_directory, sizeof(app->session.states_directory), "%s",
-                      app->paths.states.c_str());
-        std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s",
-                      app->paths.system.c_str());
-        std::string cache_path = app->paths.root + "/core_info_cache.cfg";
-        core_catalog_init(&app->catalog, app->paths.cores.c_str(), cache_path.c_str());
-        core_catalog_scan(&app->catalog, nullptr);
+        app->settings_path = app->paths.settings + "/piccolo.cfg";
+        settings_load(&app->settings, app->settings_path.c_str());
+        apply_folders(app);
         load_last_used(app);
     }
     else
@@ -391,11 +533,13 @@ int main(int argc, char** argv)
             start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
         }
         update_pause(app);
+        app->session.timing.mode = piccolo_settings_timing(&app->settings);
         core_session_update(&app->session, &app->shell);
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
             set_status(app, app->session.message);
             app->menu_visible = true;
+            update_settings_context(app);
         }
 
         if (app_shell_begin_frame(&app->shell))
@@ -415,6 +559,7 @@ int main(int argc, char** argv)
             {
                 app->has_pending_start = true;   // see pending_start
             }
+            draw_settings(app);
             if (app->show_debug_window)
             {
                 app_draw_debug_ui(app);
@@ -434,6 +579,7 @@ int main(int argc, char** argv)
         core_session_wait(&app->session);
     }
 
+    save_settings(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);

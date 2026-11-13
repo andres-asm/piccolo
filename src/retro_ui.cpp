@@ -135,7 +135,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale)
             if (open)
             {
                 use_nearest_sampler();
-                draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_DARK, true);
+                draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_LIGHT, true);
                 for (int32_t item = 0; item < menus_item_count(menu); item++)
                 {
                     const char* item_label = menus_item_label(menu, item);
@@ -227,6 +227,15 @@ static const ThemeColor THEME_COLORS[] = {
     { ImGuiCol_ScrollbarGrabHovered, HIGHLIGHT_FACE },
     { ImGuiCol_ScrollbarGrabActive,  HIGHLIGHT_FACE },
     { ImGuiCol_NavCursor,            TEXT_HIGHLIGHT },
+    { ImGuiCol_SliderGrab,           BAR_LIGHT },
+    { ImGuiCol_SliderGrabActive,     HIGHLIGHT_FACE },
+    { ImGuiCol_Tab,                  BAR_DARK },
+    { ImGuiCol_TabHovered,           HIGHLIGHT_FACE },
+    { ImGuiCol_TabSelected,          BAR_FACE },
+    { ImGuiCol_TabSelectedOverline,  TEXT_HIGHLIGHT },
+    { ImGuiCol_TabDimmed,            BAR_DARK },
+    { ImGuiCol_TabDimmedSelected,    BAR_FACE },
+    { ImGuiCol_Separator,            PANEL_DARK },
 };
 
 constexpr int THEME_COLOR_COUNT = static_cast<int>(sizeof(THEME_COLORS) / sizeof(THEME_COLORS[0]));
@@ -265,7 +274,37 @@ void retro_ui_pop_theme()
 void retro_ui_begin_window(int32_t scale)
 {
     use_nearest_sampler();
-    draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), static_cast<float>(scale), PANEL_LIGHT, PANEL_DARK, true);
+    draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), static_cast<float>(scale), PANEL_LIGHT, PANEL_LIGHT, true);
+}
+
+bool retro_ui_close_button()
+{
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    ImRect title = window->TitleBarRect();
+    float side = title.GetHeight();
+    ImRect box(ImVec2(title.Max.x - side, title.Min.y), title.Max);
+    ImGuiID id = window->GetID("#retro_close");
+
+    // The title bar is outside the content's clip rect: open it up while we
+    // add and draw the button there.
+    ImGui::PushClipRect(title.Min, title.Max, false);
+    bool pressed = false;
+    if (ImGui::ItemAdd(box, id))
+    {
+        bool hovered = false;
+        bool held = false;
+        pressed = ImGui::ButtonBehavior(box, id, &hovered, &held);
+        if (hovered || held)
+        {
+            window->DrawList->AddRectFilled(box.Min, box.Max, to_imgui_u32(HIGHLIGHT_FACE));
+        }
+        ImVec2 text = ImGui::CalcTextSize("X");
+        ImVec2 position(box.Min.x + static_cast<float>(static_cast<int32_t>((side - text.x) * 0.5f)),
+                        box.Min.y + static_cast<float>(static_cast<int32_t>((side - text.y) * 0.5f)));
+        window->DrawList->AddText(position, to_imgui_u32(hovered ? TEXT_HIGHLIGHT : TEXT_NORMAL), "X");
+    }
+    ImGui::PopClipRect();
+    return pressed;
 }
 
 void retro_ui_end_window()

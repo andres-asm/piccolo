@@ -22,9 +22,10 @@ static const MenuItem GAME_ITEMS[] = {
 };
 
 static const MenuItem CONFIG_ITEMS[] = {
-    { "INPUT...", MenuAction::input },
-    { "VIDEO...", MenuAction::video },
-    { "SOUND...", MenuAction::sound },
+    { "GENERAL...", MenuAction::general },
+    { "VIDEO...",   MenuAction::video },
+    { "INPUT...",   MenuAction::input },
+    { "SOUND...",   MenuAction::sound },
 };
 
 static const MenuItem MISC_ITEMS[] = {
@@ -75,6 +76,7 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::save_state: return "SAVE STATE";
         case MenuAction::load_state: return "LOAD STATE";
         case MenuAction::quit:       return "QUIT";
+        case MenuAction::general:    return "GENERAL";
         case MenuAction::video:      return "VIDEO";
         case MenuAction::sound:      return "SOUND";
         case MenuAction::input:      return "INPUT";
