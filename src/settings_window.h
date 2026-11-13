@@ -13,8 +13,10 @@
 //   +-----------------------------------------------------+
 //
 // The scope says which layer changes go to: GLOBAL, THIS CORE or THIS GAME
-// (plan-settings: avoids "which layer did my change go to"). It starts at
-// GLOBAL every time the window opens.
+// (plan-settings: avoids "which layer did my change go to"). When the window
+// opens it starts at the most specific layer already in use (Andrés,
+// 2026-11-13): a game with its own settings opens on THIS GAME, else a core
+// with its own on THIS CORE, else GLOBAL. Changes keep going to the override.
 
 #include <cstdint>
 
@@ -37,6 +39,7 @@ struct SettingsWindow
     SettingsTab  tab         = SettingsTab::general;
     bool         select_tab  = false;   // select `tab` on the next draw
     SettingLayer scope       = SettingLayer::global;
+    bool         choose_scope = false;  // pick the scope on the next draw (just opened)
 };
 
 // What the window needs from piccolo this frame.

@@ -315,6 +315,30 @@ void retro_ui_end_window()
 // ---------------------------------------------------------------------------
 // Combo with the font's arrow
 // ---------------------------------------------------------------------------
+// Checkbox with the font's check mark
+// ---------------------------------------------------------------------------
+
+bool retro_ui_checkbox(const char* label, bool* value)
+{
+    // ImGui draws the box, label and highlight; its check mark is made
+    // invisible and ours drawn in its place.
+    ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    bool changed = ImGui::Checkbox(label, value);
+    ImGui::PopStyleColor();
+    if (*value)
+    {
+        float side = ImGui::GetFrameHeight();
+        ImVec2 box = ImGui::GetItemRectMin();
+        ImVec2 mark = ImGui::CalcTextSize(PIXEL_FONT_UTF8_CHECK);
+        // Whole pixels, so the mark stays sharp.
+        ImVec2 position(box.x + static_cast<float>(static_cast<int32_t>((side - mark.x) * 0.5f)),
+                        box.y + static_cast<float>(static_cast<int32_t>((side - mark.y) * 0.5f)));
+        ImGui::GetWindowDrawList()->AddText(position, to_imgui_u32(TEXT_HIGHLIGHT), PIXEL_FONT_UTF8_CHECK);
+    }
+    return changed;
+}
+
+// ---------------------------------------------------------------------------
 
 bool retro_ui_begin_combo(const char* label, const char* preview)
 {

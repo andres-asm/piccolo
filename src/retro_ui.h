@@ -39,6 +39,10 @@ void retro_ui_begin_window(int32_t scale);
 bool retro_ui_close_button();
 void retro_ui_end_window();
 
+// ImGui::Checkbox with the pixel font's check mark instead of ImGui's
+// line-drawn one. Same return value. Use inside the theme.
+bool retro_ui_checkbox(const char* label, bool* value);
+
 // ImGui::BeginCombo with the pixel font's down arrow instead of ImGui's own
 // triangle. Same return value and EndCombo() rule. Use inside the theme.
 bool retro_ui_begin_combo(const char* label, const char* preview);

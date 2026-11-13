@@ -29,6 +29,7 @@ static const ArrowCodepoint ARROWS[] = {
     { 0x25BC, PIXEL_FONT_ARROW_DOWN },    // BLACK DOWN-POINTING TRIANGLE
     { 0x25C0, PIXEL_FONT_ARROW_LEFT },    // BLACK LEFT-POINTING TRIANGLE
     { 0x25B6, PIXEL_FONT_ARROW_RIGHT },   // BLACK RIGHT-POINTING TRIANGLE
+    { 0x2714, PIXEL_FONT_CHECK },         // HEAVY CHECK MARK
 };
 
 // ImGui reserves glyph index 0 for "not found", so index = character + 1.

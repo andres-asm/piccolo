@@ -295,7 +295,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         ImGui::TextDisabled("%s", picker->directory);
 
         // Bottom row.
-        if (ImGui::Checkbox("SHOW ALL FILES", &picker->show_all))
+        if (retro_ui_checkbox("SHOW ALL FILES", &picker->show_all))
         {
             picker->listing_stale = true;
         }

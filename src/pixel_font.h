@@ -23,6 +23,7 @@ constexpr char PIXEL_FONT_ARROW_UP    = '\x01';
 constexpr char PIXEL_FONT_ARROW_DOWN  = '\x02';
 constexpr char PIXEL_FONT_ARROW_LEFT  = '\x03';
 constexpr char PIXEL_FONT_ARROW_RIGHT = '\x04';
+constexpr char PIXEL_FONT_CHECK       = '\x05';   // check mark, for checkboxes
 
 // One glyph row as 5 bits: bit 4 = leftmost pixel, bit 0 = rightmost.
 // Returns false if `character` has no glyph (the rows of the hollow box are

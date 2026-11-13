@@ -182,7 +182,7 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     {
         ImGui::SameLine();
         bool checked = std::strcmp(value, "true") == 0;
-        if (ImGui::Checkbox(descriptor->label, &checked))
+        if (retro_ui_checkbox(descriptor->label, &checked))
         {
             changed = settings_set_bool(context->settings, context->scope, key, checked);
         }

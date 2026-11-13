@@ -13,7 +13,7 @@ void settings_window_open(SettingsWindow* window, SettingsTab tab)
 {
     if (!window->open)
     {
-        window->scope = SettingLayer::global;
+        window->choose_scope = true;   // needs the settings: done on the next draw
     }
     window->open = true;
     window->tab = tab;
@@ -42,6 +42,20 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
 {
     bool has_core = context->core_name[0] != '\0';
     bool has_game = has_core && context->game_name[0] != '\0';
+    if (window->choose_scope)
+    {
+        // The most specific layer already in use, so changes keep going there.
+        window->choose_scope = false;
+        window->scope = SettingLayer::global;
+        if (has_game && settings_layer_has_values(context->settings, SettingLayer::game))
+        {
+            window->scope = SettingLayer::game;
+        }
+        else if (has_core && settings_layer_has_values(context->settings, SettingLayer::core))
+        {
+            window->scope = SettingLayer::core;
+        }
+    }
     if ((window->scope == SettingLayer::core && !has_core) || (window->scope == SettingLayer::game && !has_game))
     {
         window->scope = SettingLayer::global;   // the game stopped
