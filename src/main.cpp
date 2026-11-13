@@ -645,8 +645,9 @@ static void app_draw_debug_ui(App* app)
         const CoreSession* session = &app->session;
         ImGui::Text("Core: %s, %.3f fps, timing %s", session->host->system_info.library_name,
                     session->host->av_info.timing.fps, frame_timing_mode_name(session->timing.effective));
-        ImGui::Text("Audio: x%.5f, %u ms queued, %llu underruns", session->audio.current_ratio,
-                    audio_output_queued_ms(&session->audio), static_cast<unsigned long long>(session->audio.underruns));
+        ImGui::Text("Audio: x%.5f, %u ms queued (target %.0f ms%s), %llu underruns", session->audio.current_ratio,
+                    audio_output_queued_ms(&session->audio), session->audio.rate.target_ms,
+                    session->audio.rate.automatic ? ", auto" : "", static_cast<unsigned long long>(session->audio.underruns));
     }
     ImGui::Separator();
     ImGui::Checkbox("Dear ImGui demo window", &app->show_imgui_demo);
