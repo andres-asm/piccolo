@@ -5,7 +5,7 @@
 //   +- SETTINGS ------------------------------------------+
 //   | SCOPE [ THIS CORE (SNES9X)                       v ] |   only while a game runs
 //   | [GENERAL] [VIDEO]                                   |
-//   |   [PICTURE] [SYNC]                                  |
+//   |   [PICTURE] [DISPLAY] [SYNC]                        |
 //   |   ASPECT RATIO  [ CORE PROVIDED            v ]      |
 //   | C SCALING       [ INTEGER (OVER)           v ] [RESET]
 //   |   ...                                               |
@@ -14,8 +14,8 @@
 //
 // The scope says which layer changes go to: GLOBAL, THIS CORE or THIS GAME
 // (plan-settings: avoids "which layer did my change go to"). It starts at
-// GLOBAL every time the window opens. The Display tab (window and fullscreen
-// modes) arrives with plan-settings step 7, the low latency group with step 8.
+// GLOBAL every time the window opens. The low latency group arrives with
+// plan-settings step 8.
 
 #include <cstdint>
 
@@ -48,6 +48,7 @@ struct SettingsWindowContext
     const char*              core_name = "";     // "" = no core running
     const char*              game_name = "";     // "" = no game (or running without content)
     const ImageWindowSource* image = nullptr;    // the game picture for IMAGE SETTINGS
+    const char*              window_size = "";   // what the window mode gives, for the Display tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

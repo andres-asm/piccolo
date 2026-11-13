@@ -20,6 +20,7 @@ add_executable(piccolo
     src/settings_ui.cpp
     src/settings_window.cpp
     src/image_window.cpp
+    src/piccolo_window.cpp
 )
 
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)

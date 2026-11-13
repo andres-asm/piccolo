@@ -42,6 +42,37 @@ static const SettingEnumValue TIMING_VALUES[] = {
     {"exact", "EXACT"},
 };
 
+static const SettingEnumValue FULLSCREEN_TYPE_VALUES[] = {
+    {"borderless", "BORDERLESS"},
+    {"exclusive", "EXCLUSIVE"},
+};
+
+static const SettingEnumValue WINDOW_MODE_VALUES[] = {
+    {"fixed", "FIXED SIZE"},
+    {"dynamic", "DYNAMIC (FOLLOWS THE GAME)"},
+};
+
+static const SettingEnumValue WINDOW_ASPECT_VALUES[] = {
+    {"16:9", "16:9"},
+    {"16:10", "16:10"},
+    {"4:3", "4:3"},
+};
+static const double WINDOW_ASPECTS[] = {16.0 / 9.0, 16.0 / 10.0, 4.0 / 3.0};
+
+static const SettingEnumValue WINDOW_HEIGHT_VALUES[] = {
+    {"720", "720 LINES"},
+    {"900", "900 LINES"},
+    {"1080", "1080 LINES"},
+    {"1200", "1200 LINES"},
+    {"1440", "1440 LINES"},
+};
+static const uint32_t WINDOW_HEIGHTS[] = {720, 900, 1080, 1200, 1440};
+
+constexpr uint32_t FULLSCREEN_TYPE_COUNT = sizeof(FULLSCREEN_TYPE_VALUES) / sizeof(FULLSCREEN_TYPE_VALUES[0]);
+constexpr uint32_t WINDOW_MODE_COUNT = sizeof(WINDOW_MODE_VALUES) / sizeof(WINDOW_MODE_VALUES[0]);
+constexpr uint32_t WINDOW_ASPECT_COUNT = sizeof(WINDOW_ASPECT_VALUES) / sizeof(WINDOW_ASPECT_VALUES[0]);
+constexpr uint32_t WINDOW_HEIGHT_COUNT = sizeof(WINDOW_HEIGHT_VALUES) / sizeof(WINDOW_HEIGHT_VALUES[0]);
+
 constexpr uint32_t ASPECT_COUNT = sizeof(ASPECT_VALUES) / sizeof(ASPECT_VALUES[0]);
 constexpr uint32_t SCALING_COUNT = sizeof(SCALING_VALUES) / sizeof(SCALING_VALUES[0]);
 constexpr uint32_t FILTER_COUNT = sizeof(FILTER_VALUES) / sizeof(FILTER_VALUES[0]);
@@ -103,6 +134,31 @@ static const SettingDescriptor SETTINGS[] = {
      .values = TIMING_VALUES, .value_count = TIMING_COUNT, .label = "TIMING",
      .help = "Vsync: one frame per display refresh (smooth; falls back to Exact when the rates are too far "
              "apart). Exact: the core's own speed."},
+
+    // Video: Display (global-only)
+    {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = "FULLSCREEN",
+     .help = "F11 or Alt+Enter switch it too."},
+    {.key = PICCOLO_DISPLAY_FULLSCREEN_TYPE, .type = SettingType::enumeration, .default_value = "borderless",
+     .values = FULLSCREEN_TYPE_VALUES, .value_count = FULLSCREEN_TYPE_COUNT, .label = "FULLSCREEN TYPE",
+     .help = "Borderless: a window covering the screen (quick to switch). Exclusive: the display is piccolo's, at "
+             "its current resolution."},
+    {.key = PICCOLO_WINDOW_MODE, .type = SettingType::enumeration, .default_value = "fixed",
+     .values = WINDOW_MODE_VALUES, .value_count = WINDOW_MODE_COUNT, .label = "WINDOW MODE",
+     .help = "Fixed size: the window keeps its own shape and size. Dynamic: the window is the game's picture, "
+             "resized when the game changes size."},
+    {.key = PICCOLO_WINDOW_ASPECT, .type = SettingType::enumeration, .default_value = "16:9",
+     .values = WINDOW_ASPECT_VALUES, .value_count = WINDOW_ASPECT_COUNT, .label = "WINDOW ASPECT",
+     .help = "Fixed size: the window's shape."},
+    {.key = PICCOLO_WINDOW_HEIGHT, .type = SettingType::enumeration, .default_value = "1080",
+     .values = WINDOW_HEIGHT_VALUES, .value_count = WINDOW_HEIGHT_COUNT, .label = "WINDOW HEIGHT",
+     .help = "Fixed size: the window's height. Smaller if the screen has less room."},
+    {.key = PICCOLO_WINDOW_SCALE, .type = SettingType::integer, .default_value = "3", .min = 1, .max = 10,
+     .label = "WINDOW SCALE", .help = "Dynamic: the window is the game's picture times this. Lowered when the "
+                                      "screen has less room."},
+    {.key = PICCOLO_WINDOW_REMEMBER, .type = SettingType::boolean, .default_value = "true",
+     .label = "REMEMBER WINDOW SIZE AND POSITION",
+     .help = "Start where and how big the window was last time. (Some desktops, like Wayland ones, place windows "
+             "themselves.)"},
 };
 
 const SettingDescriptor* piccolo_settings_table()
@@ -153,4 +209,14 @@ void piccolo_settings_viewport(const Settings* settings, ViewportInput* input)
 TimingMode piccolo_settings_timing(const Settings* settings)
 {
     return settings_get_enum(settings, PICCOLO_VIDEO_TIMING) == 0 ? TimingMode::vsync : TimingMode::exact;
+}
+
+double piccolo_settings_window_aspect(const Settings* settings)
+{
+    return WINDOW_ASPECTS[settings_get_enum(settings, PICCOLO_WINDOW_ASPECT)];
+}
+
+uint32_t piccolo_settings_window_height(const Settings* settings)
+{
+    return WINDOW_HEIGHTS[settings_get_enum(settings, PICCOLO_WINDOW_HEIGHT)];
 }

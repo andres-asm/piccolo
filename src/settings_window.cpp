@@ -125,6 +125,25 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     ImGui::TextDisabled("%s", crop);
 }
 
+static void draw_display(const SettingsUiContext* ui, const SettingsWindowContext* context)
+{
+    settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN, nullptr);
+    settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN_TYPE, nullptr);
+    ImGui::SeparatorText("WINDOW");
+    settings_ui_row(ui, PICCOLO_WINDOW_MODE, nullptr);
+    if (settings_get_enum(ui->settings, PICCOLO_WINDOW_MODE) == PICCOLO_WINDOW_FIXED)
+    {
+        settings_ui_row(ui, PICCOLO_WINDOW_ASPECT, nullptr);
+        settings_ui_row(ui, PICCOLO_WINDOW_HEIGHT, nullptr);
+    }
+    else
+    {
+        settings_ui_row(ui, PICCOLO_WINDOW_SCALE, nullptr);
+    }
+    ImGui::TextDisabled("%s", context->window_size);
+    settings_ui_row(ui, PICCOLO_WINDOW_REMEMBER, nullptr);
+}
+
 static void draw_sync(const SettingsUiContext* ui)
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
@@ -188,6 +207,11 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
                         if (ImGui::BeginTabItem("PICTURE"))
                         {
                             draw_picture(window, &ui, context);
+                            ImGui::EndTabItem();
+                        }
+                        if (ImGui::BeginTabItem("DISPLAY"))
+                        {
+                            draw_display(&ui, context);
                             ImGui::EndTabItem();
                         }
                         if (ImGui::BeginTabItem("SYNC"))

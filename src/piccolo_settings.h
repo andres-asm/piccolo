@@ -30,6 +30,19 @@ constexpr const char* PICCOLO_VIDEO_CROP_BOTTOM = "video_crop_bottom";
 constexpr const char* PICCOLO_VIDEO_CROP_LEFT = "video_crop_left";
 constexpr const char* PICCOLO_VIDEO_CROP_RIGHT = "video_crop_right";
 constexpr const char* PICCOLO_VIDEO_TIMING = "video_timing";
+constexpr const char* PICCOLO_DISPLAY_FULLSCREEN = "display_fullscreen";
+constexpr const char* PICCOLO_DISPLAY_FULLSCREEN_TYPE = "display_fullscreen_type";
+constexpr const char* PICCOLO_WINDOW_MODE = "window_mode";
+constexpr const char* PICCOLO_WINDOW_ASPECT = "window_aspect";
+constexpr const char* PICCOLO_WINDOW_HEIGHT = "window_height";
+constexpr const char* PICCOLO_WINDOW_SCALE = "window_scale";
+constexpr const char* PICCOLO_WINDOW_REMEMBER = "window_remember";
+
+// Values of the enumerations above, by index.
+constexpr uint32_t PICCOLO_FULLSCREEN_BORDERLESS = 0;
+constexpr uint32_t PICCOLO_FULLSCREEN_EXCLUSIVE = 1;
+constexpr uint32_t PICCOLO_WINDOW_FIXED = 0;
+constexpr uint32_t PICCOLO_WINDOW_DYNAMIC = 1;
 
 const SettingDescriptor* piccolo_settings_table();
 uint32_t piccolo_settings_count();
@@ -38,3 +51,7 @@ uint32_t piccolo_settings_count();
 void piccolo_settings_viewport(const Settings* settings, ViewportInput* input);
 
 TimingMode piccolo_settings_timing(const Settings* settings);
+
+// Fixed window mode: the window's aspect and height from the settings.
+double piccolo_settings_window_aspect(const Settings* settings);
+uint32_t piccolo_settings_window_height(const Settings* settings);

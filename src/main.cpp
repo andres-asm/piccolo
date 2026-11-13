@@ -10,6 +10,7 @@
 // piccolo's own folder (app_paths.h: ~/.local/share/piccolo on Linux).
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 #include <SDL3/SDL.h>
@@ -21,6 +22,7 @@
 #include "app_shell.h"
 #include "picture.h"
 #include "piccolo_settings.h"
+#include "piccolo_window.h"
 #include "settings_window.h"
 #include "host_fs.h"
 #include "settings_file.h"
@@ -69,6 +71,8 @@ struct App
     char           core_name[256] = {};   // for the core/game settings layers ("" = none)
     char           game_name[256] = {};
 
+    PiccoloWindow window = {};   // Display settings applied to the window
+
     bool window_focused     = true;
     bool screensaver_allowed = false;   // what we last told SDL
     std::string imgui_ini;   // <settings>/imgui.ini; ImGui keeps a pointer to it
@@ -92,7 +96,20 @@ static void save_last_used(const App* app)
         return;
     }
     SettingsFile file = {};
-    if (settings_file_set(&file, "", "core", app->last_core) && settings_file_set(&file, "", "folder", app->last_folder))
+    bool ok = settings_file_set(&file, "", "core", app->last_core) && settings_file_set(&file, "", "folder", app->last_folder);
+    if (ok && app->window.has_saved)
+    {
+        char number[16] = {};
+        std::snprintf(number, sizeof(number), "%d", app->window.saved_x);
+        ok = settings_file_set(&file, "", "window_x", number);
+        std::snprintf(number, sizeof(number), "%d", app->window.saved_y);
+        ok = ok && settings_file_set(&file, "", "window_y", number);
+        std::snprintf(number, sizeof(number), "%d", app->window.saved_width);
+        ok = ok && settings_file_set(&file, "", "window_width", number);
+        std::snprintf(number, sizeof(number), "%d", app->window.saved_height);
+        ok = ok && settings_file_set(&file, "", "window_height", number);
+    }
+    if (ok)
     {
         settings_file_save(&file, last_used_file(app).c_str(), "piccolo: last used core and folder");
     }
@@ -114,6 +131,18 @@ static void load_last_used(App* app)
     if (folder != nullptr)
     {
         std::snprintf(app->last_folder, sizeof(app->last_folder), "%s", folder);
+    }
+    const char* x = settings_file_get(&file, "", "window_x");
+    const char* y = settings_file_get(&file, "", "window_y");
+    const char* width = settings_file_get(&file, "", "window_width");
+    const char* height = settings_file_get(&file, "", "window_height");
+    if (x != nullptr && y != nullptr && width != nullptr && height != nullptr)
+    {
+        app->window.saved_x = static_cast<int32_t>(std::strtol(x, nullptr, 10));
+        app->window.saved_y = static_cast<int32_t>(std::strtol(y, nullptr, 10));
+        app->window.saved_width = static_cast<int32_t>(std::strtol(width, nullptr, 10));
+        app->window.saved_height = static_cast<int32_t>(std::strtol(height, nullptr, 10));
+        app->window.has_saved = app->window.saved_width > 0 && app->window.saved_height > 0;
     }
 }
 
@@ -300,6 +329,42 @@ static void handle_menu_action(App* app, MenuAction action)
 // Events
 // ---------------------------------------------------------------------------
 
+// F11 / Alt+Enter: the global fullscreen setting, saved on exit.
+static void toggle_fullscreen(App* app)
+{
+    bool fullscreen = settings_get_bool(&app->settings, PICCOLO_DISPLAY_FULLSCREEN);
+    settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_DISPLAY_FULLSCREEN, !fullscreen);
+}
+
+// The running game's picture for the dynamic window mode: the core's base
+// size (what it normally shows) with the Picture settings. False when no
+// game runs.
+static bool game_picture(const App* app, ViewportInput* picture)
+{
+    if (!game_running(app))
+    {
+        return false;
+    }
+    const retro_game_geometry* geometry = &app->session.host->av_info.geometry;
+    if (geometry->base_width == 0 || geometry->base_height == 0)
+    {
+        return false;
+    }
+    *picture = ViewportInput{};
+    picture->frame_width = geometry->base_width;
+    picture->frame_height = geometry->base_height;
+    picture->core_aspect = static_cast<double>(geometry->aspect_ratio);
+    piccolo_settings_viewport(&app->settings, picture);
+    return true;
+}
+
+static void update_window(App* app)
+{
+    ViewportInput picture = {};
+    bool has_picture = game_picture(app, &picture);
+    piccolo_window_apply(&app->window, app->shell.window, &app->settings, has_picture ? &picture : nullptr);
+}
+
 // Keyboard as the game's joypad only while the game has the screen.
 static bool game_has_keyboard(const App* app)
 {
@@ -353,6 +418,15 @@ static void app_handle_events(App* app)
                     else if (game_running(app))
                     {
                         app->menu_visible = !app->menu_visible;
+                    }
+                    break;
+                case SDLK_F11:
+                    toggle_fullscreen(app);
+                    break;
+                case SDLK_RETURN:
+                    if (event.key.mod & SDL_KMOD_ALT)
+                    {
+                        toggle_fullscreen(app);
                     }
                     break;
                 case SDLK_F2:
@@ -415,6 +489,22 @@ static void draw_settings(App* app)
     context.core_name = app->core_name;
     context.game_name = app->game_name;
     context.image = &image;
+    char window_size[96] = {};
+    if (app->window.target_width == 0)
+    {
+        std::snprintf(window_size, sizeof(window_size), "WINDOW: SIZED TO THE GAME WHEN ONE RUNS");
+    }
+    else if (app->window.target_scale > 0)
+    {
+        std::snprintf(window_size, sizeof(window_size), "WINDOW: %u X %u (X%u)", app->window.target_width,
+                      app->window.target_height, app->window.target_scale);
+    }
+    else
+    {
+        std::snprintf(window_size, sizeof(window_size), "WINDOW: %u X %u", app->window.target_width,
+                      app->window.target_height);
+    }
+    context.window_size = window_size;
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -517,6 +607,7 @@ int main(int argc, char** argv)
         settings_load(&app->settings, app->settings_path.c_str());
         apply_folders(app);
         load_last_used(app);
+        piccolo_window_restore(&app->window, app->shell.window, &app->settings);
     }
     else
     {
@@ -534,6 +625,7 @@ int main(int argc, char** argv)
         }
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
+        update_window(app);
         core_session_update(&app->session, &app->shell);
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
@@ -579,6 +671,8 @@ int main(int argc, char** argv)
         core_session_wait(&app->session);
     }
 
+    piccolo_window_capture(&app->window, app->shell.window);
+    save_last_used(app);
     save_settings(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     picture_destroy(&app->picture, &app->shell.vulkan);
