@@ -207,7 +207,18 @@ static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* 
     draw_latency_preset(ui);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
     settings_ui_row(ui, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
+
+    // Frame delay only helps after waiting for present (see frame_delay() in
+    // main.cpp): greyed out without it, the stored value kept.
+    const char* waits = settings_get_at(ui->settings, ui->scope, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
+    bool usable = waits != nullptr && std::strcmp(waits, "true") == 0;
+    ImGui::BeginDisabled(!usable);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
+    ImGui::EndDisabled();
+    if (!usable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        ImGui::SetTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_needs_wait));
+    }
     ImGui::TextDisabled("%s", context->present_wait);
 }
 

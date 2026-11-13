@@ -410,11 +410,15 @@ static bool game_picture(const App* app, ViewportInput* picture)
 
 // Low latency: in Vsync timing the loop is paced by the display, so waiting
 // a few ms here (right after presenting) moves the next input read and core
-// frame closer to the next refresh.
+// frame closer to the next refresh. Only after waiting for present: without
+// it the loop blocks in acquire later, after the input read, and a delay here
+// only adds latency (the setting is greyed out then).
 static void frame_delay(const App* app)
 {
     int32_t delay_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
-    if (delay_ms <= 0 || !game_running(app) || app->session.paused || app->session.timing.effective != TimingMode::vsync)
+    bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
+    if (delay_ms <= 0 || !waits || !game_running(app) || app->session.paused ||
+        app->session.timing.effective != TimingMode::vsync)
     {
         return;
     }

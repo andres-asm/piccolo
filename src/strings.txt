@@ -70,6 +70,7 @@ crop_summary = CROP (TOP, BOTTOM, LEFT, RIGHT)
 section_window = WINDOW
 window_sized_when_running = SIZED TO THE GAME WHEN ONE RUNS
 section_low_latency = LOW LATENCY
+frame_delay_needs_wait = ONLY WITH WAIT FOR PRESENT: WITHOUT IT THE LOOP WAITS FOR THE DISPLAY AFTER READING INPUT, SO A DELAY ONLY ADDS LATENCY.
 latency_preset = PRESET
 latency_preset_help = Sets the three settings below. Change them one by one for anything in between.
 preset_off = OFF
