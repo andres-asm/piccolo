@@ -4,7 +4,7 @@
 //
 //   +- SETTINGS ------------------------------------------+
 //   | SCOPE [ THIS CORE (SNES9X)                       v ] |   only while a game runs
-//   | [GENERAL] [VIDEO]                                   |
+//   | [GENERAL] [VIDEO] [SOUND]                           |
 //   |   [PICTURE] [DISPLAY] [SYNC]                        |
 //   |   ASPECT RATIO  [ CORE PROVIDED            v ]      |
 //   | C SCALING       [ INTEGER (OVER)           v ] [RESET]
@@ -31,6 +31,7 @@ enum class SettingsTab
 {
     general,
     video,
+    sound,
 };
 
 struct SettingsWindow
@@ -54,6 +55,9 @@ struct SettingsWindowContext
     const ImageWindowSource* image = nullptr;    // the game picture for IMAGE SETTINGS
     const char*              window_size = "";   // what the window mode gives, for the Display tab
     const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
+    const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
+    uint32_t                 audio_device_count = 0;
+    const char*              audio_latency = "";  // the latency in use, for the Sound tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

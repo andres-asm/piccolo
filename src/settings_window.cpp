@@ -222,6 +222,26 @@ static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* 
     ImGui::TextDisabled("%s", context->present_wait);
 }
 
+static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext* context)
+{
+    settings_ui_text_choice_row(ui, PICCOLO_AUDIO_DEVICE, context->audio_devices, context->audio_device_count,
+                                piccolo_text(ui->strings, Str::audio_device_default),
+                                piccolo_text(ui->strings, Str::audio_device_missing));
+    settings_ui_row(ui, PICCOLO_AUDIO_VOLUME, nullptr);
+    settings_ui_row(ui, PICCOLO_AUDIO_MUTE, nullptr);
+    settings_ui_row(ui, PICCOLO_AUDIO_LATENCY, nullptr);
+    ImGui::TextDisabled("%s", context->audio_latency);
+
+    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_advanced));
+    settings_ui_row(ui, PICCOLO_AUDIO_RATE_CONTROL, nullptr);
+    // The limit only matters with rate control on: greyed out without it, the stored value kept.
+    const char* drc = settings_get_at(ui->settings, ui->scope, PICCOLO_AUDIO_RATE_CONTROL, nullptr);
+    ImGui::BeginDisabled(drc == nullptr || std::strcmp(drc, "true") != 0);
+    settings_ui_row(ui, PICCOLO_AUDIO_MAX_DEVIATION, nullptr);
+    ImGui::EndDisabled();
+    settings_ui_row(ui, PICCOLO_AUDIO_QUALITY, nullptr);
+}
+
 static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     const Localization* strings = context->strings;
@@ -234,6 +254,8 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->select_tab && window->tab == SettingsTab::general ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags video_flags =
         window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags sound_flags =
+        window->select_tab && window->tab == SettingsTab::sound ? ImGuiTabItemFlags_SetSelected : 0;
     window->select_tab = false;
     if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_general), "general"), nullptr,
                             general_flags))
@@ -265,6 +287,13 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
             }
             ImGui::EndTabBar();
         }
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_sound), "sound"), nullptr,
+                            sound_flags))
+    {
+        window->tab = SettingsTab::sound;
+        draw_sound(ui, context);
         ImGui::EndTabItem();
     }
     ImGui::EndTabBar();

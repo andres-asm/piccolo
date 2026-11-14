@@ -601,3 +601,103 @@ msgstr "TAMAÑO FIJO"
 msgctxt "value_window_dynamic"
 msgid "DYNAMIC (FOLLOWS THE GAME)"
 msgstr "DINÁMICO (SIGUE AL JUEGO)"
+
+msgctxt "tab_sound"
+msgid "SOUND"
+msgstr "SONIDO"
+
+msgctxt "section_advanced"
+msgid "ADVANCED"
+msgstr "AVANZADO"
+
+msgctxt "audio_device_default"
+msgid "SYSTEM DEFAULT"
+msgstr "EL DEL SISTEMA"
+
+msgctxt "audio_device_missing"
+msgid "NOT CONNECTED"
+msgstr "NO CONECTADO"
+
+msgctxt "audio_latency_now"
+msgid "TARGET NOW"
+msgstr "OBJETIVO AHORA"
+
+msgctxt "audio_latency_minimum"
+msgid "DEVICE MINIMUM"
+msgstr "MÍNIMO DEL DISPOSITIVO"
+
+msgctxt "audio_latency_no_game"
+msgid "START A GAME TO SEE THE LATENCY IN USE"
+msgstr "INICIA UN JUEGO PARA VER LA LATENCIA EN USO"
+
+msgctxt "setting_audio_device"
+msgid "OUTPUT DEVICE"
+msgstr "DISPOSITIVO DE SALIDA"
+
+msgctxt "setting_audio_device_help"
+msgid "Where the sound goes. System default: follows the system's choice, also when it changes."
+msgstr "Por dónde sale el sonido. El del sistema: sigue lo que elija el sistema, también cuando cambia."
+
+msgctxt "setting_volume"
+msgid "VOLUME (%)"
+msgstr "VOLUMEN (%)"
+
+msgctxt "setting_volume_help"
+msgid "piccolo's own volume, on top of the system's."
+msgstr "El volumen propio de piccolo, además del del sistema."
+
+msgctxt "setting_mute"
+msgid "MUTE"
+msgstr "SILENCIO"
+
+msgctxt "setting_mute_help"
+msgid "No sound. The game keeps running at the same speed."
+msgstr "Sin sonido. El juego sigue a la misma velocidad."
+
+msgctxt "setting_audio_latency"
+msgid "LATENCY (MS)"
+msgstr "LATENCIA (MS)"
+
+msgctxt "setting_audio_latency_help"
+msgid "How much sound is queued ahead. Less: sound closer to the picture, but it may cut out. Auto: starts low and goes up only when the sound runs out."
+msgstr "Cuánto sonido se encola por adelantado. Menos: el sonido más cerca de la imagen, pero puede cortarse. Auto: empieza bajo y sube solo cuando el sonido se acaba."
+
+msgctxt "value_latency_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "setting_rate_control"
+msgid "DYNAMIC RATE CONTROL"
+msgstr "CONTROL DINÁMICO DE VELOCIDAD"
+
+msgctxt "setting_rate_control_help"
+msgid "Plays a little faster or slower to keep the queue at the latency. Off: the queue drifts until sound cuts out or is dropped."
+msgstr "Toca un poco más rápido o más lento para mantener la cola en la latencia. Apagado: la cola se desvía hasta que el sonido se corta o se descarta."
+
+msgctxt "setting_max_deviation"
+msgid "MAX SPEED CHANGE"
+msgstr "CAMBIO MÁXIMO DE VELOCIDAD"
+
+msgctxt "setting_max_deviation_help"
+msgid "How far dynamic rate control may change the speed. Up to 0.5% nobody hears it."
+msgstr "Cuánto puede cambiar la velocidad el control dinámico. Hasta 0.5% nadie lo nota."
+
+msgctxt "setting_resampler_quality"
+msgid "RESAMPLER QUALITY"
+msgstr "CALIDAD DEL REMUESTREO"
+
+msgctxt "setting_resampler_quality_help"
+msgid "Converting the core's sample rate to the device's. Fastest dulls the highest tones; best costs the most CPU."
+msgstr "La conversión de la frecuencia del core a la del dispositivo. La más rápida apaga los agudos más altos; la mejor usa más CPU."
+
+msgctxt "value_quality_fastest"
+msgid "FASTEST"
+msgstr "MÁS RÁPIDA"
+
+msgctxt "value_quality_medium"
+msgid "MEDIUM"
+msgstr "MEDIA"
+
+msgctxt "value_quality_best"
+msgid "BEST"
+msgstr "MEJOR"

@@ -8,6 +8,7 @@
 
 #include <cstdint>
 
+#include "audio_output.h"
 #include "frame_timing.h"
 #include "piccolo_text.h"
 #include "settings.h"
@@ -42,6 +43,13 @@ constexpr const char* PICCOLO_WINDOW_ASPECT = "window_aspect";
 constexpr const char* PICCOLO_WINDOW_HEIGHT = "window_height";
 constexpr const char* PICCOLO_WINDOW_SCALE = "window_scale";
 constexpr const char* PICCOLO_WINDOW_REMEMBER = "window_remember";
+constexpr const char* PICCOLO_AUDIO_DEVICE = "audio_device";
+constexpr const char* PICCOLO_AUDIO_VOLUME = "audio_volume";
+constexpr const char* PICCOLO_AUDIO_MUTE = "audio_mute";
+constexpr const char* PICCOLO_AUDIO_LATENCY = "audio_latency";
+constexpr const char* PICCOLO_AUDIO_RATE_CONTROL = "audio_rate_control";
+constexpr const char* PICCOLO_AUDIO_MAX_DEVIATION = "audio_max_deviation";
+constexpr const char* PICCOLO_AUDIO_QUALITY = "audio_resampler_quality";
 
 // Values of the enumerations above, by index.
 constexpr uint32_t PICCOLO_FULLSCREEN_BORDERLESS = 0;
@@ -72,6 +80,9 @@ constexpr uint32_t PICCOLO_LATENCY_PRESET_COUNT = 3;
 Str piccolo_settings_latency_preset_name(uint32_t preset);
 uint32_t piccolo_settings_latency_preset(const Settings* settings, SettingLayer layer);
 bool piccolo_settings_apply_latency_preset(Settings* settings, SettingLayer layer, uint32_t preset);
+
+// The Sound settings as audio_output's config.
+void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);
 
 // Fixed window mode: the window's aspect and height from the settings.
 double piccolo_settings_window_aspect(const Settings* settings);

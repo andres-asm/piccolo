@@ -88,6 +88,12 @@ struct App
     Localization strings = {};
     uint32_t     language_setting = UINT32_MAX;
 
+    // Playback devices connected now, for the Sound tab: listed at start and
+    // again when one comes or goes (not every frame).
+    bool                     audio_ready = false;   // we initialized SDL's audio subsystem
+    std::vector<std::string> audio_devices;
+    std::vector<const char*> audio_device_pointers;
+
     bool window_focused     = true;
     bool screensaver_allowed = false;   // what we last told SDL
     std::string imgui_ini;   // <settings>/imgui.ini; ImGui keeps a pointer to it
@@ -366,6 +372,9 @@ static void handle_menu_action(App* app, MenuAction action)
         case MenuAction::video:
             settings_window_open(&app->settings_window, SettingsTab::video);
             break;
+        case MenuAction::sound:
+            settings_window_open(&app->settings_window, SettingsTab::sound);
+            break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
             break;
@@ -470,6 +479,16 @@ static bool game_has_keyboard(const App* app)
            !app->settings_window.image_open;
 }
 
+static void refresh_audio_devices(App* app)
+{
+    audio_output_list_devices(&app->audio_devices);
+    app->audio_device_pointers.clear();
+    for (size_t i = 0; i < app->audio_devices.size(); i++)
+    {
+        app->audio_device_pointers.push_back(app->audio_devices[i].c_str());
+    }
+}
+
 static void app_handle_events(App* app)
 {
     SDL_Event event;
@@ -481,6 +500,11 @@ static void app_handle_events(App* app)
         }
         app_shell_process_event(&app->shell, &event);
 
+        if ((event.type == SDL_EVENT_AUDIO_DEVICE_ADDED || event.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) &&
+            !event.adevice.recording)
+        {
+            refresh_audio_devices(app);
+        }
         if (event.type == SDL_EVENT_QUIT)
         {
             app->running = false;
@@ -610,6 +634,23 @@ static void draw_settings(App* app)
     context.present_wait = piccolo_text(&app->strings, app->shell.vulkan.present_wait_version > 0
                                                            ? Str::present_wait_screen
                                                            : Str::present_wait_gpu);
+    context.audio_devices = app->audio_device_pointers.data();
+    context.audio_device_count = static_cast<uint32_t>(app->audio_device_pointers.size());
+    char audio_latency[200] = {};
+    const AudioOutput* audio = &app->session.audio;
+    if (audio->stream == nullptr)
+    {
+        std::snprintf(audio_latency, sizeof(audio_latency), "%s",
+                      piccolo_text(&app->strings, Str::audio_latency_no_game));
+    }
+    else
+    {
+        std::snprintf(audio_latency, sizeof(audio_latency), "%s: %.0f MS%s, %s: %u MS",
+                      piccolo_text(&app->strings, Str::audio_latency_now), audio->rate.target_ms,
+                      audio->rate.automatic ? " (AUTO)" : "", piccolo_text(&app->strings, Str::audio_latency_minimum),
+                      audio->rate.floor_ms);
+    }
+    context.audio_latency = audio_latency;
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -728,6 +769,15 @@ int main(int argc, char** argv)
     update_language(app);
     set_status(app, piccolo_text(&app->strings, Str::status_start));
 
+    // SDL's audio subsystem from the start (no device is opened until a core
+    // runs): the Sound tab lists the devices and follows hotplug.
+    app->audio_ready = SDL_InitSubSystem(SDL_INIT_AUDIO);
+    if (!app->audio_ready)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audio subsystem: %s", SDL_GetError());
+    }
+    refresh_audio_devices(app);
+
     app->running = true;
     while (app->running)
     {
@@ -744,6 +794,7 @@ int main(int argc, char** argv)
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
+        piccolo_settings_audio(&app->settings, &app->session.audio_config);
         core_session_update(&app->session, &app->shell);
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
@@ -811,6 +862,10 @@ int main(int argc, char** argv)
     save_last_used(app);
     save_settings(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
+    if (app->audio_ready)
+    {
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    }
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);
     delete app;

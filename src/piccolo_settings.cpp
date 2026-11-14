@@ -91,6 +91,28 @@ constexpr uint32_t WINDOW_MODE_COUNT = sizeof(WINDOW_MODE_VALUES) / sizeof(WINDO
 constexpr uint32_t WINDOW_ASPECT_COUNT = sizeof(WINDOW_ASPECT_VALUES) / sizeof(WINDOW_ASPECT_VALUES[0]);
 constexpr uint32_t WINDOW_HEIGHT_COUNT = sizeof(WINDOW_HEIGHT_VALUES) / sizeof(WINDOW_HEIGHT_VALUES[0]);
 
+static const SettingEnumValue LATENCY_VALUES[] = {
+    {"auto", text_id(Str::value_latency_auto)},
+    {"40"},
+    {"50"},
+    {"60"},
+    {"80"},
+    {"100"},
+    {"120"},
+    {"160"},
+    {"200"},
+};
+static const uint32_t LATENCIES[] = {RATE_CONTROL_AUTO_START_MS, 40, 50, 60, 80, 100, 120, 160, 200};
+constexpr uint32_t LATENCY_COUNT = sizeof(LATENCY_VALUES) / sizeof(LATENCY_VALUES[0]);
+
+static const SettingEnumValue QUALITY_VALUES[] = {
+    {"fastest", text_id(Str::value_quality_fastest)},
+    {"medium", text_id(Str::value_quality_medium)},
+    {"best", text_id(Str::value_quality_best)},
+};
+static const AudioQuality QUALITIES[] = {AudioQuality::fastest, AudioQuality::medium, AudioQuality::best};
+constexpr uint32_t QUALITY_COUNT = sizeof(QUALITY_VALUES) / sizeof(QUALITY_VALUES[0]);
+
 constexpr uint32_t ASPECT_COUNT = sizeof(ASPECT_VALUES) / sizeof(ASPECT_VALUES[0]);
 constexpr uint32_t SCALING_COUNT = sizeof(SCALING_VALUES) / sizeof(SCALING_VALUES[0]);
 constexpr uint32_t FILTER_COUNT = sizeof(FILTER_VALUES) / sizeof(FILTER_VALUES[0]);
@@ -186,6 +208,26 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_WINDOW_REMEMBER, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_window_remember),
      .help = text_id(Str::setting_window_remember_help)},
+
+    // Sound. Volume and latency overridable per core / game (plan-milestones,
+    // milestone 2); the device and the advanced ones are global.
+    {.key = PICCOLO_AUDIO_DEVICE, .type = SettingType::text, .default_value = "",
+     .label = text_id(Str::setting_audio_device), .help = text_id(Str::setting_audio_device_help)},
+    {.key = PICCOLO_AUDIO_VOLUME, .type = SettingType::integer, .default_value = "100", .overridable = true,
+     .min = 0, .max = 100, .step = 5, .label = text_id(Str::setting_volume), .help = text_id(Str::setting_volume_help)},
+    {.key = PICCOLO_AUDIO_MUTE, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_mute), .help = text_id(Str::setting_mute_help)},
+    {.key = PICCOLO_AUDIO_LATENCY, .type = SettingType::enumeration, .default_value = "auto", .overridable = true,
+     .values = LATENCY_VALUES, .value_count = LATENCY_COUNT, .label = text_id(Str::setting_audio_latency),
+     .help = text_id(Str::setting_audio_latency_help)},
+    {.key = PICCOLO_AUDIO_RATE_CONTROL, .type = SettingType::boolean, .default_value = "true",
+     .label = text_id(Str::setting_rate_control), .help = text_id(Str::setting_rate_control_help)},
+    {.key = PICCOLO_AUDIO_MAX_DEVIATION, .type = SettingType::real, .default_value = "0.5", .min_real = 0.1,
+     .max_real = 1.0, .step_real = 0.1, .label = text_id(Str::setting_max_deviation),
+     .help = text_id(Str::setting_max_deviation_help)},
+    {.key = PICCOLO_AUDIO_QUALITY, .type = SettingType::enumeration, .default_value = "medium",
+     .values = QUALITY_VALUES, .value_count = QUALITY_COUNT, .label = text_id(Str::setting_resampler_quality),
+     .help = text_id(Str::setting_resampler_quality_help)},
 };
 
 const SettingDescriptor* piccolo_settings_table()
@@ -246,6 +288,23 @@ double piccolo_settings_window_aspect(const Settings* settings)
 uint32_t piccolo_settings_window_height(const Settings* settings)
 {
     return WINDOW_HEIGHTS[settings_get_enum(settings, PICCOLO_WINDOW_HEIGHT)];
+}
+
+void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config)
+{
+    const char* device = settings_get_text(settings, PICCOLO_AUDIO_DEVICE);
+    if (config->device != device)
+    {
+        config->device = device;   // only when it changed: no copy every loop
+    }
+    config->volume_percent = static_cast<uint32_t>(settings_get_int(settings, PICCOLO_AUDIO_VOLUME));
+    config->muted = settings_get_bool(settings, PICCOLO_AUDIO_MUTE);
+    uint32_t latency = settings_get_enum(settings, PICCOLO_AUDIO_LATENCY);
+    config->automatic_latency = latency == 0;
+    config->latency_ms = LATENCIES[latency];
+    config->rate_control = settings_get_bool(settings, PICCOLO_AUDIO_RATE_CONTROL);
+    config->max_deviation = settings_get_real(settings, PICCOLO_AUDIO_MAX_DEVIATION) / 100.0;
+    config->quality = QUALITIES[settings_get_enum(settings, PICCOLO_AUDIO_QUALITY)];
 }
 
 uint32_t piccolo_settings_frames_in_flight(const Settings* settings)

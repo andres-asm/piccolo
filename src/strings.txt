@@ -50,6 +50,7 @@ tab_video = VIDEO
 tab_picture = PICTURE
 tab_display = DISPLAY
 tab_sync = SYNC
+tab_sound = SOUND
 scope = SCOPE
 scope_help = WHERE CHANGES GO. A CORE OR GAME SETTING WINS OVER THE GLOBAL ONE.
 scope_start_game_help = START A GAME TO CHANGE SETTINGS FOR ONE CORE OR ONE GAME
@@ -79,6 +80,12 @@ preset_lowest = LOWEST
 preset_custom = CUSTOM
 present_wait_screen = THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN
 present_wait_gpu = THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD
+section_advanced = ADVANCED
+audio_device_default = SYSTEM DEFAULT
+audio_device_missing = NOT CONNECTED
+audio_latency_now = TARGET NOW
+audio_latency_minimum = DEVICE MINIMUM
+audio_latency_no_game = START A GAME TO SEE THE LATENCY IN USE
 
 # IMAGE SETTINGS window
 image_title = IMAGE SETTINGS
@@ -133,6 +140,26 @@ setting_wait_for_present = WAIT FOR PRESENT
 setting_wait_for_present_help = Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU has finished it).
 setting_frame_delay = FRAME DELAY (MS)
 setting_frame_delay_help = Vsync timing: wait this long before running each frame, so input is read later. Too much and frames are missed: raise it slowly.
+
+# Settings: Sound
+setting_audio_device = OUTPUT DEVICE
+setting_audio_device_help = Where the sound goes. System default: follows the system's choice, also when it changes.
+setting_volume = VOLUME (%)
+setting_volume_help = piccolo's own volume, on top of the system's.
+setting_mute = MUTE
+setting_mute_help = No sound. The game keeps running at the same speed.
+setting_audio_latency = LATENCY (MS)
+setting_audio_latency_help = How much sound is queued ahead. Less: sound closer to the picture, but it may cut out. Auto: starts low and goes up only when the sound runs out.
+value_latency_auto = AUTO
+setting_rate_control = DYNAMIC RATE CONTROL
+setting_rate_control_help = Plays a little faster or slower to keep the queue at the latency. Off: the queue drifts until sound cuts out or is dropped.
+setting_max_deviation = MAX SPEED CHANGE
+setting_max_deviation_help = How far dynamic rate control may change the speed. Up to 0.5% nobody hears it.
+setting_resampler_quality = RESAMPLER QUALITY
+setting_resampler_quality_help = Converting the core's sample rate to the device's. Fastest dulls the highest tones; best costs the most CPU.
+value_quality_fastest = FASTEST
+value_quality_medium = MEDIUM
+value_quality_best = BEST
 
 # Settings: Display
 setting_fullscreen = FULLSCREEN

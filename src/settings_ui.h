@@ -31,6 +31,13 @@ struct SettingsUiContext
 // default folder); may be nullptr. Returns true if the value changed.
 bool settings_ui_row(const SettingsUiContext* context, const char* key, const char* hint);
 
+// A text setting picked from a list (e.g. the audio devices connected now).
+// "" shows `empty_label`; a stored value that isn't in the list is shown
+// with `missing_label` after it, and kept until something else is picked.
+// Returns true if the value changed.
+bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* key, const char* const* choices,
+                                 uint32_t choice_count, const char* empty_label, const char* missing_label);
+
 // Just the marker (for rows drawn by hand). Takes the space of one glyph
 // even when there's no marker, so rows line up.
 void settings_ui_marker(const SettingsUiContext* context, const char* key);

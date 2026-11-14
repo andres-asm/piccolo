@@ -261,3 +261,73 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     ImGui::PopID();
     return changed;
 }
+
+bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* key, const char* const* choices,
+                                 uint32_t choice_count, const char* empty_label, const char* missing_label)
+{
+    const SettingDescriptor* descriptor = settings_find(context->settings, key);
+    if (descriptor == nullptr)
+    {
+        return false;
+    }
+    bool global_only_here = !descriptor->overridable && context->scope != SettingLayer::global;
+    const char* value = settings_get_at(context->settings, context->scope, key, nullptr);
+    bool listed = value[0] == '\0';
+    for (uint32_t i = 0; i < choice_count && !listed; i++)
+    {
+        listed = std::strcmp(choices[i], value) == 0;
+    }
+    char preview[512] = {};
+    if (value[0] == '\0')
+    {
+        std::snprintf(preview, sizeof(preview), "%s", empty_label);
+    }
+    else if (listed)
+    {
+        std::snprintf(preview, sizeof(preview), "%s", value);
+    }
+    else
+    {
+        std::snprintf(preview, sizeof(preview), "%s (%s)", value, missing_label);
+    }
+
+    bool changed = false;
+    ImGui::PushID(key);
+    settings_ui_marker(context, key);
+    ImGui::BeginDisabled(global_only_here);
+    label_column(context, descriptor);
+    ImGui::SetNextItemWidth(widget_width(context));
+    if (retro_ui_begin_combo("##value", preview))
+    {
+        if (ImGui::Selectable(empty_label, value[0] == '\0') && value[0] != '\0')
+        {
+            changed = settings_reset(context->settings, context->scope, key);   // "" = the default
+        }
+        for (uint32_t i = 0; i < choice_count; i++)
+        {
+            ImGui::PushID(static_cast<int>(i));
+            bool current = std::strcmp(choices[i], value) == 0;
+            bool picked = ImGui::Selectable(choices[i], current);
+            ImGui::PopID();
+            if (picked && !current)
+            {
+                changed = settings_set(context->settings, context->scope, key, choices[i]);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::EndDisabled();
+    if (global_only_here)
+    {
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            ImGui::SetTooltip("%s", piccolo_text(context->strings, Str::global_only_help));
+        }
+    }
+    else if (settings_ui_reset_button(context, key))
+    {
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
+}
