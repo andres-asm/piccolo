@@ -186,13 +186,14 @@ static const SettingDescriptor SETTINGS[] = {
      .overridable = true, .values = FRAMES_IN_FLIGHT_VALUES, .value_count = FRAMES_IN_FLIGHT_COUNT,
      .label = text_id(Str::setting_frames_in_flight),
      .help = text_id(Str::setting_frames_in_flight_help)},
-    {.key = PICCOLO_LATENCY_WAIT_FOR_PRESENT, .type = SettingType::boolean, .default_value = "false",
+    // On by default (Andrés, 2026-11-14): AUTO FRAME DELAY, also on, needs it.
+    {.key = PICCOLO_LATENCY_WAIT_FOR_PRESENT, .type = SettingType::boolean, .default_value = "true",
      .overridable = true, .label = text_id(Str::setting_wait_for_present),
      .help = text_id(Str::setting_wait_for_present_help)},
     {.key = PICCOLO_LATENCY_FRAME_DELAY, .type = SettingType::integer, .default_value = "0", .overridable = true,
      .min = 0, .max = 12, .label = text_id(Str::setting_frame_delay),
      .help = text_id(Str::setting_frame_delay_help)},
-    {.key = PICCOLO_LATENCY_FRAME_DELAY_AUTO, .type = SettingType::boolean, .default_value = "false",
+    {.key = PICCOLO_LATENCY_FRAME_DELAY_AUTO, .type = SettingType::boolean, .default_value = "true",
      .overridable = true, .label = text_id(Str::setting_frame_delay_auto),
      .help = text_id(Str::setting_frame_delay_auto_help)},
 

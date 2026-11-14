@@ -202,7 +202,7 @@ static void draw_latency_preset(const SettingsUiContext* ui)
     ImGui::PopID();
 }
 
-static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* context)
+static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_CATCH_UP, nullptr);
@@ -215,18 +215,32 @@ static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* 
     // main.cpp): greyed out without it, the stored value kept.
     const char* waits = settings_get_at(ui->settings, ui->scope, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
     bool usable = waits != nullptr && std::strcmp(waits, "true") == 0;
+    // AUTO ignores the manual value: greyed out then (kept for turning AUTO off).
+    const char* automatic = settings_get_at(ui->settings, ui->scope, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
+    bool is_automatic = automatic != nullptr && std::strcmp(automatic, "true") == 0;
     ImGui::BeginDisabled(!usable);
+    ImGui::BeginDisabled(is_automatic);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
+    ImGui::EndDisabled();
     if (!usable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
         ImGui::SetTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_needs_wait));
     }
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
     ImGui::EndDisabled();
-    const char* automatic = settings_get_at(ui->settings, ui->scope, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
-    if (usable && automatic != nullptr && std::strcmp(automatic, "true") == 0)
+    if (usable && is_automatic)
     {
         ImGui::TextDisabled("%s", context->frame_delay);
+        if (context->frame_delay_found)
+        {
+            char button[200] = {};
+            if (ImGui::Button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::frame_delay_search_again),
+                                      "search_delay")))
+            {
+                window->search_frame_delay = true;
+            }
+            ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_search_again_help));
+        }
     }
     ImGui::TextDisabled("%s", context->present_wait);
 }
@@ -291,7 +305,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
             }
             if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_sync), "sync")))
             {
-                draw_sync(ui, context);
+                draw_sync(window, ui, context);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

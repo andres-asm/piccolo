@@ -739,8 +739,8 @@ msgid "AUTO FRAME DELAY"
 msgstr "FRAME DELAY AUTOMÁTICO"
 
 msgctxt "setting_frame_delay_auto_help"
-msgid "Finds the longest delay that doesn't miss frames, up to FRAME DELAY, and backs off when a frame is missed."
-msgstr "Busca el delay más largo que no pierde frames, hasta FRAME DELAY, y retrocede cuando se pierde uno."
+msgid "Ignores FRAME DELAY: each game starts at the longest delay the display allows and lowers it each time a frame is missed (the first 5 seconds don't count: games stall on their own while starting). After a minute of play in a row without a miss (pausing, the menu or another window start the minute over) it locks and is kept for that game. If the game later gets more demanding (a heavier scene), the locked delay may be too long: missed frames and sound cutting out; turn AUTO off or SEARCH AGAIN."
+msgstr "Ignora FRAME DELAY: cada juego empieza en el delay más largo que permite la pantalla y lo baja cada vez que se pierde un frame (los primeros 5 segundos no cuentan: los juegos se traban solos al arrancar). Tras un minuto seguido de juego sin perder ninguno (la pausa, el menú u otra ventana reinician el minuto) queda fijo y se guarda para ese juego. Si después el juego exige más (una escena más pesada), el delay fijo puede quedar largo: se pierden frames y el sonido puede cortarse; apaga el automático o usa BUSCAR DE NUEVO."
 
 msgctxt "setting_catch_up"
 msgid "CATCH UP MISSED FRAMES"
@@ -754,6 +754,18 @@ msgctxt "frame_delay_needs_vsync"
 msgid "ONLY WITH VSYNC TIMING (THE GAME RUNS IN EXACT)"
 msgstr "SOLO CON TIMING VSYNC (EL JUEGO CORRE EN EXACT)"
 
-msgctxt "frame_delay_needs_maximum"
-msgid "SET FRAME DELAY ABOVE 0: AUTO GOES UP TO IT"
-msgstr "PON FRAME DELAY SOBRE 0: EL AUTOMÁTICO SUBE HASTA AHÍ"
+msgctxt "frame_delay_locked"
+msgid "LOCKED"
+msgstr "FIJO"
+
+msgctxt "frame_delay_searching"
+msgid "SEARCHING, LOCKS AFTER"
+msgstr "BUSCANDO, QUEDA FIJO EN"
+
+msgctxt "frame_delay_search_again"
+msgid "SEARCH AGAIN"
+msgstr "BUSCAR DE NUEVO"
+
+msgctxt "frame_delay_search_again_help"
+msgid "Forget the delay found for this game and search again from the top (e.g. after changing hardware or settings)."
+msgstr "Olvidar el delay encontrado para este juego y buscar de nuevo desde arriba (por ejemplo, tras cambiar de hardware o de settings)."

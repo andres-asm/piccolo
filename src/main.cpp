@@ -111,6 +111,11 @@ struct App
     AutoFrameDelay auto_delay = {};
     uint64_t       delay_last_ns = 0;      // last loop it was fed (0 = not applying)
     uint32_t       frame_delay_ms = 0;     // the delay used last loop
+    // The locked AUTO delay per game (<settings>/frame_delay.cfg, a section
+    // per "core/game", "delay_ms = N"): state, not a setting. A game found
+    // before starts locked at it; SEARCH AGAIN forgets it.
+    SettingsFile   frame_delay_saved;
+    std::string    frame_delay_saved_path;
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
@@ -497,30 +502,103 @@ static bool game_picture(const App* app, ViewportInput* picture)
 // frame closer to the next refresh. Only after waiting for present: without
 // it the loop blocks in acquire later, after the input read, and a delay here
 // only adds latency (the setting is greyed out then).
-// FRAME DELAY, or with AUTO FRAME DELAY the delay it found up to that value
-// (it watches this loop's missed refresh, measured by frame_timing).
+// FRAME DELAY, or with AUTO FRAME DELAY the delay it is finding or found for
+// this game (frame_delay.h). AUTO watches this loop's missed refresh
+// (frame_timing) and needs a minute of uninterrupted play to lock: the menu,
+// a pause or another window having focus start that minute over.
+// This game's section in frame_delay.cfg: "core/game" ("core" without content).
+static std::string frame_delay_section(const App* app)
+{
+    std::string section = app->core_name;
+    if (app->game_name[0] != '\0')
+    {
+        section += "/";
+        section += app->game_name;
+    }
+    return section;
+}
+
+static void save_frame_delay_file(App* app)
+{
+    if (!app->frame_delay_saved_path.empty())
+    {
+        settings_file_save(&app->frame_delay_saved, app->frame_delay_saved_path.c_str(),
+                           "piccolo: automatic frame delay found per game (ms)");
+    }
+}
+
+// SEARCH AGAIN: forget this game's delay and start the search over.
+static void search_frame_delay_again(App* app)
+{
+    if (app->core_name[0] != '\0' &&
+        settings_file_remove(&app->frame_delay_saved, frame_delay_section(app).c_str(), "delay_ms"))
+    {
+        save_frame_delay_file(app);
+    }
+    auto_frame_delay_reset(&app->auto_delay);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: searching again (automatic)");
+}
+
 static void frame_delay(App* app)
 {
-    int32_t delay_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
+    bool automatic = settings_get_bool(&app->settings, PICCOLO_LATENCY_FRAME_DELAY_AUTO);
+    int32_t manual_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
     bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
     app->frame_delay_ms = 0;
-    if (delay_ms <= 0 || !waits || !game_running(app) || app->session.paused ||
-        app->session.timing.effective != TimingMode::vsync)
+    bool applies = waits && game_running(app) && !app->session.paused &&
+                   app->session.timing.effective == TimingMode::vsync && (automatic || manual_ms > 0);
+    if (!applies)
     {
         app->delay_last_ns = 0;
+        auto_frame_delay_interrupt(&app->auto_delay);
         return;
     }
-    uint32_t use = static_cast<uint32_t>(delay_ms);
-    if (settings_get_bool(&app->settings, PICCOLO_LATENCY_FRAME_DELAY_AUTO))
+    uint32_t use = static_cast<uint32_t>(manual_ms > 0 ? manual_ms : 0);
+    if (automatic)
     {
+        bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
+                         app->settings_window.image_open;
+        if (menu_open || !app->window_focused)
+        {
+            auto_frame_delay_interrupt(&app->auto_delay);
+        }
         uint64_t now = SDL_GetTicksNS();
         double elapsed = app->delay_last_ns > 0 ? static_cast<double>(now - app->delay_last_ns) / 1e9 : 0.0;
         app->delay_last_ns = now;
+        if (!app->auto_delay.started && app->core_name[0] != '\0')
+        {
+            // Found before for this game: locked at it from the start.
+            const char* saved = settings_file_get(&app->frame_delay_saved, frame_delay_section(app).c_str(), "delay_ms");
+            long ms = saved != nullptr ? std::strtol(saved, nullptr, 10) : -1;
+            if (ms >= 0 && ms <= 1000)
+            {
+                auto_frame_delay_restore(&app->auto_delay, static_cast<uint32_t>(ms));
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: %ld ms, found before for this game (automatic)", ms);
+            }
+        }
+        bool started = app->auto_delay.started;
         uint32_t before = app->auto_delay.delay_ms;
-        use = auto_frame_delay_update(&app->auto_delay, app->session.timing.missed, elapsed, use);
-        if (use != before)
+        bool was_locked = app->auto_delay.locked;
+        use = auto_frame_delay_update(&app->auto_delay, app->session.timing.missed, elapsed,
+                                      auto_frame_delay_start_ms(app->session.timing.display_hz));
+        if (!started)
+        {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: starting at %u ms (automatic)", use);
+        }
+        else if (use != before)
         {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: %u -> %u ms (automatic)", before, use);
+        }
+        if (app->auto_delay.locked && !was_locked)
+        {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: locked at %u ms", use);
+            if (app->core_name[0] != '\0')
+            {
+                char number[16] = {};
+                std::snprintf(number, sizeof(number), "%u", use);
+                settings_file_set(&app->frame_delay_saved, frame_delay_section(app).c_str(), "delay_ms", number);
+                save_frame_delay_file(app);
+            }
         }
     }
     app->frame_delay_ms = use;
@@ -765,30 +843,40 @@ static void draw_settings(App* app)
     }
     context.game_mode = piccolo_text(&app->strings, game_mode);
     char frame_delay_text[200] = {};
+    const AutoFrameDelay* auto_delay = &app->auto_delay;
     if (game_running(app) && app->session.timing.effective != TimingMode::vsync)
     {
         std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
                       piccolo_text(&app->strings, Str::frame_delay_needs_vsync));
     }
-    else if (settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY) <= 0)
-    {
-        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
-                      piccolo_text(&app->strings, Str::frame_delay_needs_maximum));
-    }
-    else if (game_running(app))
-    {
-        // While paused (this window pauses the game) the delay isn't applied:
-        // show what AUTO found, which is what resuming uses.
-        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s: %u MS",
-                      piccolo_text(&app->strings, Str::frame_delay_now), app->auto_delay.delay_ms);
-    }
-    else
+    else if (!game_running(app) || !auto_delay->started)
     {
         std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
                       piccolo_text(&app->strings, Str::frame_delay_needs_game));
     }
+    else if (auto_delay->locked)
+    {
+        // While paused (this window pauses the game) the delay isn't applied:
+        // what's shown is what resuming uses.
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s: %u MS - %s",
+                      piccolo_text(&app->strings, Str::frame_delay_now), auto_delay->delay_ms,
+                      piccolo_text(&app->strings, Str::frame_delay_locked));
+    }
+    else
+    {
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s: %u MS - %s %.0f S",
+                      piccolo_text(&app->strings, Str::frame_delay_now), auto_delay->delay_ms,
+                      piccolo_text(&app->strings, Str::frame_delay_searching),
+                      auto_frame_delay_seconds_to_lock(auto_delay));
+    }
     context.frame_delay = frame_delay_text;
+    context.frame_delay_found = game_running(app) && auto_delay->locked;
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
+    if (app->settings_window.search_frame_delay)
+    {
+        app->settings_window.search_frame_delay = false;
+        search_frame_delay_again(app);
+    }
 
     // Closed (by its button or Esc): apply the folders and save.
     bool open = app->settings_window.open || app->settings_window.image_open;
@@ -902,6 +990,8 @@ int main(int argc, char** argv)
         recent_games_load(&app->recent, app->recent_path.c_str());
         app->audio_learned_path = app->paths.settings + "/audio_latency.cfg";
         settings_file_load(&app->audio_learned, app->audio_learned_path.c_str());
+        app->frame_delay_saved_path = app->paths.settings + "/frame_delay.cfg";
+        settings_file_load(&app->frame_delay_saved, app->frame_delay_saved_path.c_str());
         piccolo_window_restore(&app->window, app->shell.window, &app->settings);
     }
     else

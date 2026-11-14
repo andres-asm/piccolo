@@ -42,6 +42,7 @@ struct SettingsWindow
     bool         select_tab  = false;   // select `tab` on the next draw
     SettingLayer scope       = SettingLayer::global;
     bool         choose_scope = false;  // pick the scope on the next draw (just opened)
+    bool         search_frame_delay = false;   // SEARCH AGAIN was pressed (piccolo acts on it, then clears it)
 };
 
 // What the window needs from piccolo this frame.
@@ -56,6 +57,7 @@ struct SettingsWindowContext
     const char*              window_size = "";   // what the window mode gives, for the Display tab
     const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
     const char*              frame_delay = "";   // the frame delay in use (AUTO), for the Sync tab
+    bool                     frame_delay_found = false;   // this game has a locked AUTO delay (SEARCH AGAIN shown)
     const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
