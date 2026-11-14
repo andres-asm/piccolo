@@ -8,8 +8,9 @@
 // rate) next to ImGui's demo window; logcat (adb logcat -s piccolo SDL/GPU)
 // has the same plus the display modes.
 //
-// Not handled yet: the app going to the background (Android destroys the
-// window's surface then; the swapchain has to follow).
+// The app going to the background (Android destroys the window's surface)
+// is handled inside app_shell: it releases the swapchain and surface and
+// creates them again when the app is back, while SDL blocks this loop.
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
