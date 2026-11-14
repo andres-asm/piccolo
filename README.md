@@ -30,6 +30,42 @@ session) and its CMake helpers. It doesn't build on its own.
 
 Not there yet: input mapping, state slots, shaders, archives.
 
+## Settings and overrides
+
+Every setting has a global value. Some can also be set **for one core** or
+**for one game** (on one core): an override. The SCOPE selector at the top of
+SETTINGS says where a change goes; it opens on the most specific scope the
+running game already uses, so edits keep going to that override. A setting
+overridden for the running core shows a **C** in front of it, for the running
+game a **G**; RESET removes the override (back to the value below).
+
+Overrides you set are stored in `settings/piccolo.cfg`: the global values
+first, then a section per core (`[core:snes9x]`) and per game
+(`[game:snes9x/Super Mario World (USA)]`). The core name is the core file's
+short name, the game name the content file's name without extension.
+
+| Can be overridden per core / game | Global only |
+|-----------------------------------|-------------|
+| PICTURE: aspect ratio, scaling, auto max offscreen, filter, position, crop (top, bottom, left, right) | GENERAL: language, pause in menu, pause on focus loss, screensaver, game mode, folders |
+| SYNC: timing, catch up missed frames, frames in flight, wait for present, frame delay, auto frame delay | DISPLAY: fullscreen, fullscreen type, window mode, aspect, height, scale, remember |
+| SOUND: volume, latency | SOUND: output device, mute, rate control, max speed change, resampler quality |
+
+### Automatic overrides
+
+Some values piccolo **finds and keeps by itself**, per core or per game, without
+you setting an override. They are not in `piccolo.cfg` and don't show a C or G
+marker: they live in their own files, so deleting one of them (with piccolo
+closed) only forgets what was learned, never your settings.
+
+| What | Per | Stored in | Kept when | Forget it |
+|------|-----|-----------|-----------|-----------|
+| Audio latency learned by SOUND > LATENCY: AUTO | core | `settings/audio_latency.cfg` (`snes9x = 52`) | latency is AUTO; written when another game starts and on quit | delete the line or the file |
+| Frame delay found by SYNC > AUTO FRAME DELAY | game (on one core) | `settings/frame_delay.cfg` (section `[snes9x/Super Mario World (USA)]`, `delay_ms = 11`) | auto frame delay is on and the search locked | SYNC > SEARCH AGAIN, or delete the section or the file |
+
+Other state piccolo keeps (not per core or game): `settings/last_used.cfg`
+(last core and folder, window size and position), `settings/recent.cfg` (the
+RECENT list), `settings/imgui.ini` (window layout) and `core_info_cache.cfg`.
+
 ## Automatic settings
 
 piccolo tunes a few things by itself, so the out-of-the-box experience is low
