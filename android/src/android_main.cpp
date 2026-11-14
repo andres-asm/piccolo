@@ -5,11 +5,17 @@
 // that the activity opens, the window exists, and the log (adb logcat -s piccolo)
 // shows the window's pixel size next to the display modes. On Android TV that
 // tells us whether we get a 1080p window on a 4K display.
+// It also logs each Vulkan device's version and the extensions piccolo's
+// renderer depends on (it's written for Vulkan 1.3 on desktop).
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
 #include <android/log.h>
+#include <vulkan/vulkan.h>
+
+#include <cstring>
+#include <vector>
 
 static const char* LOG_TAG = "piccolo";
 
@@ -34,6 +40,88 @@ static void log_display_modes(SDL_DisplayID display)
                             static_cast<double>(modes[i]->refresh_rate));
     }
     SDL_free(modes);
+}
+
+static void log_vulkan_version(const char* what, uint32_t version)
+{
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "%s: Vulkan %u.%u.%u", what, VK_API_VERSION_MAJOR(version),
+                        VK_API_VERSION_MINOR(version), VK_API_VERSION_PATCH(version));
+}
+
+static bool has_extension(const std::vector<VkExtensionProperties>& extensions, const char* name)
+{
+    for (size_t i = 0; i < extensions.size(); i++) {
+        if (std::strcmp(extensions[i].extensionName, name) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// What the device offers, compared with what the desktop renderer uses.
+// Diagnostic only: the instance is destroyed again right away.
+static void log_vulkan_devices()
+{
+    // Vulkan 1.1 function: libvulkan.so for API 26 only exports 1.0, so ask the loader.
+    uint32_t instance_version = VK_API_VERSION_1_0;
+    PFN_vkEnumerateInstanceVersion enumerate_instance_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
+        vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
+    if (enumerate_instance_version != nullptr) {
+        enumerate_instance_version(&instance_version);
+    }
+    log_vulkan_version("loader", instance_version);
+
+    VkApplicationInfo app_info = {
+        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pApplicationName = "piccolo",
+        .apiVersion = instance_version,
+    };
+    VkInstanceCreateInfo instance_info = {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pApplicationInfo = &app_info,
+    };
+    VkInstance instance = VK_NULL_HANDLE;
+    VkResult result = vkCreateInstance(&instance_info, nullptr, &instance);
+    if (result != VK_SUCCESS) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "vkCreateInstance failed: %d", static_cast<int32_t>(result));
+        return;
+    }
+
+    uint32_t device_count = 0;
+    vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
+    std::vector<VkPhysicalDevice> devices(device_count);
+    vkEnumeratePhysicalDevices(instance, &device_count, devices.data());
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "%u Vulkan devices", device_count);
+
+    const char* wanted[] = {
+        "VK_KHR_dynamic_rendering",
+        "VK_KHR_synchronization2",
+        "VK_KHR_timeline_semaphore",
+        "VK_KHR_maintenance4",
+        "VK_KHR_present_id",
+        "VK_KHR_present_wait",
+        "VK_EXT_swapchain_maintenance1",
+        "VK_GOOGLE_display_timing",
+    };
+
+    for (uint32_t d = 0; d < device_count; d++) {
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceProperties(devices[d], &properties);
+        __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "device %u: %s, driver 0x%08x", d, properties.deviceName,
+                            properties.driverVersion);
+        log_vulkan_version("  device", properties.apiVersion);
+
+        uint32_t extension_count = 0;
+        vkEnumerateDeviceExtensionProperties(devices[d], nullptr, &extension_count, nullptr);
+        std::vector<VkExtensionProperties> extensions(extension_count);
+        vkEnumerateDeviceExtensionProperties(devices[d], nullptr, &extension_count, extensions.data());
+        for (size_t w = 0; w < sizeof(wanted) / sizeof(wanted[0]); w++) {
+            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "  %-32s %s", wanted[w],
+                                has_extension(extensions, wanted[w]) ? "yes" : "NO");
+        }
+    }
+
+    vkDestroyInstance(instance, nullptr);
 }
 
 static void log_window_size(SDL_Window* window, const char* reason)
@@ -65,6 +153,7 @@ int main(int argc, char* argv[])
     }
 
     log_display_modes(SDL_GetDisplayForWindow(window));
+    log_vulkan_devices();
     log_window_size(window, "created");
 
     bool running = true;

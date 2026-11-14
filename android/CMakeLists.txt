@@ -43,7 +43,7 @@ add_subdirectory("${MULTITAP_ROOT}/deps/SDL" sdl EXCLUDE_FROM_ALL SYSTEM)
 add_library(main SHARED
     src/android_main.cpp
 )
-target_link_libraries(main PRIVATE SDL3::SDL3-static android log)
+target_link_libraries(main PRIVATE SDL3::SDL3-static android log vulkan)
 
 # Same warnings as multitap_set_project_flags() in multitap's root CMakeLists.
 target_compile_options(main PRIVATE
