@@ -117,6 +117,14 @@ struct App
     SettingsFile   frame_delay_saved;
     std::string    frame_delay_saved_path;
 
+    // Core options per core / folder / game (settings/core_options.cfg) and
+    // what each core declared (settings/core_options_cache.cfg), for the
+    // session and the CORE OPTIONS tab.
+    CoreOptionsStore option_store;
+    CoreOptionsCache option_cache;
+    std::string      option_store_path;
+    std::string      option_cache_path;
+
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
     bool window_focused     = true;
@@ -382,8 +390,22 @@ static void save_learned_latency(App* app)
     }
 }
 
+static void save_core_options(App* app)
+{
+    if (app->option_store.dirty && !app->option_store_path.empty())
+    {
+        core_options_store_save(&app->option_store, app->option_store_path.c_str());
+    }
+    // The cache right away: a core that crashes later can still be cleaned.
+    if (app->option_cache.dirty && !app->option_cache_path.empty())
+    {
+        core_options_cache_save(&app->option_cache, app->option_cache_path.c_str());
+    }
+}
+
 static void start_game(App* app, const FilePickerChoice* choice)
 {
+    save_core_options(app);   // what was changed for the previous game
     save_learned_latency(app);   // what the previous game learned
     app->game_starts++;
     auto_frame_delay_reset(&app->auto_delay);   // each game finds its own
@@ -871,6 +893,14 @@ static void draw_settings(App* app)
     }
     context.frame_delay = frame_delay_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
+    context.core_options.session = &app->session;
+    context.core_options.store = &app->option_store;
+    context.core_options.cache = &app->option_cache;
+    context.core_options.running_core = game_running(app) ? app->core_name : "";
+    context.core_options.game = app->game_name;
+    const std::string& folder_section = app->option_store.directory_section;
+    size_t folder_at = folder_section.find("/dir:");
+    context.core_options.folder = folder_at != std::string::npos ? folder_section.c_str() + folder_at + 5 : "";
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
     if (app->settings_window.search_frame_delay)
     {
@@ -884,6 +914,7 @@ static void draw_settings(App* app)
     {
         apply_folders(app);
         save_settings(app);
+        save_core_options(app);
     }
     app->settings_window_was_open = open;
 }
@@ -990,6 +1021,12 @@ int main(int argc, char** argv)
         recent_games_load(&app->recent, app->recent_path.c_str());
         app->audio_learned_path = app->paths.settings + "/audio_latency.cfg";
         settings_file_load(&app->audio_learned, app->audio_learned_path.c_str());
+        app->option_store_path = app->paths.settings + "/core_options.cfg";
+        app->option_cache_path = app->paths.settings + "/core_options_cache.cfg";
+        core_options_store_load(&app->option_store, app->option_store_path.c_str());
+        core_options_cache_load(&app->option_cache, app->option_cache_path.c_str());
+        app->session.option_store = &app->option_store;
+        app->session.option_cache = &app->option_cache;
         app->frame_delay_saved_path = app->paths.settings + "/frame_delay.cfg";
         settings_file_load(&app->frame_delay_saved, app->frame_delay_saved_path.c_str());
         piccolo_window_restore(&app->window, app->shell.window, &app->settings);
@@ -1033,6 +1070,10 @@ int main(int argc, char** argv)
         // that may block, so not on every pause and resume.
         game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
         core_session_update(&app->session, &app->shell);
+        if (app->option_cache.dirty)
+        {
+            save_core_options(app);   // a core declared new options: on disk before it can crash
+        }
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
             set_status(app, app->session.message);
@@ -1099,6 +1140,7 @@ int main(int argc, char** argv)
     save_last_used(app);
     save_settings(app);
     save_learned_latency(app);
+    save_core_options(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     game_mode_set(&app->game_mode, false);
     if (app->audio_ready)

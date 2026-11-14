@@ -16,6 +16,8 @@ void settings_window_open(SettingsWindow* window, SettingsTab tab)
     if (!window->open)
     {
         window->choose_scope = true;   // needs the settings: done on the next draw
+        window->core_options.selected_core.clear();   // the running core again
+        window->core_options.choose_layer = true;
     }
     window->open = true;
     window->tab = tab;
@@ -279,6 +281,8 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags sound_flags =
         window->select_tab && window->tab == SettingsTab::sound ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags core_flags =
+        window->select_tab && window->tab == SettingsTab::core_options ? ImGuiTabItemFlags_SetSelected : 0;
     window->select_tab = false;
     if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_general), "general"), nullptr,
                             general_flags))
@@ -319,6 +323,19 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         draw_sound(ui, context);
         ImGui::EndTabItem();
     }
+    if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_core_options), "core_options"),
+                            nullptr, core_flags))
+    {
+        window->tab = SettingsTab::core_options;
+        CoreOptionsUiContext core = context->core_options;
+        core.strings = strings;
+        core.label_width = ui->label_width;
+        if (core.store != nullptr && core.cache != nullptr)
+        {
+            core_options_ui_draw(&window->core_options, &core);
+        }
+        ImGui::EndTabItem();
+    }
     ImGui::EndTabBar();
 }
 
@@ -354,7 +371,11 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
             {
                 window->open = false;
             }
-            draw_scope(window, context);
+            // The core options have their own layers (SAVE TO in their tab).
+            if (window->tab != SettingsTab::core_options)
+            {
+                draw_scope(window, context);
+            }
 
             SettingsUiContext ui = {};
             ui.settings = context->settings;

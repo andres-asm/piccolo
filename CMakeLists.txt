@@ -23,6 +23,7 @@ add_executable(piccolo
     src/piccolo_window.cpp
     src/piccolo_text.cpp
     src/recent_games.cpp
+    src/core_options_ui.cpp
 )
 
 # UI text: src/strings.txt is the one English source. The build turns it into

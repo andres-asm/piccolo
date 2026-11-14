@@ -769,3 +769,99 @@ msgstr "BUSCAR DE NUEVO"
 msgctxt "frame_delay_search_again_help"
 msgid "Forget the delay found for this game and search again from the top (e.g. after changing hardware or settings)."
 msgstr "Olvidar el delay encontrado para este juego y buscar de nuevo desde arriba (por ejemplo, tras cambiar de hardware o de settings)."
+
+msgctxt "tab_core_options"
+msgid "CORE OPTIONS"
+msgstr "OPCIONES DEL CORE"
+
+msgctxt "core_options_core"
+msgid "CORE"
+msgstr "CORE"
+
+msgctxt "core_options_running"
+msgid "RUNNING"
+msgstr "EN USO"
+
+msgctxt "core_options_save_to"
+msgid "SAVE TO"
+msgstr "GUARDAR EN"
+
+msgctxt "core_options_save_to_help"
+msgid "WHERE CHANGES GO. A FOLDER VALUE WINS OVER THE CORE'S, A GAME VALUE OVER BOTH."
+msgstr "DÓNDE VAN LOS CAMBIOS. UN VALOR DE CARPETA GANA AL DEL CORE, UNO DE JUEGO A AMBOS."
+
+msgctxt "core_options_layer_core"
+msgid "THIS CORE"
+msgstr "ESTE CORE"
+
+msgctxt "core_options_layer_folder"
+msgid "THIS FOLDER"
+msgstr "ESTA CARPETA"
+
+msgctxt "core_options_layer_game"
+msgid "THIS GAME"
+msgstr "ESTE JUEGO"
+
+msgctxt "core_options_marker_core_help"
+msgid "SET FOR THIS CORE"
+msgstr "GUARDADO PARA ESTE CORE"
+
+msgctxt "core_options_marker_folder_help"
+msgid "SET FOR THIS FOLDER"
+msgstr "GUARDADO PARA ESTA CARPETA"
+
+msgctxt "core_options_marker_game_help"
+msgid "SET FOR THIS GAME"
+msgstr "GUARDADO PARA ESTE JUEGO"
+
+msgctxt "core_options_none"
+msgid "THIS CORE HAS NO OPTIONS"
+msgstr "ESTE CORE NO TIENE OPCIONES"
+
+msgctxt "core_options_not_running"
+msgid "START A GAME ON THIS CORE TO CHANGE ITS OPTIONS. WHAT IS STORED FOR IT CAN BE DELETED BELOW, EVEN IF THE CORE DOESN'T START."
+msgstr "INICIA UN JUEGO EN ESTE CORE PARA CAMBIAR SUS OPCIONES. LO GUARDADO PARA ÉL SE PUEDE BORRAR ABAJO, AUNQUE EL CORE NO ARRANQUE."
+
+msgctxt "core_options_no_cores"
+msgid "NO CORE HAS RUN YET"
+msgstr "NINGÚN CORE HA CORRIDO TODAVÍA"
+
+msgctxt "core_options_stored"
+msgid "STORED VALUES"
+msgstr "VALORES GUARDADOS"
+
+msgctxt "core_options_stored_none"
+msgid "NOTHING STORED: THE CORE'S DEFAULTS"
+msgstr "NADA GUARDADO: LOS VALORES DEL CORE"
+
+msgctxt "core_options_section_core"
+msgid "FOR THE CORE"
+msgstr "PARA EL CORE"
+
+msgctxt "core_options_section_folder"
+msgid "FOLDER"
+msgstr "CARPETA"
+
+msgctxt "core_options_section_game"
+msgid "GAME"
+msgstr "JUEGO"
+
+msgctxt "core_options_delete"
+msgid "DELETE"
+msgstr "BORRAR"
+
+msgctxt "core_options_delete_section"
+msgid "DELETE SECTION"
+msgstr "BORRAR SECCIÓN"
+
+msgctxt "core_options_delete_all"
+msgid "DELETE ALL FOR THIS CORE"
+msgstr "BORRAR TODO DE ESTE CORE"
+
+msgctxt "core_options_delete_all_help"
+msgid "Back to the core's own defaults for every game. Use it when an option keeps the core from starting."
+msgstr "Volver a los valores del propio core en todos los juegos. Úsalo cuando una opción no deja arrancar al core."
+
+msgctxt "core_options_gone"
+msgid "NO LONGER DECLARED"
+msgstr "YA NO EXISTE"

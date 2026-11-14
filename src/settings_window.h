@@ -21,6 +21,7 @@
 #include <cstdint>
 
 #include "app_paths.h"
+#include "core_options_ui.h"
 #include "image_window.h"
 #include "localization.h"
 #include "settings.h"
@@ -32,6 +33,7 @@ enum class SettingsTab
     general,
     video,
     sound,
+    core_options,
 };
 
 struct SettingsWindow
@@ -43,6 +45,7 @@ struct SettingsWindow
     SettingLayer scope       = SettingLayer::global;
     bool         choose_scope = false;  // pick the scope on the next draw (just opened)
     bool         search_frame_delay = false;   // SEARCH AGAIN was pressed (piccolo acts on it, then clears it)
+    CoreOptionsUiState core_options;           // the CORE OPTIONS tab
 };
 
 // What the window needs from piccolo this frame.
@@ -58,6 +61,7 @@ struct SettingsWindowContext
     const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
     const char*              frame_delay = "";   // the frame delay in use (AUTO), for the Sync tab
     bool                     frame_delay_found = false;   // this game has a locked AUTO delay (SEARCH AGAIN shown)
+    CoreOptionsUiContext     core_options;        // for the CORE OPTIONS tab (strings and label width filled here)
     const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab

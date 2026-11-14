@@ -98,6 +98,32 @@ audio_latency_now = TARGET NOW
 audio_latency_minimum = DEVICE MINIMUM
 audio_latency_no_game = START A GAME TO SEE THE LATENCY IN USE
 
+# CORE OPTIONS tab
+tab_core_options = CORE OPTIONS
+core_options_core = CORE
+core_options_running = RUNNING
+core_options_save_to = SAVE TO
+core_options_save_to_help = WHERE CHANGES GO. A FOLDER VALUE WINS OVER THE CORE'S, A GAME VALUE OVER BOTH.
+core_options_layer_core = THIS CORE
+core_options_layer_folder = THIS FOLDER
+core_options_layer_game = THIS GAME
+core_options_marker_core_help = SET FOR THIS CORE
+core_options_marker_folder_help = SET FOR THIS FOLDER
+core_options_marker_game_help = SET FOR THIS GAME
+core_options_none = THIS CORE HAS NO OPTIONS
+core_options_not_running = START A GAME ON THIS CORE TO CHANGE ITS OPTIONS. WHAT IS STORED FOR IT CAN BE DELETED BELOW, EVEN IF THE CORE DOESN'T START.
+core_options_no_cores = NO CORE HAS RUN YET
+core_options_stored = STORED VALUES
+core_options_stored_none = NOTHING STORED: THE CORE'S DEFAULTS
+core_options_section_core = FOR THE CORE
+core_options_section_folder = FOLDER
+core_options_section_game = GAME
+core_options_delete = DELETE
+core_options_delete_section = DELETE SECTION
+core_options_delete_all = DELETE ALL FOR THIS CORE
+core_options_delete_all_help = Back to the core's own defaults for every game. Use it when an option keeps the core from starting.
+core_options_gone = NO LONGER DECLARED
+
 # IMAGE SETTINGS window
 image_title = IMAGE SETTINGS
 image_editing = EDITING
