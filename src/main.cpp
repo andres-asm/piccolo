@@ -22,6 +22,7 @@
 
 #include "app_paths.h"
 #include "app_shell.h"
+#include "frame_delay.h"
 #include "game_mode.h"
 #include "picture.h"
 #include "piccolo_settings.h"
@@ -105,6 +106,11 @@ struct App
     uint32_t     learned_for_start = 0;      // the start the values below belong to (0 = none)
     uint32_t     learned_start_ms = 0;       // where this game's AUTO target starts (0 = the default)
     uint32_t     learned_recorded_ms = 0;    // the last target written to audio_learned
+
+    // AUTO FRAME DELAY (frame_delay.h): the delay it found, for this game.
+    AutoFrameDelay auto_delay = {};
+    uint64_t       delay_last_ns = 0;      // last loop it was fed (0 = not applying)
+    uint32_t       frame_delay_ms = 0;     // the delay used last loop
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
@@ -375,6 +381,7 @@ static void start_game(App* app, const FilePickerChoice* choice)
 {
     save_learned_latency(app);   // what the previous game learned
     app->game_starts++;
+    auto_frame_delay_reset(&app->auto_delay);   // each game finds its own
     bool started = core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path);
     update_settings_context(app);
     if (started)
@@ -490,16 +497,37 @@ static bool game_picture(const App* app, ViewportInput* picture)
 // frame closer to the next refresh. Only after waiting for present: without
 // it the loop blocks in acquire later, after the input read, and a delay here
 // only adds latency (the setting is greyed out then).
-static void frame_delay(const App* app)
+// FRAME DELAY, or with AUTO FRAME DELAY the delay it found up to that value
+// (it watches this loop's missed refresh, measured by frame_timing).
+static void frame_delay(App* app)
 {
     int32_t delay_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
     bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
+    app->frame_delay_ms = 0;
     if (delay_ms <= 0 || !waits || !game_running(app) || app->session.paused ||
         app->session.timing.effective != TimingMode::vsync)
     {
+        app->delay_last_ns = 0;
         return;
     }
-    SDL_DelayPrecise(static_cast<Uint64>(delay_ms) * 1000000u);
+    uint32_t use = static_cast<uint32_t>(delay_ms);
+    if (settings_get_bool(&app->settings, PICCOLO_LATENCY_FRAME_DELAY_AUTO))
+    {
+        uint64_t now = SDL_GetTicksNS();
+        double elapsed = app->delay_last_ns > 0 ? static_cast<double>(now - app->delay_last_ns) / 1e9 : 0.0;
+        app->delay_last_ns = now;
+        uint32_t before = app->auto_delay.delay_ms;
+        use = auto_frame_delay_update(&app->auto_delay, app->session.timing.missed, elapsed, use);
+        if (use != before)
+        {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: %u -> %u ms (automatic)", before, use);
+        }
+    }
+    app->frame_delay_ms = use;
+    if (use > 0)
+    {
+        SDL_DelayPrecise(static_cast<Uint64>(use) * 1000000u);
+    }
 }
 
 // The language setting -> the UI text and what cores are told (GET_LANGUAGE,
@@ -736,6 +764,30 @@ static void draw_settings(App* app)
         break;
     }
     context.game_mode = piccolo_text(&app->strings, game_mode);
+    char frame_delay_text[200] = {};
+    if (game_running(app) && app->session.timing.effective != TimingMode::vsync)
+    {
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
+                      piccolo_text(&app->strings, Str::frame_delay_needs_vsync));
+    }
+    else if (settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY) <= 0)
+    {
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
+                      piccolo_text(&app->strings, Str::frame_delay_needs_maximum));
+    }
+    else if (game_running(app))
+    {
+        // While paused (this window pauses the game) the delay isn't applied:
+        // show what AUTO found, which is what resuming uses.
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s: %u MS",
+                      piccolo_text(&app->strings, Str::frame_delay_now), app->auto_delay.delay_ms);
+    }
+    else
+    {
+        std::snprintf(frame_delay_text, sizeof(frame_delay_text), "%s",
+                      piccolo_text(&app->strings, Str::frame_delay_needs_game));
+    }
+    context.frame_delay = frame_delay_text;
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -774,6 +826,9 @@ static void app_draw_debug_ui(App* app)
         ImGui::Text("Audio: x%.5f, %u ms queued (target %.0f ms%s), %llu underruns", session->audio.current_ratio,
                     audio_output_queued_ms(&session->audio), session->audio.rate.target_ms,
                     session->audio.rate.automatic ? ", auto" : "", static_cast<unsigned long long>(session->audio.underruns));
+        ImGui::Text("Frames: %llu missed refreshes, %llu caught up; frame delay %u ms",
+                    static_cast<unsigned long long>(session->timing.missed_total),
+                    static_cast<unsigned long long>(session->timing.caught_up_total), app->frame_delay_ms);
     }
     ImGui::Separator();
     ImGui::Checkbox("Dear ImGui demo window", &app->show_imgui_demo);
@@ -876,6 +931,7 @@ int main(int argc, char** argv)
         }
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
+        app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
         update_window(app);
         update_language(app);
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,

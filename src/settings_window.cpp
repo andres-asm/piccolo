@@ -205,6 +205,7 @@ static void draw_latency_preset(const SettingsUiContext* ui)
 static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
+    settings_ui_row(ui, PICCOLO_VIDEO_CATCH_UP, nullptr);
     ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_low_latency));
     draw_latency_preset(ui);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
@@ -216,10 +217,16 @@ static void draw_sync(const SettingsUiContext* ui, const SettingsWindowContext* 
     bool usable = waits != nullptr && std::strcmp(waits, "true") == 0;
     ImGui::BeginDisabled(!usable);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY, nullptr);
-    ImGui::EndDisabled();
     if (!usable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
         ImGui::SetTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_needs_wait));
+    }
+    settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
+    ImGui::EndDisabled();
+    const char* automatic = settings_get_at(ui->settings, ui->scope, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
+    if (usable && automatic != nullptr && std::strcmp(automatic, "true") == 0)
+    {
+        ImGui::TextDisabled("%s", context->frame_delay);
     }
     ImGui::TextDisabled("%s", context->present_wait);
 }

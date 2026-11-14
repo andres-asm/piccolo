@@ -178,6 +178,9 @@ static const SettingDescriptor SETTINGS[] = {
      .values = TIMING_VALUES, .value_count = TIMING_COUNT, .label = text_id(Str::setting_timing),
      .help = text_id(Str::setting_timing_help)},
 
+    {.key = PICCOLO_VIDEO_CATCH_UP, .type = SettingType::boolean, .default_value = "true", .overridable = true,
+     .label = text_id(Str::setting_catch_up), .help = text_id(Str::setting_catch_up_help)},
+
     // Video: Sync, low latency (overridable: a heavy core may not afford it)
     {.key = PICCOLO_LATENCY_FRAMES_IN_FLIGHT, .type = SettingType::enumeration, .default_value = "2",
      .overridable = true, .values = FRAMES_IN_FLIGHT_VALUES, .value_count = FRAMES_IN_FLIGHT_COUNT,
@@ -189,6 +192,9 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_LATENCY_FRAME_DELAY, .type = SettingType::integer, .default_value = "0", .overridable = true,
      .min = 0, .max = 12, .label = text_id(Str::setting_frame_delay),
      .help = text_id(Str::setting_frame_delay_help)},
+    {.key = PICCOLO_LATENCY_FRAME_DELAY_AUTO, .type = SettingType::boolean, .default_value = "false",
+     .overridable = true, .label = text_id(Str::setting_frame_delay_auto),
+     .help = text_id(Str::setting_frame_delay_auto_help)},
 
     // Video: Display (global-only)
     {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = text_id(Str::setting_fullscreen),

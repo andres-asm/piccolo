@@ -80,6 +80,10 @@ preset_lowest = LOWEST
 preset_custom = CUSTOM
 present_wait_screen = THIS GPU: WAITS UNTIL THE FRAME IS ON SCREEN
 present_wait_gpu = THIS GPU: NO PRESENT WAIT, WAITS FOR THE GPU INSTEAD
+frame_delay_now = FRAME DELAY NOW
+frame_delay_needs_game = START A GAME TO SEE THE DELAY IN USE
+frame_delay_needs_vsync = ONLY WITH VSYNC TIMING (THE GAME RUNS IN EXACT)
+frame_delay_needs_maximum = SET FRAME DELAY ABOVE 0: AUTO GOES UP TO IT
 section_advanced = ADVANCED
 game_mode_active = GAMEMODE: ACTIVE
 game_mode_off = GAMEMODE: NOT IN USE
@@ -146,6 +150,10 @@ setting_wait_for_present = WAIT FOR PRESENT
 setting_wait_for_present_help = Don't start the next frame until this one is on screen (or, where the GPU can't tell, until the GPU has finished it).
 setting_frame_delay = FRAME DELAY (MS)
 setting_frame_delay_help = Vsync timing: wait this long before running each frame, so input is read later. Too much and frames are missed: raise it slowly.
+setting_frame_delay_auto = AUTO FRAME DELAY
+setting_frame_delay_auto_help = Finds the longest delay that doesn't miss frames, up to FRAME DELAY, and backs off when a frame is missed.
+setting_catch_up = CATCH UP MISSED FRAMES
+setting_catch_up_help = Vsync timing: when the system stalls and a frame comes late, run the frames it missed, so the game and its sound don't fall behind. Off: a stall slows the game for a moment and the sound may cut out.
 
 # Settings: Sound
 setting_audio_device = OUTPUT DEVICE

@@ -725,3 +725,35 @@ msgstr "MODO JUEGO"
 msgctxt "setting_game_mode_help"
 msgid "While a game runs, ask GameMode (Linux) for full CPU speed, so the clock doesn't drop and the sound doesn't cut out. Needs GameMode installed."
 msgstr "Mientras corre un juego, pedir a GameMode (Linux) la CPU a toda velocidad, para que el reloj no baje y el sonido no se corte. Necesita GameMode instalado."
+
+msgctxt "frame_delay_now"
+msgid "FRAME DELAY NOW"
+msgstr "FRAME DELAY AHORA"
+
+msgctxt "frame_delay_needs_game"
+msgid "START A GAME TO SEE THE DELAY IN USE"
+msgstr "INICIA UN JUEGO PARA VER EL DELAY EN USO"
+
+msgctxt "setting_frame_delay_auto"
+msgid "AUTO FRAME DELAY"
+msgstr "FRAME DELAY AUTOMÁTICO"
+
+msgctxt "setting_frame_delay_auto_help"
+msgid "Finds the longest delay that doesn't miss frames, up to FRAME DELAY, and backs off when a frame is missed."
+msgstr "Busca el delay más largo que no pierde frames, hasta FRAME DELAY, y retrocede cuando se pierde uno."
+
+msgctxt "setting_catch_up"
+msgid "CATCH UP MISSED FRAMES"
+msgstr "RECUPERAR FRAMES PERDIDOS"
+
+msgctxt "setting_catch_up_help"
+msgid "Vsync timing: when the system stalls and a frame comes late, run the frames it missed, so the game and its sound don't fall behind. Off: a stall slows the game for a moment and the sound may cut out."
+msgstr "Con Vsync: cuando el sistema se traba y un frame llega tarde, correr los frames perdidos, así el juego y su sonido no se atrasan. Apagado: una trabada frena el juego un momento y el sonido puede cortarse."
+
+msgctxt "frame_delay_needs_vsync"
+msgid "ONLY WITH VSYNC TIMING (THE GAME RUNS IN EXACT)"
+msgstr "SOLO CON TIMING VSYNC (EL JUEGO CORRE EN EXACT)"
+
+msgctxt "frame_delay_needs_maximum"
+msgid "SET FRAME DELAY ABOVE 0: AUTO GOES UP TO IT"
+msgstr "PON FRAME DELAY SOBRE 0: EL AUTOMÁTICO SUBE HASTA AHÍ"
