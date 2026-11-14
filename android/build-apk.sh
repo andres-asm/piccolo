@@ -11,7 +11,7 @@
 # aligned (zipalign) and signed with the debug key (apksigner).
 #
 # Tools, overridable from the environment:
-#   ANDROID_NDK_ROOT  NDK, only its sysroot is used (default ~/Android/ndk/android-ndk-r28c)
+#   ANDROID_NDK_ROOT  NDK, only its sysroot is used (default ~/Android/ndk/android-ndk-r30)
 #   ANDROID_JAR       android.jar that Java compiles against (default /usr/lib/android-sdk/platforms/android-35/android.jar)
 #   AAPT_ANDROID_JAR  android.jar that aapt2 links the manifest against (default .../android-32/android.jar):
 #                     Debian's aapt2 (2.19) can't read the resource table of API 33+ jars.
@@ -29,7 +29,7 @@ ANDROID_JAR=${ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-35/android.jar
 AAPT_ANDROID_JAR=${AAPT_ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-32/android.jar}
 D8_JAR=${D8_JAR:-$HOME/Android/r8/r8.jar}
 JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}
-MIN_API=26
+MIN_API=28
 
 for f in "$ANDROID_JAR" "$AAPT_ANDROID_JAR" "$D8_JAR" "$JAVA_HOME/bin/javac"; do
     if [ ! -e "$f" ]; then
@@ -39,7 +39,9 @@ for f in "$ANDROID_JAR" "$AAPT_ANDROID_JAR" "$D8_JAR" "$JAVA_HOME/bin/javac"; do
 done
 
 echo "== native library"
-cmake -S "$here" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$here/cmake/android-toolchain.cmake" >/dev/null
+# From multitap's root CMakeLists.txt: it builds only piccolo's libmain.so for Android.
+cmake -S "$multitap_root" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$here/cmake/android-toolchain.cmake" \
+    -DMULTITAP_BUILD_TESTS=OFF >/dev/null
 cmake --build "$build"
 
 echo "== java"

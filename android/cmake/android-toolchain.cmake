@@ -8,23 +8,25 @@
 # aarch64-linux-android with those.
 #
 # Variables (pass with -D, or set in the environment):
-#   ANDROID_NDK_ROOT     the unpacked NDK (default ~/Android/ndk/android-ndk-r28c)
+#   ANDROID_NDK_ROOT     the unpacked NDK (default ~/Android/ndk/android-ndk-r30)
 #   PICCOLO_LLVM_ROOT    the LLVM install with clang + lld (default /usr/lib/llvm-21)
-#   PICCOLO_ANDROID_API  minimum Android API level (default 26, Android 8.0)
+#   PICCOLO_ANDROID_API  minimum Android API level (default 28, Android 9)
 
 if(NOT ANDROID_NDK_ROOT)
     if(DEFINED ENV{ANDROID_NDK_ROOT})
         set(ANDROID_NDK_ROOT "$ENV{ANDROID_NDK_ROOT}")
     else()
-        set(ANDROID_NDK_ROOT "$ENV{HOME}/Android/ndk/android-ndk-r28c")
+        set(ANDROID_NDK_ROOT "$ENV{HOME}/Android/ndk/android-ndk-r30")
     endif()
 endif()
 if(NOT PICCOLO_LLVM_ROOT)
     set(PICCOLO_LLVM_ROOT "/usr/lib/llvm-21")
 endif()
 if(NOT PICCOLO_ANDROID_API)
-    # 26: AAudio, Vulkan 1.0 is everywhere that matters, and the Shield TV is on 30.
-    set(PICCOLO_ANDROID_API 26)
+    # 28 (Android 9): its libvulkan.so exports the Vulkan 1.1 functions
+    # vk_context calls (vkEnumerateInstanceVersion, vkGetPhysicalDeviceFeatures2).
+    # The Shield TV is on 30.
+    set(PICCOLO_ANDROID_API 28)
 endif()
 
 # Try-compile projects run this file again in their own folder: hand the
