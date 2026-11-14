@@ -95,6 +95,17 @@ struct App
     std::vector<std::string> audio_devices;
     std::vector<const char*> audio_device_pointers;
 
+    // AUTO audio latency learned per core (<settings>/audio_latency.cfg,
+    // "core = ms"): state, not a setting. A game on that core starts its
+    // automatic target there instead of from the bottom again.
+    SettingsFile audio_learned;
+    std::string  audio_learned_path;
+    bool         audio_learned_dirty = false;
+    uint32_t     game_starts = 0;            // counts start_game calls
+    uint32_t     learned_for_start = 0;      // the start the values below belong to (0 = none)
+    uint32_t     learned_start_ms = 0;       // where this game's AUTO target starts (0 = the default)
+    uint32_t     learned_recorded_ms = 0;    // the last target written to audio_learned
+
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
     bool window_focused     = true;
@@ -308,8 +319,62 @@ static void update_pause(App* app)
     }
 }
 
+// AUTO latency per core: a game starts its automatic target where this core
+// ended last time, and where it goes is recorded as it moves (saved with the
+// other state: at each game start and on quit).
+static void apply_learned_latency(App* app)
+{
+    AudioOutputConfig* config = &app->session.audio_config;
+    if (!game_running(app) || !config->automatic_latency || app->core_name[0] == '\0')
+    {
+        app->learned_for_start = 0;   // read again if AUTO comes back
+        return;
+    }
+    if (app->learned_for_start != app->game_starts)
+    {
+        // This game's start value, read once (the same for the whole game:
+        // a new start value restarts the target).
+        app->learned_for_start = app->game_starts;
+        const char* value = settings_file_get(&app->audio_learned, "", app->core_name);
+        long ms = value != nullptr ? std::strtol(value, nullptr, 10) : 0;
+        app->learned_start_ms = ms > 0 && ms <= static_cast<long>(RATE_CONTROL_MAX_TARGET_MS) ? static_cast<uint32_t>(ms) : 0;
+        app->learned_recorded_ms = app->learned_start_ms;
+    }
+    if (app->learned_start_ms > 0)
+    {
+        config->latency_ms = app->learned_start_ms;
+    }
+
+    const AudioOutput* audio = &app->session.audio;
+    if (audio->stream == nullptr || !audio->rate.automatic)
+    {
+        return;
+    }
+    uint32_t now = static_cast<uint32_t>(audio->rate.target_ms + 0.5);
+    if (now != app->learned_recorded_ms)
+    {
+        char number[16] = {};
+        std::snprintf(number, sizeof(number), "%u", now);
+        settings_file_set(&app->audio_learned, "", app->core_name, number);
+        app->learned_recorded_ms = now;
+        app->audio_learned_dirty = true;
+    }
+}
+
+static void save_learned_latency(App* app)
+{
+    if (app->audio_learned_dirty && !app->audio_learned_path.empty())
+    {
+        settings_file_save(&app->audio_learned, app->audio_learned_path.c_str(),
+                           "piccolo: automatic audio latency learned per core (ms)");
+        app->audio_learned_dirty = false;
+    }
+}
+
 static void start_game(App* app, const FilePickerChoice* choice)
 {
+    save_learned_latency(app);   // what the previous game learned
+    app->game_starts++;
     bool started = core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path);
     update_settings_context(app);
     if (started)
@@ -780,6 +845,8 @@ int main(int argc, char** argv)
         load_last_used(app);
         app->recent_path = app->paths.settings + "/recent.cfg";
         recent_games_load(&app->recent, app->recent_path.c_str());
+        app->audio_learned_path = app->paths.settings + "/audio_latency.cfg";
+        settings_file_load(&app->audio_learned, app->audio_learned_path.c_str());
         piccolo_window_restore(&app->window, app->shell.window, &app->settings);
     }
     else
@@ -815,6 +882,7 @@ int main(int argc, char** argv)
                                       piccolo_settings_frames_in_flight(&app->settings));
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
+        apply_learned_latency(app);
         // Held for the whole game, paused or not: a request is a D-Bus call
         // that may block, so not on every pause and resume.
         game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
@@ -884,6 +952,7 @@ int main(int argc, char** argv)
     piccolo_window_capture(&app->window, app->shell.window);
     save_last_used(app);
     save_settings(app);
+    save_learned_latency(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     game_mode_set(&app->game_mode, false);
     if (app->audio_ready)
