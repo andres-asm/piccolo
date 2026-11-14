@@ -58,6 +58,7 @@ struct SettingsWindowContext
     const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
+    const char*              game_mode = "";      // GameMode's state, for the General tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

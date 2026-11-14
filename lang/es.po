@@ -701,3 +701,27 @@ msgstr "MEDIA"
 msgctxt "value_quality_best"
 msgid "BEST"
 msgstr "MEJOR"
+
+msgctxt "game_mode_active"
+msgid "GAMEMODE: ACTIVE"
+msgstr "GAMEMODE: ACTIVO"
+
+msgctxt "game_mode_off"
+msgid "GAMEMODE: NOT IN USE"
+msgstr "GAMEMODE: SIN USAR"
+
+msgctxt "game_mode_not_available"
+msgid "GAMEMODE: NOT INSTALLED OR NOT RUNNING"
+msgstr "GAMEMODE: NO INSTALADO O NO RESPONDE"
+
+msgctxt "game_mode_not_supported"
+msgid "GAMEMODE: ONLY ON LINUX"
+msgstr "GAMEMODE: SOLO EN LINUX"
+
+msgctxt "setting_game_mode"
+msgid "GAME MODE"
+msgstr "MODO JUEGO"
+
+msgctxt "setting_game_mode_help"
+msgid "While a game runs, ask GameMode (Linux) for full CPU speed, so the clock doesn't drop and the sound doesn't cut out. Needs GameMode installed."
+msgstr "Mientras corre un juego, pedir a GameMode (Linux) la CPU a toda velocidad, para que el reloj no baje y el sonido no se corte. Necesita GameMode instalado."

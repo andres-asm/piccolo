@@ -22,6 +22,7 @@
 
 #include "app_paths.h"
 #include "app_shell.h"
+#include "game_mode.h"
 #include "picture.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -93,6 +94,8 @@ struct App
     bool                     audio_ready = false;   // we initialized SDL's audio subsystem
     std::vector<std::string> audio_devices;
     std::vector<const char*> audio_device_pointers;
+
+    GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
     bool window_focused     = true;
     bool screensaver_allowed = false;   // what we last told SDL
@@ -651,6 +654,23 @@ static void draw_settings(App* app)
                       audio->rate.floor_ms);
     }
     context.audio_latency = audio_latency;
+    Str game_mode = Str::game_mode_off;
+    switch (app->game_mode.state)
+    {
+    case GameModeState::off:
+        game_mode = Str::game_mode_off;
+        break;
+    case GameModeState::active:
+        game_mode = Str::game_mode_active;
+        break;
+    case GameModeState::not_available:
+        game_mode = Str::game_mode_not_available;
+        break;
+    case GameModeState::not_supported:
+        game_mode = Str::game_mode_not_supported;
+        break;
+    }
+    context.game_mode = piccolo_text(&app->strings, game_mode);
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
 
     // Closed (by its button or Esc): apply the folders and save.
@@ -795,6 +815,9 @@ int main(int argc, char** argv)
                                       piccolo_settings_frames_in_flight(&app->settings));
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
+        // Held for the whole game, paused or not: a request is a D-Bus call
+        // that may block, so not on every pause and resume.
+        game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
         core_session_update(&app->session, &app->shell);
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
@@ -862,6 +885,7 @@ int main(int argc, char** argv)
     save_last_used(app);
     save_settings(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
+    game_mode_set(&app->game_mode, false);
     if (app->audio_ready)
     {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);

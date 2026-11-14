@@ -137,6 +137,8 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_SCREENSAVER_WHEN_PAUSED, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_screensaver),
      .help = text_id(Str::setting_screensaver_help)},
+    {.key = PICCOLO_GAME_MODE, .type = SettingType::boolean, .default_value = "true",
+     .label = text_id(Str::setting_game_mode), .help = text_id(Str::setting_game_mode_help)},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
      .help = text_id(Str::setting_path_cores_help)},
     {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),

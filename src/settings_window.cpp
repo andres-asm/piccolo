@@ -110,6 +110,8 @@ static void draw_general(const SettingsUiContext* ui, const SettingsWindowContex
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_ON_FOCUS_LOSS, nullptr);
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
+    settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
+    ImGui::TextDisabled("%s", context->game_mode);
     ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_folders));
     settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());
