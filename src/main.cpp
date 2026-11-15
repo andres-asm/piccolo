@@ -1374,7 +1374,7 @@ int main(int argc, char** argv)
             {
                 ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
             }
-            input_glyphs_update(&app->glyphs);
+            input_glyphs_update(&app->glyphs, app->ui_scale);
             bool menu_shown = app->menu_visible || !game_running(app);
             if (big_picture && !game_running(app))
             {

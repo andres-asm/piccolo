@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Generate 32x32 pixel-art gamepad glyphs for piccolo's big picture GUI.
+"""Generate pixel-art gamepad glyphs for piccolo's big picture GUI.
+
+One set per size in SIZES (12, 16, 24, 32 pixels square): the shapes are
+designed on a 32x32 grid and drawn natively at each size (every pixel tests
+the shape at its centre, mapped back to the 32 grid), so a 24-pixel glyph
+is drawn at 24, not 32 shrunk with pixels dropped. Labels pick a pixel font
+that fits the size (5x7 doubled, 5x7, or 3x5), and long words are
+abbreviated where they don't fit (ABBREVIATIONS).
 
 Every glyph is pure white with a 1-bit alpha mask, so the GUI can tint it to
 any theme colour (multiply the texture by the colour). Labels are cut out of
@@ -12,6 +19,11 @@ written next to the glyphs.
 No dependencies beyond the Python standard library.
 
     python3 tools/make_glyphs.py [output_dir] [--sheet sheet.png]
+
+Output: assets/glyphs/<size>/<pad>/<button>.png and
+assets/glyphs/<size>/keyboard/<lang>/<key>.png. The 32 set is the design
+size; the GUI picks the set for its size (and draws the 24 set doubled at
+48 for 4K).
 """
 
 import math
@@ -20,7 +32,33 @@ import struct
 import sys
 import zlib
 
-SIZE = 32
+SIZES = [12, 16, 24, 32]
+
+DESIGN = 32      # the grid every shape below is designed on
+SIZE = DESIGN    # the size being drawn now (main() sets it per set)
+K = 1.0          # SIZE / DESIGN
+
+
+def set_size(size):
+    global SIZE, K
+    SIZE = size
+    K = size / float(DESIGN)
+
+
+def px(v):
+    """A design-grid coordinate -> the nearest pixel edge at SIZE."""
+    return int(math.floor(v * K + 0.5))
+
+
+# Words that don't fit a small glyph, shortened (pills: SELECT, START...).
+ABBREVIATIONS = {
+    "SELECT": ["SELEC", "SEL", "SE"],
+    "START": ["STA", "ST"],
+    "OPTIONS": ["OPTION", "OPT", "OP"],
+    "SHARE": ["SHR", "SH"],
+    "CREATE": ["CRT", "CR"],
+    "BACK": ["BCK", "BK"],
+}
 
 # ---------------------------------------------------------------------------
 # fonts
@@ -88,9 +126,11 @@ FONT3x5 = {
 # canvas
 
 class Canvas:
-    def __init__(self, w=SIZE, h=SIZE):
-        self.w = w
-        self.h = h
+    def __init__(self, w=None, h=None):
+        self.w = SIZE if w is None else w
+        self.h = SIZE if h is None else h
+        w = self.w
+        h = self.h
         self.p = [[0] * w for _ in range(h)]
 
     def set(self, x, y, v=1):
@@ -103,9 +143,10 @@ class Canvas:
         return 0
 
     def fill_if(self, test, v=1):
+        """Sets every pixel whose centre, on the design grid, passes test."""
         for y in range(self.h):
             for x in range(self.w):
-                if test(x + 0.5, y + 0.5):
+                if test((x + 0.5) / K, (y + 0.5) / K):
                     self.p[y][x] = v
 
     # shapes take pixel-center coordinates; (16, 16) is the glyph centre
@@ -119,7 +160,14 @@ class Canvas:
         self.fill_if(t, v)
 
     def rect(self, x0, y0, x1, y1, v=1):
-        """Inclusive pixel rectangle."""
+        """Inclusive rectangle on the design grid; at least 1 pixel thick."""
+        ax0, ay0 = px(x0), px(y0)
+        ax1 = max(ax0, px(x1 + 1) - 1)
+        ay1 = max(ay0, px(y1 + 1) - 1)
+        self.pixel_rect(ax0, ay0, ax1, ay1, v)
+
+    def pixel_rect(self, x0, y0, x1, y1, v=1):
+        """Inclusive rectangle in pixels at SIZE."""
         for y in range(y0, y1 + 1):
             for x in range(x0, x1 + 1):
                 self.set(x, y, v)
@@ -152,25 +200,41 @@ class Canvas:
         self.fill_if(t, v)
 
     def text(self, s, font, scale, cx, cy, v=0, spacing=1):
-        """Draw text centred on (cx, cy) (pixel-edge coordinates)."""
+        """Draw text centred on (cx, cy) (design-grid edge coordinates).
+
+        `font` and `scale` are what the design size uses; smaller sizes
+        shrink the scale, switch 5x7 to 3x5 below 1, and abbreviate words
+        wider than the glyph."""
+        font, scale = fit_font(s, font, scale)
+        if text_width(s, font, scale, spacing) > self.w - 2:
+            for short in ABBREVIATIONS.get(s, []):
+                if text_width(short, font, scale, spacing) <= self.w - 2:
+                    s = short
+                    break
+            else:
+                if s in ABBREVIATIONS:
+                    s = ABBREVIATIONS[s][-1]
+                if text_width(s, font, scale, spacing) > self.w:
+                    print("warning: %r too wide at %d px" % (s, SIZE))
         gw = len(next(iter(font.values()))[0])
         gh = len(next(iter(font.values())))
-        tw = (len(s) * (gw + spacing) - spacing) * scale
+        tw = text_width(s, font, scale, spacing)
         th = gh * scale
-        ox = int(round(cx - tw / 2.0))
-        oy = int(round(cy - th / 2.0))
+        ox = int(round(cx * K - tw / 2.0))
+        oy = int(round(cy * K - th / 2.0))
         for i, ch in enumerate(s):
             rows = font[ch]
             bx = ox + i * (gw + spacing) * scale
             for ry, row in enumerate(rows):
                 for rx, c in enumerate(row):
                     if c == "#":
-                        self.rect(bx + rx * scale, oy + ry * scale,
-                                  bx + rx * scale + scale - 1,
-                                  oy + ry * scale + scale - 1, v)
+                        self.pixel_rect(bx + rx * scale, oy + ry * scale,
+                                        bx + rx * scale + scale - 1,
+                                        oy + ry * scale + scale - 1, v)
 
     def outline(self, width=2):
-        """Keep only the outer `width` pixels of the current shape."""
+        """Keep only the outer `width` design pixels of the current shape."""
+        width = max(1, int(math.floor(width * K + 0.5)))
         mask = [row[:] for row in self.p]
         for _ in range(width):
             nxt = [[0] * self.w for _ in range(self.h)]
@@ -197,6 +261,23 @@ class Canvas:
             for x in range(self.w):
                 if other.p[y][x]:
                     self.p[y][x] = 1
+
+
+def text_width(s, font, scale, spacing=1):
+    gw = len(next(iter(font.values()))[0])
+    return (len(s) * (gw + spacing) - spacing) * scale
+
+
+def fit_font(s, font, scale):
+    """The font and whole pixel scale for text the design draws with
+    `font` at `scale`: the scale shrinks with the glyph; below 1, 5x7
+    becomes 3x5 (when it has the characters)."""
+    wanted = scale * K
+    if wanted >= 1.0:
+        return font, max(1, int(math.floor(wanted + 0.01)))
+    if font is FONT5x7 and all(ch in FONT3x5 for ch in s):
+        return FONT3x5, 1
+    return font, 1
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +350,7 @@ def g_bean(label, vertical):
     def t(x, y):
         if vertical:
             # arch over A: concave side faces down
-            x, y = SIZE - y, x
+            x, y = DESIGN - y, x
         dx, dy = x - ox, y - C
         d = math.hypot(dx, dy)
         a = math.atan2(dy, dx)
@@ -284,7 +365,7 @@ def g_bean(label, vertical):
     c.fill_if(t)
     lx = ox + mid
     if vertical:
-        c.text(label, FONT5x7, 2, C, SIZE - lx)
+        c.text(label, FONT5x7, 2, C, DESIGN - lx)
     else:
         c.text(label, FONT5x7, 2, lx, C)
     return c
@@ -401,7 +482,11 @@ def g_dpad_sony(active=None):
 
 def g_pill(word):
     c = Canvas()
-    c.rrect(0, 9, 31, 22, 6)
+    if SIZE < 16:
+        # Below 16 the pill would be as tall as its 3x5 text: taller there.
+        c.rrect(0, 5, 31, 26, 8)
+    else:
+        c.rrect(0, 9, 31, 22, 6)
     c.text(word, FONT3x5, 1, C, C)
     return c
 
@@ -782,21 +867,22 @@ def key_label(c, s):
         scale = 2 if len(s) <= 2 else 1
         c.text(s, FONT5x7, scale, C, KEY_CY)
         return
-    # 3x5, one or more lines, accents take 2 extra rows above a line
+    # 3x5, one or more lines, accents take 2 extra rows above a line.
+    # Pixel positions at SIZE (the 3x5 font is 1 pixel per dot at every size).
     heights = []
     for ln in lines:
         acc = any(ch in ACCENTS3 and ACCENTS3[ch][1] for ch in ln)
         heights.append((7 if acc else 5, acc))
     gap = 2
     total = sum(h for h, _ in heights) + gap * (len(lines) - 1)
-    y = int(round(KEY_CY - total / 2.0))
+    y = int(round(KEY_CY * K - total / 2.0))
     for ln, (h, acc) in zip(lines, heights):
         top = y + (2 if acc else 0)
         bases = [ACCENTS3[ch][0] if ch in ACCENTS3 else ch for ch in ln]
         width = sum(len(glyph3(b)[0]) + 1 for b in bases) - 1
-        if width > 26:
-            print("warning: label %r too wide (%d px)" % (ln, width))
-        bx = int(round(C - width / 2.0))
+        if width > SIZE - 6:
+            print("warning: label %r too wide (%d px) at %d" % (ln, width, SIZE))
+        bx = int(round(C * K - width / 2.0))
         for ch in ln:
             accent = None
             base = ch
@@ -1003,15 +1089,20 @@ def write_sheet(pads, path, row_order, col_order, scale=3):
 
 README = """# Gamepad glyphs
 
-32x32 pixel-art button glyphs for the big picture GUI. Generated by
-`tools/make_glyphs.py` -- edit the script and re-run it rather than editing
-the PNGs.
+Pixel-art button glyphs for the big picture GUI, in four sizes: 12, 16, 24
+and 32 pixels square. Generated by `tools/make_glyphs.py` -- edit the script
+and re-run it rather than editing the PNGs.
 
 Every glyph is pure white with a hard (0/255) alpha mask, so tint it with the
-theme colour. Labels are cut out of the shapes. Scale with nearest-neighbour
-filtering (32 -> 16 for small UI, or integer upscales).
+theme colour. Labels are cut out of the shapes. Each size is drawn natively
+(designed on the 32 grid, rasterized at the size; small sizes use smaller
+fonts and abbreviate long words), so never shrink one: use the set for the
+size, or an integer upscale of one (piccolo: 48 = the 24 set doubled).
 
-Layout: `<pad>/<button>.png`. Button names follow SDL3 gamepad naming, with
+Sizes piccolo uses (a text line tall): 480p 12, 720p 16, 1080p 24,
+1440p 32, 4K 48 (24 x2).
+
+Layout: `<size>/<pad>/<button>.png`. Button names follow SDL3 gamepad naming, with
 face buttons named by position so the GUI can ask for "south" and get the
 right label on every pad (A on Xbox, B on Nintendo, cross on PlayStation).
 A pad simply has no file for a button it lacks.
@@ -1037,7 +1128,7 @@ ps1 ps2 ps3 ps4 ps5 xbox xbox360 xboxone xboxseries.
 
 ## Keyboard
 
-Keycaps in the same style, under `keyboard/`:
+Keycaps in the same style, under `<size>/keyboard/`:
 
 - `keyboard/common/` -- language-neutral keys: `a`..`z`, `0`..`9`,
   `f1`..`f12`, `up` `down` `left` `right`, and the icon keys `return`
@@ -1047,13 +1138,43 @@ Keycaps in the same style, under `keyboard/`:
   `delete` `insert` `home` `end` `pageup` `pagedown` `capslock`
   `printscreen`, plus extra keys the layout has (es: `ntilde`, `ccedilla`).
 
-Lookup: `keyboard/<lang>/<key>.png`, then `keyboard/en/<key>.png`, then
-`keyboard/common/<key>.png`. A language folder may also override a common
+Lookup (in one size): `keyboard/<lang>/<key>.png`, then
+`keyboard/en/<key>.png`, then `keyboard/common/<key>.png`. A language folder may also override a common
 key.
 
 Languages: en, es. de/fr/it/pt are placeholders in `KEYBOARD_LOCALES` in the
 script: fill in their labels and re-run to add them.
 """
+
+
+def write_set(out, size, sheet):
+    """Every glyph at `size` under out/<size>/; contact sheets if asked."""
+    set_size(size)
+    base = os.path.join(out, str(size))
+    pads = build_pads()
+    count = 0
+    for pad in PAD_ORDER:
+        d = os.path.join(base, pad)
+        os.makedirs(d, exist_ok=True)
+        for name, g in pads[pad].items():
+            assert name in BUTTON_ORDER, name
+            save_canvas(g, os.path.join(d, name + ".png"))
+            count += 1
+    kb = build_keyboard()
+    kb_rows = ["common"] + [l for l in KEYBOARD_LOCALES if l in kb]
+    for loc in kb_rows:
+        d = os.path.join(base, "keyboard", loc)
+        os.makedirs(d, exist_ok=True)
+        for name, g in kb[loc].items():
+            assert name in KEYBOARD_ORDER, name
+            save_canvas(g, os.path.join(d, name + ".png"))
+            count += 1
+    print("wrote %d glyphs to %s" % (count, os.path.normpath(base)))
+    if sheet:
+        stem = os.path.splitext(sheet)[0] + "_%d" % size
+        write_sheet(pads, stem + ".png", PAD_ORDER, BUTTON_ORDER, max(1, 96 // size))
+        write_sheet(kb, stem + "_keyboard.png", kb_rows, KEYBOARD_ORDER, max(1, 64 // size))
+        print("wrote sheets", stem + "*.png")
 
 
 def main():
@@ -1067,33 +1188,10 @@ def main():
             sheet = args.pop(0)
         else:
             out = a
-    pads = build_pads()
-    count = 0
-    for pad in PAD_ORDER:
-        d = os.path.join(out, pad)
-        os.makedirs(d, exist_ok=True)
-        for name, g in pads[pad].items():
-            assert name in BUTTON_ORDER, name
-            save_canvas(g, os.path.join(d, name + ".png"))
-            count += 1
+    for size in SIZES:
+        write_set(out, size, sheet)
     with open(os.path.join(out, "README.md"), "w") as f:
         f.write(README)
-    kb = build_keyboard()
-    kb_rows = ["common"] + [l for l in KEYBOARD_LOCALES if l in kb]
-    for loc in kb_rows:
-        d = os.path.join(out, "keyboard", loc)
-        os.makedirs(d, exist_ok=True)
-        for name, g in kb[loc].items():
-            assert name in KEYBOARD_ORDER, name
-            save_canvas(g, os.path.join(d, name + ".png"))
-            count += 1
-    print("wrote %d glyphs to %s" % (count, os.path.normpath(out)))
-    if sheet:
-        write_sheet(pads, sheet, PAD_ORDER, BUTTON_ORDER)
-        print("wrote sheet", sheet)
-        kbsheet = os.path.splitext(sheet)[0] + "_keyboard.png"
-        write_sheet(kb, kbsheet, kb_rows, KEYBOARD_ORDER, 2)
-        print("wrote sheet", kbsheet)
 
 
 if __name__ == "__main__":
