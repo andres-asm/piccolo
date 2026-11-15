@@ -450,3 +450,6 @@ input_port_empty = PRESS START TO JOIN
 input_leave = LEAVE
 input_move_up = MOVE UP
 input_keyboard_shared = KEYBOARD (SHARED)
+setting_input_port_device = DEVICE
+setting_input_port_device_help = What the core emulates on this port (its own list: joypad, mouse, multitap...).
+quick_menu_device = DEVICE

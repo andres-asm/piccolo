@@ -1658,3 +1658,15 @@ msgstr "SUBIR"
 msgctxt "input_keyboard_shared"
 msgid "KEYBOARD (SHARED)"
 msgstr "TECLADO (COMPARTIDO)"
+
+msgctxt "setting_input_port_device"
+msgid "DEVICE"
+msgstr "DISPOSITIVO"
+
+msgctxt "setting_input_port_device_help"
+msgid "What the core emulates on this port (its own list: joypad, mouse, multitap...)."
+msgstr "Lo que el core emula en este puerto (su propia lista: joypad, mouse, multitap...)."
+
+msgctxt "quick_menu_device"
+msgid "DEVICE"
+msgstr "DISPOSITIVO"

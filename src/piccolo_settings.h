@@ -24,6 +24,10 @@ constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
 constexpr const char* PICCOLO_INPUT_HOTKEY_MODE = "input_hotkey_mode";
+// The emulated device on each port (the core's own ids; 1 = the joypad),
+// picked in the quick menu's CONTROLS; kept per core (or game).
+constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "input_port2_device", "input_port3_device",
+                                                       "input_port4_device"};
 constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";

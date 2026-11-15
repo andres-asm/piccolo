@@ -9,6 +9,7 @@
 
 #include "app_shell.h"
 #include "debug_ui.h"
+#include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -315,6 +316,45 @@ static void draw_controls_tab(const QuickMenuContext* context, float block)
         }
         ImGui::PopID();
     }
+    // DEVICE per port: what the core emulates there (only ports it describes).
+    LibretroHost* host = context->host;
+    if (host != nullptr && host->game_loaded)
+    {
+        for (uint32_t p = 0; p < host->input_info.port_count && p < INPUT_PORT_COUNT; p++)
+        {
+            const LibretroPortControllers* types = &host->input_info.ports[p];
+            if (types->count < 2)
+            {
+                continue;   // nothing to choose
+            }
+            ImGui::PushID(static_cast<int>(100 + p));
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("%s %u", piccolo_text(strings, Str::quick_menu_device), static_cast<unsigned>(p + 1));
+            ImGui::SameLine(label_width + 20.0f * block);
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            const char* current = libretro_input_controller_name(&host->input_info, p, host->port_devices[p]);
+            if (retro_ui_begin_combo("##device", current != nullptr ? current : "?"))
+            {
+                for (uint32_t t = 0; t < types->count; t++)
+                {
+                    ImGui::PushID(static_cast<int>(t));
+                    if (ImGui::Selectable(types->types[t].description, types->types[t].id == host->port_devices[p]))
+                    {
+                        libretro_host_set_port_device(host, p, types->types[t].id);
+                        if (context->settings != nullptr)
+                        {
+                            settings_set_int(context->settings, SettingLayer::core, PICCOLO_INPUT_PORT_DEVICES[p],
+                                             static_cast<int32_t>(types->types[t].id));
+                        }
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::PopID();
+        }
+    }
+
     if (!anybody && !input->settings.keyboard_shares_port1)
     {
         ImGui::Spacing();

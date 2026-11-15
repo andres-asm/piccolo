@@ -537,6 +537,18 @@ static void start_game(App* app, const FilePickerChoice* choice)
     write_running_marker(app);
     bool started = core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path);
     update_settings_context(app);
+    if (started)
+    {
+        // The emulated device on each port, as kept for this core (or game).
+        for (unsigned port = 0; port < LIBRETRO_MAX_PORTS; port++)
+        {
+            int32_t device = settings_get_int(&app->settings, PICCOLO_INPUT_PORT_DEVICES[port]);
+            if (device >= 0 && static_cast<unsigned>(device) != app->session.host->port_devices[port])
+            {
+                libretro_host_set_port_device(app->session.host, port, static_cast<unsigned>(device));
+            }
+        }
+    }
     if (!started)
     {
         remove_running_marker(app);   // failed cleanly: not a crash
@@ -1016,6 +1028,12 @@ static void app_update_input(App* app)
     bool ui_up = ui_is_up(app);
     app->input.settings.game_has_input = !ui_up;
     piccolo_settings_input(&app->settings, &app->input.settings);   // SETTINGS > INPUT, per core / game too
+    // The core and the device on each port: a controller's bindings for them.
+    app->input.core_name = game_running(app) ? app->core_name : "";
+    for (unsigned port = 0; port < LIBRETRO_MAX_PORTS; port++)
+    {
+        app->input.port_devices[port] = app->session.host->port_devices[port];
+    }
     app->input.settings.core_takes_keyboard = app->session.keyboard.game_focus;
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
@@ -1271,6 +1289,7 @@ static void save_after_options_windows(App* app)
     if (app->options_window_was_open && !open)
     {
         save_core_options(app);
+        save_settings(app);   // a port's DEVICE (CONTROLS)
     }
     app->options_window_was_open = open;
 }
@@ -1532,6 +1551,8 @@ int main(int argc, char** argv)
             quick.core_options_state = &app->core_options_state;
             quick.core_options = core_options_context(app);
             quick.input = &app->input;
+            quick.host = app->session.host;
+            quick.settings = &app->settings;
             uint32_t slot_before = app->quick_menu.slot;
             QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
             if (app->quick_menu.slot != slot_before || app->quick_menu.open)

@@ -24,6 +24,7 @@
 #include "core_options_ui.h"
 #include "core_session.h"
 #include "input_bindings.h"
+#include "settings.h"
 #include "localization.h"
 #include "vk_texture.h"
 
@@ -68,6 +69,8 @@ struct QuickMenuContext
     CoreOptionsUiState*  core_options_state = nullptr;
     CoreOptionsUiContext core_options;   // label_width and strings filled by the menu
     InputSystem*         input = nullptr;   // CONTROLS: who plays on which port
+    LibretroHost*        host = nullptr;    // CONTROLS: the core's devices per port, and the one plugged in
+    Settings*            settings = nullptr;   // CONTROLS: the device picked is kept per core
 };
 
 // Opens on `slot` (the session's current slot), on the SAVESTATES tab.
