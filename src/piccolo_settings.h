@@ -47,6 +47,7 @@ constexpr const char* PICCOLO_WINDOW_ASPECT = "window_aspect";
 constexpr const char* PICCOLO_WINDOW_HEIGHT = "window_height";
 constexpr const char* PICCOLO_WINDOW_SCALE = "window_scale";
 constexpr const char* PICCOLO_WINDOW_REMEMBER = "window_remember";
+constexpr const char* PICCOLO_UI_MODE = "ui_mode";   // 0 desktop (menu bar), 1 big picture (big_picture.h)
 constexpr const char* PICCOLO_UI_MENU_BOXES = "ui_menu_boxes";
 constexpr const char* PICCOLO_UI_SHADOWS = "ui_shadows";
 constexpr const char* PICCOLO_UI_COLOR_BACKGROUND = "ui_color_background";

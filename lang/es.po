@@ -1265,3 +1265,63 @@ msgstr "CURSOR"
 msgctxt "setting_ui_color_cursor_help"
 msgid "The theme's mouse cursor (with THEME CURSOR on)."
 msgstr "El cursor del tema (con CURSOR DEL TEMA)."
+
+msgctxt "setting_ui_mode"
+msgid "UI MODE"
+msgstr "MODO DE INTERFAZ"
+
+msgctxt "setting_ui_mode_help"
+msgid "DESKTOP: a menu bar and windows, for mouse and keyboard. BIG PICTURE: full screen menus for a gamepad on a TV."
+msgstr "ESCRITORIO: barra de menús y ventanas, para ratón y teclado. PANTALLA GRANDE: menús a pantalla completa para jugar con mando en la tele."
+
+msgctxt "value_ui_mode_desktop"
+msgid "DESKTOP"
+msgstr "ESCRITORIO"
+
+msgctxt "value_ui_mode_big_picture"
+msgid "BIG PICTURE"
+msgstr "PANTALLA GRANDE"
+
+msgctxt "bp_subtitle"
+msgid "LIBRETRO PLAYER"
+msgstr "REPRODUCTOR LIBRETRO"
+
+msgctxt "bp_load_game"
+msgid "LOAD GAME"
+msgstr "CARGAR JUEGO"
+
+msgctxt "bp_load_core"
+msgid "LOAD CORE"
+msgstr "CARGAR CORE"
+
+msgctxt "bp_settings"
+msgid "SETTINGS"
+msgstr "AJUSTES"
+
+msgctxt "bp_quit"
+msgid "QUIT"
+msgstr "SALIR"
+
+msgctxt "bp_core"
+msgid "CORE"
+msgstr "CORE"
+
+msgctxt "bp_core_none"
+msgid "NONE YET"
+msgstr "NINGUNO AÚN"
+
+msgctxt "bp_last_used"
+msgid "LAST USED"
+msgstr "EL ÚLTIMO"
+
+msgctxt "bp_no_game"
+msgid "NO GAME LOADED"
+msgstr "NINGÚN JUEGO CARGADO"
+
+msgctxt "bp_hint_move"
+msgid "MOVE"
+msgstr "MOVER"
+
+msgctxt "bp_hint_select"
+msgid "SELECT"
+msgstr "ELEGIR"

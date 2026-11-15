@@ -26,6 +26,8 @@ add_executable(piccolo
     src/core_options_ui.cpp
     src/safe_start_window.cpp
     src/quick_menu.cpp
+    src/input_glyphs.cpp
+    src/big_picture.cpp
 )
 
 # UI text: src/strings.txt is the one English source. The build turns it into
@@ -42,16 +44,20 @@ add_custom_command(
 target_sources(piccolo PRIVATE "${PICCOLO_GENERATED}/piccolo_strings.cpp")
 target_include_directories(piccolo PRIVATE "${PICCOLO_GENERATED}")
 
-# Translations (lang/<code>.po) next to the program, in the build folder and
-# in piccolo's own folder.
+# Translations (lang/<code>.po) and the button glyphs (assets/glyphs) next
+# to the program, in the build folder and in piccolo's own folder.
 add_custom_command(TARGET piccolo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "$<TARGET_FILE_DIR:piccolo>/lang"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/glyphs"
+            "$<TARGET_FILE_DIR:piccolo>/assets/glyphs"
     VERBATIM)
 if(MULTITAP_PICCOLO_DIR)
     add_custom_target(copy_piccolo_lang ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "${MULTITAP_PICCOLO_DIR}/lang"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/glyphs"
+                "${MULTITAP_PICCOLO_DIR}/assets/glyphs"
         DEPENDS piccolo
-        COMMENT "Copying piccolo's translations to ${MULTITAP_PICCOLO_DIR}/lang"
+        COMMENT "Copying piccolo's translations and glyphs to ${MULTITAP_PICCOLO_DIR}"
         VERBATIM)
 endif()
 

@@ -314,6 +314,7 @@ static void draw_interface(const SettingsUiContext* context)
     SettingsUiContext global = *context;
     global.scope = SettingLayer::global;
     const SettingsUiContext* ui = &global;
+    settings_ui_row(ui, PICCOLO_UI_MODE, nullptr);
     draw_theme_preset(ui);
     settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
     settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);

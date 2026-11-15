@@ -54,6 +54,11 @@ static const SettingEnumValue LANGUAGE_VALUES[] = {
 };
 constexpr uint32_t LANGUAGE_COUNT = sizeof(LANGUAGE_VALUES) / sizeof(LANGUAGE_VALUES[0]);
 
+static const SettingEnumValue UI_MODE_VALUES[] = {
+    {"desktop", text_id(Str::value_ui_mode_desktop)},
+    {"big_picture", text_id(Str::value_ui_mode_big_picture)},
+};
+
 static const SettingEnumValue FRAMES_IN_FLIGHT_VALUES[] = {
     {"2", text_id(Str::value_frames_2)},
     {"1", text_id(Str::value_frames_1)},
@@ -218,8 +223,11 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_window_remember),
      .help = text_id(Str::setting_window_remember_help)},
 
-    // Interface (global-only): MENU TITLE BOXES and the palette; defaults =
-    // the PICCOLO theme (retro_ui.cpp). The THEME presets set them all.
+    // Interface (global-only): UI MODE, MENU TITLE BOXES and the palette;
+    // defaults = the PICCOLO theme (retro_ui.cpp). The THEME presets set the
+    // look (not UI MODE).
+    {.key = PICCOLO_UI_MODE, .type = SettingType::enumeration, .default_value = "desktop", .values = UI_MODE_VALUES,
+     .value_count = 2, .label = text_id(Str::setting_ui_mode), .help = text_id(Str::setting_ui_mode_help)},
     {.key = PICCOLO_UI_MENU_BOXES, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_menu_boxes), .help = text_id(Str::setting_ui_menu_boxes_help)},
     {.key = PICCOLO_UI_SHADOWS, .type = SettingType::boolean, .default_value = "false",

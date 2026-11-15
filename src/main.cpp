@@ -22,6 +22,7 @@
 
 #include "app_paths.h"
 #include "app_shell.h"
+#include "big_picture.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "picture.h"
@@ -38,6 +39,7 @@
 #include "core_session.h"
 #include "debug_ui.h"
 #include "file_picker.h"
+#include "input_glyphs.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
@@ -150,6 +152,13 @@ struct App
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
+
+    // Big picture UI (UI MODE setting): HOME while no game runs, and the
+    // button glyphs of the device used last for its hints.
+    InputGlyphs    glyphs;
+    BigPictureHome home = {};
+    char           home_core_path[LIBRETRO_PATH_MAX] = {};   // last_core when home_core was worked out
+    char           home_core[128] = {};                      // its short name ("snes9x")
 
     bool window_focused     = true;
     bool screensaver_allowed = false;   // what we last told SDL
@@ -805,6 +814,7 @@ static void update_language(App* app)
     app->language_setting = setting;
     uint32_t language = piccolo_settings_language(&app->settings);
     app->session.language = piccolo_language_retro(language);
+    input_glyphs_set_language(&app->glyphs, piccolo_language_code(language));
     if (language == 0)
     {
         localization_use_english(&app->strings);
@@ -847,11 +857,47 @@ static void refresh_audio_devices(App* app)
     }
 }
 
+// Closes the topmost of piccolo's windows. False if none was open.
+static bool close_topmost_window(App* app)
+{
+    if (app->quick_menu.open)
+    {
+        app->quick_menu.open = false;
+    }
+    else if (app->core_options_manager)
+    {
+        app->core_options_manager = false;
+    }
+    else if (app->settings_window.image_open)
+    {
+        app->settings_window.image_open = false;
+    }
+    else if (app->settings_window.open)
+    {
+        app->settings_window.open = false;
+    }
+    else if (app->picker.open)
+    {
+        app->picker.open = false;
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
+
+static bool big_picture_mode(const App* app)
+{
+    return settings_get_enum(&app->settings, PICCOLO_UI_MODE) == 1;
+}
+
 static void app_handle_events(App* app)
 {
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        input_glyphs_handle_event(&app->glyphs, &event);   // every event, even the core's keys
         if (core_session_handle_event(&app->session, &app->shell, &event, game_has_keyboard(app)))
         {
             continue;   // the core's keyboard (game focus)
@@ -875,6 +921,13 @@ static void app_handle_events(App* app)
         {
             app->running = false;
         }
+        // Big picture: the gamepad's back button (east) closes the window on
+        // top, like Esc. Only windows: during play it's a game button.
+        if (event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && event.gbutton.button == SDL_GAMEPAD_BUTTON_EAST &&
+            big_picture_mode(app))
+        {
+            close_topmost_window(app);
+        }
         if (event.type == SDL_EVENT_KEY_DOWN && !event.key.repeat)
         {
             switch (event.key.key)
@@ -883,27 +936,7 @@ static void app_handle_events(App* app)
                     // Close the topmost window first (IMAGE SETTINGS, SETTINGS,
                     // LOAD GAME); otherwise show/hide the menu (it stays up when
                     // nothing runs).
-                    if (app->quick_menu.open)
-                    {
-                        app->quick_menu.open = false;
-                    }
-                    else if (app->core_options_manager)
-                    {
-                        app->core_options_manager = false;
-                    }
-                    else if (app->settings_window.image_open)
-                    {
-                        app->settings_window.image_open = false;
-                    }
-                    else if (app->settings_window.open)
-                    {
-                        app->settings_window.open = false;
-                    }
-                    else if (app->picker.open)
-                    {
-                        app->picker.open = false;
-                    }
-                    else if (game_running(app))
+                    if (!close_topmost_window(app) && game_running(app))
                     {
                         app->menu_visible = !app->menu_visible;
                     }
@@ -1090,6 +1123,50 @@ static void draw_settings(App* app)
         save_core_options(app);
     }
     app->settings_window_was_open = open;
+}
+
+// Big picture HOME (no game running) and what its items do.
+static void draw_home(App* app, const RetroUiPalette* palette)
+{
+    // The last core's short name, worked out again only when it changes
+    // ("/cores/snes9x_libretro.so" -> "snes9x").
+    if (std::strcmp(app->home_core_path, app->last_core) != 0)
+    {
+        std::snprintf(app->home_core_path, sizeof(app->home_core_path), "%s", app->last_core);
+        app->home_core[0] = 0;
+        if (app->last_core[0] != 0 && host_fs_stem(app->last_core, app->home_core, sizeof(app->home_core)))
+        {
+            char* suffix = std::strstr(app->home_core, "_libretro");
+            if (suffix != nullptr)
+            {
+                *suffix = 0;
+            }
+        }
+    }
+    BigPictureContext context = {};
+    context.strings = &app->strings;
+    context.glyphs = &app->glyphs;
+    context.palette = palette;
+    context.pixel_font = app->pixel_font;
+    context.scale = app->ui_scale;
+    context.core_name = app->home_core;
+    context.takes_input = !app->picker.open && !app->settings_window.open && !app->settings_window.image_open &&
+                          !app->core_options_manager && !app->safe_start_open;
+    switch (big_picture_home_draw(&app->home, &context))
+    {
+        case BigPictureAction::load_game:
+            handle_menu_action(app, MenuAction::load_game);
+            break;
+        case BigPictureAction::settings:
+            handle_menu_action(app, MenuAction::general);
+            break;
+        case BigPictureAction::quit:
+            handle_menu_action(app, MenuAction::quit);
+            break;
+        case BigPictureAction::load_core:   // not there yet (disabled on HOME)
+        case BigPictureAction::none:
+            break;
+    }
 }
 
 static void app_draw_debug_ui(App* app)
@@ -1287,8 +1364,23 @@ int main(int argc, char** argv)
             app->ui_scale = retro_ui_scale_for_width(ImGui::GetIO().DisplaySize.x);
 
             draw_game(app);   // background, behind everything
+            bool big_picture = big_picture_mode(app);
+            // Big picture: the pad navigates the windows too (LOAD GAME, SETTINGS).
+            if (big_picture)
+            {
+                ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+            }
+            else
+            {
+                ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
+            }
+            input_glyphs_update(&app->glyphs);
             bool menu_shown = app->menu_visible || !game_running(app);
-            if (menu_shown)
+            if (big_picture && !game_running(app))
+            {
+                draw_home(app, &palette);
+            }
+            else if (menu_shown)
             {
                 // The status line's window goes first, so it stays behind the others.
                 retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
@@ -1410,6 +1502,7 @@ int main(int argc, char** argv)
 
             core_session_upload_video(&app->session, &app->shell);
             quick_menu_upload(&app->quick_menu, &app->shell);
+            input_glyphs_upload(&app->glyphs, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
@@ -1437,6 +1530,7 @@ int main(int argc, char** argv)
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
+    input_glyphs_destroy(&app->glyphs, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);
     delete app;

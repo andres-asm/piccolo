@@ -235,6 +235,10 @@ value_quality_medium = MEDIUM
 value_quality_best = BEST
 
 # Settings: Interface
+setting_ui_mode = UI MODE
+setting_ui_mode_help = DESKTOP: a menu bar and windows, for mouse and keyboard. BIG PICTURE: full screen menus for a gamepad on a TV.
+value_ui_mode_desktop = DESKTOP
+value_ui_mode_big_picture = BIG PICTURE
 setting_ui_menu_boxes = MENU TITLE BOXES
 setting_ui_menu_boxes_help = A raised box behind each menu title on the bar.
 setting_ui_shadows = DROP SHADOWS
@@ -357,3 +361,16 @@ value_fullscreen_borderless = BORDERLESS
 value_fullscreen_exclusive = EXCLUSIVE
 value_window_fixed = FIXED SIZE
 value_window_dynamic = DYNAMIC (FOLLOWS THE GAME)
+
+# Big picture UI (big_picture.h)
+bp_subtitle = LIBRETRO PLAYER
+bp_load_game = LOAD GAME
+bp_load_core = LOAD CORE
+bp_settings = SETTINGS
+bp_quit = QUIT
+bp_core = CORE
+bp_core_none = NONE YET
+bp_last_used = LAST USED
+bp_no_game = NO GAME LOADED
+bp_hint_move = MOVE
+bp_hint_select = SELECT
