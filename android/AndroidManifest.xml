@@ -10,7 +10,13 @@
     android:versionName="0.1"
     android:installLocation="auto">
 
-    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35" />
+    <!-- targetSdk 29 (Android 10), on purpose: an app that targets 29 and asks
+         for legacy storage still gets all of /sdcard on Android 11+ with the
+         classic permission dialog. With 30+ only "All files access" does that,
+         and Android TV builds often have no screen to grant it (the SHIELD
+         loki's doesn't). Play Store needs a high target: that variant comes
+         with SAF (Andrés, 2026-11-14). -->
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="29" />
 
     <!-- Vulkan 1.1+ (the renderer itself needs 1.3 features; checked at runtime). -->
     <uses-feature android:name="android.hardware.vulkan.version" android:version="0x401000" android:required="true" />
@@ -27,11 +33,12 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- piccolo's folder is /sdcard/piccolo (survives uninstalling; see
-         PiccoloActivity.java): "All files access" on Android 11+,
-         WRITE_EXTERNAL_STORAGE before (with legacy storage on Android 10). -->
+         PiccoloActivity.java): WRITE_EXTERNAL_STORAGE with legacy storage
+         (targetSdk 29). MANAGE_EXTERNAL_STORAGE is for a future variant that
+         targets 30+. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
     <application android:label="piccolo"
         android:allowBackup="true"
@@ -39,6 +46,19 @@
         android:requestLegacyExternalStorage="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
         android:hardwareAccelerated="true">
+
+        <!-- What the launcher opens: settles storage access before SDL starts,
+             then opens PiccoloActivity (see StartActivity.java). -->
+        <activity android:name=".StartActivity"
+            android:label="piccolo"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
 
         <!-- preferMinimalPostProcessing: ask the TV for its game mode (ALLM). -->
         <activity android:name=".PiccoloActivity"
@@ -48,11 +68,6 @@
             android:configChanges="layoutDirection|locale|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
-            </intent-filter>
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
