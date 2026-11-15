@@ -17,7 +17,8 @@ session) and its CMake helpers. It doesn't build on its own.
 - The game fills the window at the core's aspect ratio, with sharp pixels.
 - **Esc** shows and hides the menu while a game runs; the game pauses while
   the menu or the LOAD GAME window is up.
-- **GAME**: reset, save state / load state (slot 0, also F2 / F4), quit.
+- **GAME**: reset, save state / load state (the current slot, also F2 / F4), quit.
+- **F1: quick menu** while a game runs (see [Quick menu](#quick-menu)).
 - Save RAM and savestates are kept automatically.
 - Keyboard and gamepad as the controller (fixed mapping for now).
 - **RECENT** (the first menu entry): the last 10 games started.
@@ -68,6 +69,22 @@ closed) only forgets what was learned, never your settings.
 Other state piccolo keeps (not per core or game): `settings/last_used.cfg`
 (last core and folder, window size and position), `settings/recent.cfg` (the
 RECENT list), `settings/imgui.ini` (window layout) and `core_info_cache.cfg`.
+
+## Quick menu
+
+F1 while a game runs opens the quick menu (F1 or Esc closes it; the game
+pauses while it's open). Two tabs:
+
+- **SAVESTATES**: slots 1 to 9. Arrows, the keys 1-9 or the mouse pick one
+  (it's also the slot F2 / F4 use); used slots are lit. The selected slot
+  shows its thumbnail and date. SAVE (S) and LOAD (L) act on it; Enter only
+  picks a slot, so nothing is loaded or overwritten by accident. Also RESET
+  and CLOSE GAME.
+- **CORE OPTIONS**: the running core's options, as in SETTINGS.
+
+Each state is `states/<core>/<game>.state<N>`, with a thumbnail next to it,
+`<game>.state<N>.png` (also written by F2): the picture as it is shown (the
+Picture settings' aspect ratio and crop), at x1.
 
 ## Core options
 
@@ -132,7 +149,7 @@ and next to `piccolo.exe` on Windows.
 |------|------|
 | `cores/` | the cores piccolo offers (drop `*_libretro.so` files here) |
 | `saves/<core>/<game>.srm` | save RAM |
-| `states/<core>/<game>.state<N>` | savestates |
+| `states/<core>/<game>.state<N>` | savestates (slots 1-9), each with a `.png` thumbnail |
 | `system/` | BIOS and other files cores ask for |
 | `settings/piccolo.cfg` | the settings (global, per core, per game) |
 | `settings/last_used.cfg` | last core and folder, window size and position |
