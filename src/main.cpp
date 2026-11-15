@@ -20,6 +20,7 @@
 
 #include "imgui.h"
 
+#include "app_icon.h"
 #include "app_paths.h"
 #include "app_shell.h"
 #include "frame_delay.h"
@@ -1299,6 +1300,8 @@ int main(int argc, char** argv)
     AppShellConfig config = {};
     config.name       = "piccolo";
     config.identifier = "org.multitap.piccolo";
+    config.icons      = app_icon_images;
+    config.icon_count = app_icon_image_count;
 
     if (!pixel_font_init() || !core_session_create(&app->session))
     {

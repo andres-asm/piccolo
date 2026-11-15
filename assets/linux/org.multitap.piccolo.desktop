@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=piccolo
+Comment=A small retro libretro frontend
+Exec=piccolo
+Icon=org.multitap.piccolo
+Terminal=false
+Categories=Game;Emulator;
+StartupWMClass=org.multitap.piccolo
