@@ -140,6 +140,12 @@ struct App
     bool             safe_start_confirmed = false;    // the next start skips the check (answered)
     FilePickerChoice safe_start_pending = {};
 
+    // The core options UI's state, shared by the quick menu (live options)
+    // and the CORE OPTIONS MANAGER window (CONFIG menu).
+    CoreOptionsUiState core_options_state;
+    bool               core_options_manager = false;   // the window is open
+    bool               core_options_manager_was_open = false;
+
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
 
@@ -331,7 +337,7 @@ static void set_status(App* app, const char* text)
 static void update_pause(App* app)
 {
     bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
-                     app->settings_window.image_open || app->quick_menu.open;
+                     app->settings_window.image_open || app->quick_menu.open || app->core_options_manager;
     bool pause_for_menu = menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU);
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
     bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
@@ -558,6 +564,22 @@ static bool save_state_with_thumbnail(App* app)
     return saved;
 }
 
+// What the core options UI (quick menu, manager) needs this frame.
+static CoreOptionsUiContext core_options_context(App* app)
+{
+    CoreOptionsUiContext context = {};
+    context.strings = &app->strings;
+    context.session = &app->session;
+    context.store = &app->option_store;
+    context.cache = &app->option_cache;
+    context.running_core = game_running(app) ? app->core_name : "";
+    context.game = app->game_name;
+    const std::string& folder_section = app->option_store.directory_section;
+    size_t folder_at = folder_section.find("/dir:");
+    context.folder = folder_at != std::string::npos ? folder_section.c_str() + folder_at + 5 : "";
+    return context;
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -603,6 +625,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::sound:
             settings_window_open(&app->settings_window, SettingsTab::sound);
+            break;
+        case MenuAction::options_manager:
+            core_options_manager_open(&app->core_options_manager, &app->core_options_state);
             break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
@@ -852,6 +877,10 @@ static void app_handle_events(App* app)
                     {
                         app->quick_menu.open = false;
                     }
+                    else if (app->core_options_manager)
+                    {
+                        app->core_options_manager = false;
+                    }
                     else if (app->settings_window.image_open)
                     {
                         app->settings_window.image_open = false;
@@ -886,6 +915,7 @@ static void app_handle_events(App* app)
                     else if (game_running(app))
                     {
                         quick_menu_open(&app->quick_menu, app->session.state_slot);
+                        app->core_options_state.choose_layer = true;   // SAVE TO: the most specific layer in use
                     }
                     break;
                 case SDLK_F2:
@@ -1034,14 +1064,6 @@ static void draw_settings(App* app)
     }
     context.frame_delay = frame_delay_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
-    context.core_options.session = &app->session;
-    context.core_options.store = &app->option_store;
-    context.core_options.cache = &app->option_cache;
-    context.core_options.running_core = game_running(app) ? app->core_name : "";
-    context.core_options.game = app->game_name;
-    const std::string& folder_section = app->option_store.directory_section;
-    size_t folder_at = folder_section.find("/dir:");
-    context.core_options.folder = folder_at != std::string::npos ? folder_section.c_str() + folder_at + 5 : "";
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
     if (app->settings_window.search_frame_delay)
     {
@@ -1282,15 +1304,8 @@ int main(int argc, char** argv)
             QuickMenuContext quick = {};
             quick.strings = &app->strings;
             quick.session = &app->session;
-            quick.core_options_state = &app->settings_window.core_options;
-            quick.core_options.session = &app->session;
-            quick.core_options.store = &app->option_store;
-            quick.core_options.cache = &app->option_cache;
-            quick.core_options.running_core = app->core_name;
-            quick.core_options.game = app->game_name;
-            size_t quick_folder = app->option_store.directory_section.find("/dir:");
-            quick.core_options.folder =
-                quick_folder != std::string::npos ? app->option_store.directory_section.c_str() + quick_folder + 5 : "";
+            quick.core_options_state = &app->core_options_state;
+            quick.core_options = core_options_context(app);
             uint32_t slot_before = app->quick_menu.slot;
             QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
             if (app->quick_menu.slot != slot_before || app->quick_menu.open)
@@ -1322,6 +1337,14 @@ int main(int argc, char** argv)
             case QuickMenuAction::none:
                 break;
             }
+            CoreOptionsUiContext manager = core_options_context(app);
+            core_options_manager_draw(&app->core_options_manager, &app->core_options_state, &manager, app->pixel_font,
+                                      app->ui_scale);
+            if (app->core_options_manager_was_open && !app->core_options_manager)
+            {
+                save_core_options(app);   // what was deleted
+            }
+            app->core_options_manager_was_open = app->core_options_manager;
             if (app->safe_start_open)
             {
                 SafeStartChoice answer = safe_start_window_draw(app->pixel_font, app->ui_scale, &app->strings,

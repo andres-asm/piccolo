@@ -1,12 +1,11 @@
 #pragma once
 
-// The CORE OPTIONS tab of piccolo's settings window (decided by Andrés,
-// 2026-11-14):
+// piccolo's core options UI (decided by Andrés, 2026-11-14): the running
+// core's options live in the quick menu (F1); the CORE OPTIONS MANAGER
+// window (CONFIG menu) lists and deletes what is stored for any core. Both
+// drawn from here. The manager:
 //
 //   CORE     [ SNES9X (RUNNING)                v ]
-//   SAVE TO  [ THIS GAME (SUPER MARIO WORLD)   v ]       only for the running core
-//     C CONSOLE REGION   [ AUTO               v ] [RESET]
-//   SECTION  [ SYSTEM                          v ]       one category at a time
 //   v STORED VALUES                                       any core, even one that won't start
 //     FOR THE CORE                           [DELETE SECTION]
 //       CONSOLE REGION = PAL                 [DELETE]
@@ -27,6 +26,7 @@
 #include "localization.h"
 
 struct CoreSession;
+struct ImFont;
 
 struct CoreOptionsUiState
 {
@@ -48,8 +48,14 @@ struct CoreOptionsUiContext
     float                   label_width = 0.0f;
 };
 
-// Draws the tab's contents (inside the settings window's theme).
+// The manager's contents: CORE (any core the cache or the store knows) and
+// its STORED VALUES. Inside a themed window.
 void core_options_ui_draw(CoreOptionsUiState* state, const CoreOptionsUiContext* context);
+
+// The CORE OPTIONS MANAGER window. Opening it starts on the running core.
+void core_options_manager_open(bool* open, CoreOptionsUiState* state);
+void core_options_manager_draw(bool* open, CoreOptionsUiState* state, const CoreOptionsUiContext* context,
+                               ImFont* pixel_font, int32_t scale);
 
 // Only the running core's options (SAVE TO and the options), e.g. for the
 // quick menu. Nothing when no core runs.

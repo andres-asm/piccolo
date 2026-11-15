@@ -340,9 +340,8 @@ static void draw_section_combo(CoreOptionsUiState* state, const CoreOptionsUiCon
 }
 
 // The running core's options: SAVE TO, SECTION, then that section's options
-// in their own scrolling area: the rest of the window (`fill`), or 60% of it
-// when more follows below (STORED VALUES in the settings tab).
-static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* context, bool fill)
+// in their own scrolling area (the rest of the window).
+static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* context)
 {
     const LibretroOptions* options = &context->session->host->options;
     draw_layer_combo(state, context);
@@ -369,7 +368,7 @@ static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* con
     float most = ImGui::GetContentRegionAvail().x * 0.5f;
     label_width = label_width < most ? label_width : most;
 
-    float height = ImGui::GetContentRegionAvail().y * (fill ? 1.0f : 0.6f);
+    float height = ImGui::GetContentRegionAvail().y;
     float minimum = ImGui::GetFrameHeightWithSpacing() * 4.0f;
     ImGui::BeginChild("options", ImVec2(0.0f, height > minimum ? height : minimum));
     for (uint32_t i = 0; i < options->count; i++)
@@ -523,7 +522,7 @@ void core_options_ui_draw_running(CoreOptionsUiState* state, const CoreOptionsUi
 {
     if (running(context))
     {
-        draw_live(state, context, true);
+        draw_live(state, context);
     }
 }
 
@@ -547,14 +546,62 @@ void core_options_ui_draw(CoreOptionsUiState* state, const CoreOptionsUiContext*
     }
     draw_core_combo(state, context, &cores);
 
-    if (running(context) && state->selected_core == context->running_core)
-    {
-        draw_live(state, context, false);
-    }
-    else
-    {
-        ImGui::TextWrapped("%s", piccolo_text(context->strings, Str::core_options_not_running));
-    }
+    // The running core's options are changed in the quick menu; here only
+    // what is stored is seen and deleted.
+    bool selected_running = running(context) && state->selected_core == context->running_core;
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", piccolo_text(context->strings, selected_running ? Str::core_options_running_note
+                                                                               : Str::core_options_not_running));
+    ImGui::PopTextWrapPos();
     ImGui::Spacing();
     draw_stored(state, context);
+}
+
+void core_options_manager_open(bool* open, CoreOptionsUiState* state)
+{
+    if (!*open)
+    {
+        state->selected_core.clear();   // the running core (or the first one)
+    }
+    *open = true;
+}
+
+void core_options_manager_draw(bool* open, CoreOptionsUiState* state, const CoreOptionsUiContext* context,
+                               ImFont* pixel_font, int32_t scale)
+{
+    if (!*open)
+    {
+        return;
+    }
+    float block = static_cast<float>(scale);
+    const ImGuiIO& io = ImGui::GetIO();
+    retro_ui_push_theme(pixel_font, scale);
+    // The same size as SETTINGS: 360 x 240 retro pixels, never bigger than the window.
+    ImVec2 size(360.0f * block, 240.0f * block);
+    size.x = size.x < io.DisplaySize.x - 8.0f * block ? size.x : io.DisplaySize.x - 8.0f * block;
+    size.y = size.y < io.DisplaySize.y - 24.0f * block ? size.y : io.DisplaySize.y - 24.0f * block;
+    ImGui::SetNextWindowSize(size, ImGuiCond_Always);
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing,
+                            ImVec2(0.5f, 0.5f));
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+    char title[200] = {};
+    std::snprintf(title, sizeof(title), "%s###core_options_manager",
+                  piccolo_text(context->strings, Str::core_options_manager_title));
+    if (ImGui::Begin(title, nullptr, flags))
+    {
+        retro_ui_begin_window(scale);
+        if (retro_ui_close_button())
+        {
+            *open = false;
+        }
+        CoreOptionsUiContext manager = *context;
+        manager.label_width = 50.0f * block;   // CORE
+        if (manager.store != nullptr && manager.cache != nullptr)
+        {
+            core_options_ui_draw(state, &manager);
+        }
+        retro_ui_end_window();
+    }
+    ImGui::End();
+    retro_ui_pop_theme();
 }

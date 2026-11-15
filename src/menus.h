@@ -23,6 +23,8 @@ enum class MenuAction
     about,
     debug_window,
     recent_game,   // from the RECENT menu (see retro_ui_menu_bar)
+    options_manager,   // TOOLS > OPTIONS MANAGER (stored core options)
+    separator,     // not an action: a line between items (its label isn't shown)
 };
 
 int32_t     menus_count();

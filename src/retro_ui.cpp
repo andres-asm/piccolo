@@ -195,6 +195,11 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
                 draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, PANEL_LIGHT, PANEL_LIGHT, true);
                 for (int32_t item = 0; item < menus_item_count(menu); item++)
                 {
+                    if (menus_item_action(menu, item) == MenuAction::separator)
+                    {
+                        ImGui::Separator();
+                        continue;
+                    }
                     if (menu_item(piccolo_text(strings, menus_item_label(menu, item)), block))
                     {
                         picked = menus_item_action(menu, item);

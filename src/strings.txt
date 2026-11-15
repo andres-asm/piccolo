@@ -14,6 +14,7 @@
 # Menu bar
 menu_game = GAME
 menu_config = CONFIG
+menu_tools = TOOLS
 menu_misc = MISC
 menu_load_game = LOAD GAME...
 menu_reset = RESET
@@ -24,6 +25,7 @@ menu_general = GENERAL...
 menu_video = VIDEO...
 menu_input = INPUT...
 menu_sound = SOUND...
+menu_options_manager = OPTIONS MANAGER...
 menu_debug_window = DEBUG WINDOW
 menu_about = ABOUT PICCOLO
 menu_recent_empty = NO RECENT GAMES
@@ -113,7 +115,9 @@ core_options_marker_core_help = SET FOR THIS CORE
 core_options_marker_folder_help = SET FOR THIS FOLDER
 core_options_marker_game_help = SET FOR THIS GAME
 core_options_none = THIS CORE HAS NO OPTIONS
-core_options_not_running = START A GAME ON THIS CORE TO CHANGE ITS OPTIONS. WHAT IS STORED FOR IT CAN BE DELETED BELOW, EVEN IF THE CORE DOESN'T START.
+core_options_not_running = START A GAME ON THIS CORE AND OPEN THE QUICK MENU (F1) TO CHANGE ITS OPTIONS. WHAT IS STORED FOR IT CAN BE DELETED HERE, EVEN IF THE CORE DOESN'T START.
+core_options_running_note = THIS CORE IS RUNNING: CHANGE ITS OPTIONS IN THE QUICK MENU (F1). WHAT IS STORED FOR IT CAN BE DELETED HERE.
+core_options_manager_title = OPTIONS MANAGER
 core_options_no_cores = NO CORE HAS RUN YET
 core_options_stored = STORED VALUES
 core_options_stored_none = NOTHING STORED: THE CORE'S DEFAULTS

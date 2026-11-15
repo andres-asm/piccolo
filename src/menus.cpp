@@ -28,6 +28,11 @@ static const MenuItem CONFIG_ITEMS[] = {
     { Str::menu_sound,   MenuAction::sound },
 };
 
+// Tools: the options manager now; a core installer later (Andrés, 2026-11-14).
+static const MenuItem TOOLS_ITEMS[] = {
+    { Str::menu_options_manager, MenuAction::options_manager },
+};
+
 static const MenuItem MISC_ITEMS[] = {
     { Str::menu_debug_window, MenuAction::debug_window },
     { Str::menu_about,        MenuAction::about },
@@ -36,6 +41,7 @@ static const MenuItem MISC_ITEMS[] = {
 static const Menu MENUS[] = {
     { Str::menu_game,   GAME_ITEMS,   static_cast<int32_t>(sizeof(GAME_ITEMS) / sizeof(GAME_ITEMS[0])) },
     { Str::menu_config, CONFIG_ITEMS, static_cast<int32_t>(sizeof(CONFIG_ITEMS) / sizeof(CONFIG_ITEMS[0])) },
+    { Str::menu_tools,  TOOLS_ITEMS,  static_cast<int32_t>(sizeof(TOOLS_ITEMS) / sizeof(TOOLS_ITEMS[0])) },
     { Str::menu_misc,   MISC_ITEMS,   static_cast<int32_t>(sizeof(MISC_ITEMS) / sizeof(MISC_ITEMS[0])) },
 };
 
@@ -83,6 +89,8 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::about:      return "ABOUT";
         case MenuAction::debug_window: return "DEBUG WINDOW";
         case MenuAction::recent_game:  return "RECENT GAME";
+        case MenuAction::options_manager: return "OPTIONS MANAGER";
+        case MenuAction::separator:    return "SEPARATOR";
         default:                     return "?";
     }
 }
