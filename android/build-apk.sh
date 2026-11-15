@@ -38,16 +38,25 @@ for f in "$ANDROID_JAR" "$AAPT_ANDROID_JAR" "$D8_JAR" "$JAVA_HOME/bin/javac"; do
     fi
 done
 
+echo "== build tools for this machine"
+# The Android build runs multitap_strings_generator (piccolo's string IDs),
+# so it's built for this machine first, in its own build folder.
+host_build="$here/build-host"
+cmake -S "$multitap_root" -B "$host_build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_BUILD_TESTS=OFF \
+    -DMULTITAP_PICCOLO_DIR= -DMULTITAP_HOST_LIBRETRO_DIR= >/dev/null
+cmake --build "$host_build" --target multitap_strings_generator
+
 echo "== native library"
-# From multitap's root CMakeLists.txt: for Android it builds piccolo's
-# libmain.so and Test libretro.
+# From multitap's root CMakeLists.txt: for Android it builds piccolo (the same
+# one as on desktop) as libmain.so, and Test libretro.
 cmake -S "$multitap_root" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$here/cmake/android-toolchain.cmake" \
-    -DMULTITAP_BUILD_TESTS=OFF >/dev/null
+    -DMULTITAP_BUILD_TESTS=OFF -DMULTITAP_STRINGS_GENERATOR="$host_build/frontends/common/multitap_strings_generator" \
+    >/dev/null
 cmake --build "$build"
 
 echo "== java"
 rm -rf "$apk_dir"
-mkdir -p "$apk_dir/classes" "$apk_dir/dex" "$apk_dir/lib/arm64-v8a"
+mkdir -p "$apk_dir/classes" "$apk_dir/dex" "$apk_dir/lib/arm64-v8a" "$apk_dir/assets/lang"
 # SDL's Java side straight from the submodule, plus our activity.
 find "$multitap_root/deps/SDL/android-project/app/src/main/java" "$here/java" -name '*.java' > "$apk_dir/sources.txt"
 # Java 8 bytecode against android.jar as the boot class path (not the JDK's
@@ -61,7 +70,10 @@ find "$apk_dir/classes" -name '*.class' > "$apk_dir/classes.txt"
     --lib "$ANDROID_JAR" --output "$apk_dir/dex" @"$apk_dir/classes.txt"
 
 echo "== package"
-aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -o "$apk_dir/unaligned.apk"
+# Translations as assets: on Android SDL's base path ("./") is the APK's
+# assets, so piccolo finds lang/<code>.po there like next to the program.
+cp "$here/../lang/"*.po "$apk_dir/assets/lang/"
+aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -A "$apk_dir/assets" -o "$apk_dir/unaligned.apk"
 cp "$build/libmain.so" "$apk_dir/lib/arm64-v8a/libmain.so"
 # Android only extracts lib/<abi>/lib*.so when installing, hence the "lib"
 # prefix for the core (android_main.cpp looks for it under that name).

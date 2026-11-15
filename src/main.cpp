@@ -22,6 +22,7 @@
 
 #include "app_paths.h"
 #include "app_shell.h"
+#include "bundled_cores.h"
 #include "game_mode.h"
 #include "picture.h"
 #include "piccolo_settings.h"
@@ -837,6 +838,7 @@ int main(int argc, char** argv)
     ImGuiIO& io = ImGui::GetIO();
     if (app_paths_init(&app->paths, "piccolo", "piccolo.cfg"))
     {
+        bundled_cores_install(app->paths.cores.c_str());   // before the catalog first looks (apply_folders)
         app->imgui_ini = app->paths.settings + "/imgui.ini";
         io.IniFilename = app->imgui_ini.c_str();
         app->settings_path = app->paths.settings + "/piccolo.cfg";

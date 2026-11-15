@@ -10,7 +10,7 @@ add_library(piccolo_font STATIC
 target_include_directories(piccolo_font PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 multitap_set_project_flags(piccolo_font)
 
-add_executable(piccolo
+set(PICCOLO_SOURCES
     src/main.cpp
     src/menus.cpp
     src/retro_ui.cpp
@@ -24,6 +24,24 @@ add_executable(piccolo
     src/piccolo_text.cpp
     src/recent_games.cpp
 )
+
+if(ANDROID)
+    # Android: the same piccolo as libmain.so, which SDL's Java activity
+    # loads and whose SDL_main (main.cpp's main, renamed by SDL_main.h) it
+    # calls. android/ has the rest of the APK (manifest, activity, build-apk.sh).
+    add_library(piccolo SHARED ${PICCOLO_SOURCES} src/bundled_cores_android.cpp)
+    set_target_properties(piccolo PROPERTIES
+        OUTPUT_NAME "main"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")   # where build-apk.sh picks it up
+    target_link_libraries(piccolo PRIVATE android log)
+    # Test libretro goes into the APK too (build-apk.sh): build it with piccolo.
+    if(TARGET test_libretro)
+        add_dependencies(piccolo test_libretro)
+        set_target_properties(test_libretro PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
+else()
+    add_executable(piccolo ${PICCOLO_SOURCES} src/bundled_cores_none.cpp)
+endif()
 
 # UI text: src/strings.txt is the one English source. The build turns it into
 # the string IDs (enum class Str), the English table and piccolo.pot (the
@@ -58,9 +76,11 @@ multitap_set_project_flags(piccolo)
 multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 
 # Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
-add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
-target_link_libraries(pixel_font_preview PRIVATE piccolo_font)
-multitap_set_project_flags(pixel_font_preview)
+if(NOT ANDROID)
+    add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
+    target_link_libraries(pixel_font_preview PRIVATE piccolo_font)
+    multitap_set_project_flags(pixel_font_preview)
+endif()
 
 if(MULTITAP_BUILD_TESTS)
     # Table well formed, no character defined twice, no two glyphs identical.
