@@ -26,7 +26,7 @@ session) and its CMake helpers. It doesn't build on its own.
   Video: aspect ratio, integer / auto scaling, filters, overscan crop (IMAGE
   SETTINGS), window and fullscreen, Vsync / Exact timing, low latency. Sound:
   output device, volume, latency, rate control, resampler quality.
-- **CONFIG > SETTINGS > CORE OPTIONS**: the running core's options, kept per
+- **CORE OPTIONS** (a tab of the window any CONFIG entry opens): the running core's options, kept per
   core, per content folder or per game, and a list of what is stored for any
   core (see [Core options](#core-options)).
 - English and Spanish (GENERAL > LANGUAGE).
