@@ -689,7 +689,7 @@ static bool game_picture(const App* app, ViewportInput* picture)
 // FRAME DELAY, or with AUTO FRAME DELAY the delay it is finding or found for
 // this game (frame_delay.h). AUTO watches this loop's missed refresh
 // (frame_timing) and needs a minute of uninterrupted play to lock: the menu,
-// a pause or another window having focus start that minute over.
+// a pause, fast forward or another window having focus start that minute over.
 // This game's section in frame_delay.cfg: "core/game" ("core" without content).
 static std::string frame_delay_section(const App* app)
 {
@@ -729,7 +729,11 @@ static void frame_delay(App* app)
     int32_t manual_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
     bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
     app->frame_delay_ms = 0;
+    // Not while fast-forwarding: the delay would eat the time fast forward runs
+    // extra frames in, and those loops say nothing about this game's pacing
+    // (AUTO's minute starts over, like a pause; the delay comes back after).
     bool applies = waits && game_running(app) && !app->session.paused &&
+                   !core_session_fast_forwarding(&app->session) &&
                    app->session.timing.effective == TimingMode::vsync && (automatic || manual_ms > 0);
     if (!applies)
     {
