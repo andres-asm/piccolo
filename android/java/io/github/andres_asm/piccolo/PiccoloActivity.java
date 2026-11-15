@@ -29,8 +29,11 @@ public class PiccoloActivity extends SDLActivity {
         if (mBrokenLibraries) {
             return;
         }
+        // Where browsing for games starts (app_paths_home_folder): SDL has no
+        // user folders on Android.
+        String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
+        nativeSetenv("MULTITAP_HOME_DIR", sdcard);
         if (StartActivity.hasSharedStorageAccess(this)) {
-            String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);
             Log.i(TAG, "data folder: " + sdcard + "/piccolo");
         } else {

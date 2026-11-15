@@ -8,6 +8,7 @@
 
 #include "imgui.h"
 
+#include "app_paths.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -133,7 +134,7 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
     }
     else
     {
-        const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+        const char* home = app_paths_home_folder();   // /sdcard on Android
         std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
     }
 
