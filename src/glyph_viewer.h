@@ -1,10 +1,11 @@
 #pragma once
 
-// TEMPORARY development window: every glyph PNG of one folder of
-// assets/glyphs (a pad, or the keyboard in one language), with its file
-// name, at a chosen zoom, nearest-filtered. For judging the glyphs from
-// tools/make_glyphs.py on screen. F9, or from the debug window (MISC >
-// DEBUG WINDOW). Remove when the glyphs are settled.
+// Development window: every glyph PNG of one folder of assets/glyphs (a
+// pad, or the keyboard in one language), with its file name, at a chosen
+// zoom, nearest-filtered. For judging the glyphs from tools/make_glyphs.py
+// (or a theme's) on screen. F9, or from the debug window (MISC > DEBUG
+// WINDOW). A debug tool to keep (Andrés, 2026-11-15: more debug tools will
+// join it there).
 
 #include <cstdint>
 #include <string>

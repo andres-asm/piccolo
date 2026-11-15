@@ -96,7 +96,7 @@ void glyph_viewer_draw(GlyphViewer* viewer)
         return;
     }
     ImGui::SetNextWindowSize(ImVec2(900.0f, 600.0f), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Glyphs (temporary)", &viewer->open))
+    if (!ImGui::Begin("Glyphs", &viewer->open))
     {
         ImGui::End();
         return;

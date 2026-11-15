@@ -157,7 +157,7 @@ struct App
     // Big picture UI (UI MODE setting): HOME while no game runs, and the
     // button glyphs of the device used last for its hints.
     InputGlyphs    glyphs;
-    GlyphViewer    glyph_viewer;   // TEMPORARY: every glyph on screen (debug window)
+    GlyphViewer    glyph_viewer;   // debug tool: every glyph on screen (F9, debug window)
     BigPictureHome home = {};
     char           home_core_path[LIBRETRO_PATH_MAX] = {};   // last_core when home_core was worked out
     char           home_core[128] = {};                      // its short name ("snes9x")
@@ -944,7 +944,7 @@ static void app_handle_events(App* app)
                     }
                     break;
                 case SDLK_F9:
-                    app->glyph_viewer.open = !app->glyph_viewer.open;   // TEMPORARY glyph viewer
+                    app->glyph_viewer.open = !app->glyph_viewer.open;   // debug: glyph viewer
                     break;
                 case SDLK_F11:
                     toggle_fullscreen(app);
@@ -1206,7 +1206,7 @@ static void app_draw_debug_ui(App* app)
     }
     ImGui::Separator();
     ImGui::Checkbox("Dear ImGui demo window", &app->show_imgui_demo);
-    ImGui::Checkbox("Glyph viewer (temporary)", &app->glyph_viewer.open);
+    ImGui::Checkbox("Glyph viewer (F9)", &app->glyph_viewer.open);
 
     ImGui::End();
 
