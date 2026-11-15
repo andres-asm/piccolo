@@ -23,6 +23,7 @@
 
 #include "core_options_ui.h"
 #include "core_session.h"
+#include "input_bindings.h"
 #include "localization.h"
 #include "vk_texture.h"
 
@@ -41,6 +42,8 @@ enum class QuickMenuAction
 struct QuickMenu
 {
     bool          open = false;
+    int           tab = 0;              // 0 SAVESTATES, 1 CORE OPTIONS, 2 CONTROLS (for PAGE LEFT / RIGHT)
+    int           open_on_tab = 0;      // the tab it opens on
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]
     bool          refresh = true;   // read the slots again on the next draw
@@ -64,10 +67,14 @@ struct QuickMenuContext
     const CoreSession*   session = nullptr;
     CoreOptionsUiState*  core_options_state = nullptr;
     CoreOptionsUiContext core_options;   // label_width and strings filled by the menu
+    InputSystem*         input = nullptr;   // CONTROLS: who plays on which port
 };
 
-// Opens on `slot` (the session's current slot).
+// Opens on `slot` (the session's current slot), on the SAVESTATES tab.
 void quick_menu_open(QuickMenu* menu, uint32_t slot);
+
+// Opens on the CONTROLS tab (a controller went away: rearrange the ports).
+void quick_menu_open_controls(QuickMenu* menu, uint32_t slot);
 
 // The slots changed on disk (a state was saved): read them again.
 void quick_menu_refresh(QuickMenu* menu);

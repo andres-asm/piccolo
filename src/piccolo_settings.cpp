@@ -105,6 +105,12 @@ static const SettingEnumValue LATENCY_VALUES[] = {
 static const uint32_t LATENCIES[] = {RATE_CONTROL_AUTO_START_MS, 40, 50, 60, 80, 100, 120, 160, 200};
 constexpr uint32_t LATENCY_COUNT = sizeof(LATENCY_VALUES) / sizeof(LATENCY_VALUES[0]);
 
+static const SettingEnumValue HOTKEY_MODE_VALUES[] = {
+    {"hold", text_id(Str::value_hotkey_hold)},
+    {"double_tap", text_id(Str::value_hotkey_double_tap)},
+};
+constexpr uint32_t HOTKEY_MODE_COUNT = sizeof(HOTKEY_MODE_VALUES) / sizeof(HOTKEY_MODE_VALUES[0]);
+
 static const SettingEnumValue QUALITY_VALUES[] = {
     {"fastest", text_id(Str::value_quality_fastest)},
     {"medium", text_id(Str::value_quality_medium)},
@@ -137,6 +143,12 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_SCREENSAVER_WHEN_PAUSED, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_screensaver),
      .help = text_id(Str::setting_screensaver_help)},
+    // Input (overridable per core / game; the bindings are per controller, in input.cfg)
+    {.key = PICCOLO_INPUT_SHARE_PORT1, .type = SettingType::boolean, .default_value = "true", .overridable = true,
+     .label = text_id(Str::setting_input_share_port1), .help = text_id(Str::setting_input_share_port1_help)},
+    {.key = PICCOLO_INPUT_HOTKEY_MODE, .type = SettingType::enumeration, .default_value = "hold", .overridable = true,
+     .values = HOTKEY_MODE_VALUES, .value_count = HOTKEY_MODE_COUNT, .label = text_id(Str::setting_input_hotkey_mode),
+     .help = text_id(Str::setting_input_hotkey_mode_help)},
     {.key = PICCOLO_GAME_MODE, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_game_mode), .help = text_id(Str::setting_game_mode_help)},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
@@ -739,4 +751,11 @@ bool piccolo_settings_complete_ui_theme(Settings* settings)
         }
     }
     return changed;
+}
+
+void piccolo_settings_input(const Settings* settings, InputSettings* input)
+{
+    input->keyboard_shares_port1 = settings_get_bool(settings, PICCOLO_INPUT_SHARE_PORT1);
+    input->hotkey_mode = settings_get_enum(settings, PICCOLO_INPUT_HOTKEY_MODE) == 1 ? InputHotkeyMode::double_tap
+                                                                                   : InputHotkeyMode::hold;
 }

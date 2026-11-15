@@ -11,8 +11,8 @@ msgid "GAME"
 msgstr "JUEGO"
 
 msgctxt "menu_config"
-msgid "CONFIG"
-msgstr "CONFIG"
+msgid "SETTINGS"
+msgstr "AJUSTES"
 
 msgctxt "menu_misc"
 msgid "MISC"
@@ -1273,3 +1273,388 @@ msgstr "BORDE DEL CURSOR"
 msgctxt "setting_ui_color_cursor_edge_help"
 msgid "The cursor's top and right edge: with the same color as CURSOR, a flat cursor."
 msgstr "El borde de arriba y derecho del cursor: con el mismo color que CURSOR, un cursor plano."
+
+msgctxt "input_title"
+msgid "INPUT"
+msgstr "CONTROLES"
+
+
+
+msgctxt "input_tab_devices"
+msgid "DEVICES"
+msgstr "DISPOSITIVOS"
+
+
+
+
+
+
+
+
+
+
+
+
+
+msgctxt "input_name"
+msgid "NAME"
+msgstr "NOMBRE"
+
+msgctxt "input_deadzone"
+msgid "DEADZONE"
+msgstr "ZONA MUERTA"
+
+msgctxt "input_deadzone_help"
+msgid "How far a stick must move before it counts."
+msgstr "Cuánto hay que mover un stick para que cuente."
+
+msgctxt "input_add_part"
+msgid "ADD KEYBOARD PLAYER"
+msgstr "AGREGAR JUGADOR DE TECLADO"
+
+msgctxt "input_add_part_help"
+msgid "Another player on the same keyboard, with its own keys and its own START."
+msgstr "Otro jugador en el mismo teclado, con sus propias teclas y su propio START."
+
+msgctxt "input_remove_part"
+msgid "REMOVE THIS PLAYER"
+msgstr "QUITAR ESTE JUGADOR"
+
+msgctxt "input_defaults"
+msgid "DEFAULTS"
+msgstr "POR DEFECTO"
+
+msgctxt "input_defaults_help"
+msgid "Every binding of this controller back to the defaults."
+msgstr "Todas las asignaciones de este control vuelven a las de por defecto."
+
+
+msgctxt "input_section_interface"
+msgid "INTERFACE"
+msgstr "INTERFAZ"
+
+msgctxt "input_section_hotkeys"
+msgid "HOTKEYS"
+msgstr "HOTKEYS"
+
+msgctxt "input_set"
+msgid "SET"
+msgstr "ASIGNAR"
+
+msgctxt "input_clear"
+msgid "CLEAR"
+msgstr "QUITAR"
+
+msgctxt "input_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "input_press"
+msgid "PRESS A KEY OR BUTTON (ESC CANCELS)"
+msgstr "PRESIONA UNA TECLA O BOTÓN (ESC CANCELA)"
+
+
+msgctxt "input_device_ignored_auto"
+msgid "IGNORED: NOT A REAL GAMEPAD"
+msgstr "IGNORADO: NO ES UN GAMEPAD REAL"
+
+msgctxt "input_device_ignored"
+msgid "IGNORED"
+msgstr "IGNORADO"
+
+msgctxt "input_device_disconnected"
+msgid "NOT CONNECTED"
+msgstr "NO CONECTADO"
+
+msgctxt "input_ignore"
+msgid "IGNORE"
+msgstr "IGNORAR"
+
+msgctxt "input_ignore_help"
+msgid "AUTOMATIC ignores a device whose sticks sit at an extreme from the start (not a real gamepad)."
+msgstr "AUTOMÁTICO ignora un dispositivo cuyos sticks están en un extremo desde el principio (no es un gamepad real)."
+
+msgctxt "input_ignore_auto"
+msgid "AUTOMATIC"
+msgstr "AUTOMÁTICO"
+
+msgctxt "input_ignore_yes"
+msgid "YES"
+msgstr "SÍ"
+
+msgctxt "input_ignore_no"
+msgid "NO"
+msgstr "NO"
+
+msgctxt "input_unmapped"
+msgid "NOT KNOWN AS A GAMEPAD"
+msgstr "NO RECONOCIDO COMO GAMEPAD"
+
+msgctxt "input_map"
+msgid "MAP..."
+msgstr "MAPEAR..."
+
+msgctxt "input_action_pad_b"
+msgid "B"
+msgstr "B"
+
+msgctxt "input_action_pad_y"
+msgid "Y"
+msgstr "Y"
+
+msgctxt "input_action_pad_select"
+msgid "SELECT"
+msgstr "SELECT"
+
+msgctxt "input_action_pad_start"
+msgid "START"
+msgstr "START"
+
+msgctxt "input_action_pad_up"
+msgid "UP"
+msgstr "ARRIBA"
+
+msgctxt "input_action_pad_down"
+msgid "DOWN"
+msgstr "ABAJO"
+
+msgctxt "input_action_pad_left"
+msgid "LEFT"
+msgstr "IZQUIERDA"
+
+msgctxt "input_action_pad_right"
+msgid "RIGHT"
+msgstr "DERECHA"
+
+msgctxt "input_action_pad_a"
+msgid "A"
+msgstr "A"
+
+msgctxt "input_action_pad_x"
+msgid "X"
+msgstr "X"
+
+msgctxt "input_action_pad_l"
+msgid "L"
+msgstr "L"
+
+msgctxt "input_action_pad_r"
+msgid "R"
+msgstr "R"
+
+msgctxt "input_action_pad_l2"
+msgid "L2"
+msgstr "L2"
+
+msgctxt "input_action_pad_r2"
+msgid "R2"
+msgstr "R2"
+
+msgctxt "input_action_pad_l3"
+msgid "L3"
+msgstr "L3"
+
+msgctxt "input_action_pad_r3"
+msgid "R3"
+msgstr "R3"
+
+msgctxt "input_action_left_x_plus"
+msgid "LEFT STICK RIGHT"
+msgstr "STICK IZQ. DERECHA"
+
+msgctxt "input_action_left_x_minus"
+msgid "LEFT STICK LEFT"
+msgstr "STICK IZQ. IZQUIERDA"
+
+msgctxt "input_action_left_y_plus"
+msgid "LEFT STICK DOWN"
+msgstr "STICK IZQ. ABAJO"
+
+msgctxt "input_action_left_y_minus"
+msgid "LEFT STICK UP"
+msgstr "STICK IZQ. ARRIBA"
+
+msgctxt "input_action_right_x_plus"
+msgid "RIGHT STICK RIGHT"
+msgstr "STICK DER. DERECHA"
+
+msgctxt "input_action_right_x_minus"
+msgid "RIGHT STICK LEFT"
+msgstr "STICK DER. IZQUIERDA"
+
+msgctxt "input_action_right_y_plus"
+msgid "RIGHT STICK DOWN"
+msgstr "STICK DER. ABAJO"
+
+msgctxt "input_action_right_y_minus"
+msgid "RIGHT STICK UP"
+msgstr "STICK DER. ARRIBA"
+
+msgctxt "input_action_ui_up"
+msgid "UP"
+msgstr "ARRIBA"
+
+msgctxt "input_action_ui_down"
+msgid "DOWN"
+msgstr "ABAJO"
+
+msgctxt "input_action_ui_left"
+msgid "LEFT"
+msgstr "IZQUIERDA"
+
+msgctxt "input_action_ui_right"
+msgid "RIGHT"
+msgstr "DERECHA"
+
+msgctxt "input_action_ui_accept"
+msgid "ACCEPT"
+msgstr "ACEPTAR"
+
+msgctxt "input_action_ui_back"
+msgid "BACK"
+msgstr "VOLVER"
+
+msgctxt "input_action_ui_page_left"
+msgid "PAGE LEFT"
+msgstr "PÁGINA IZQUIERDA"
+
+msgctxt "input_action_ui_page_right"
+msgid "PAGE RIGHT"
+msgstr "PÁGINA DERECHA"
+
+msgctxt "input_action_ui_open_menu"
+msgid "OPEN MENU"
+msgstr "ABRIR MENÚ"
+
+msgctxt "input_action_hotkey_enable"
+msgid "HOTKEY ENABLE"
+msgstr "HABILITAR HOTKEYS"
+
+msgctxt "input_action_hotkey_menu"
+msgid "MENU"
+msgstr "MENÚ"
+
+msgctxt "input_action_hotkey_quick_menu"
+msgid "QUICK MENU"
+msgstr "MENÚ RÁPIDO"
+
+msgctxt "input_action_hotkey_save_state"
+msgid "SAVE STATE"
+msgstr "GUARDAR ESTADO"
+
+msgctxt "input_action_hotkey_load_state"
+msgid "LOAD STATE"
+msgstr "CARGAR ESTADO"
+
+msgctxt "input_action_hotkey_fast_forward"
+msgid "FAST FORWARD"
+msgstr "AVANCE RÁPIDO"
+
+
+
+msgctxt "input_player"
+msgid "PLAYER"
+msgstr "JUGADOR"
+
+
+
+msgctxt "input_column_game"
+msgid "GAME"
+msgstr "JUEGO"
+
+msgctxt "input_column_action"
+msgid "ACTION"
+msgstr "ACCIÓN"
+
+msgctxt "input_column_pad"
+msgid "GAMEPAD"
+msgstr "GAMEPAD"
+
+msgctxt "input_column_key"
+msgid "KEY"
+msgstr "TECLA"
+
+msgctxt "setting_input_share_port1"
+msgid "GAMEPAD 1 AND KEYBOARD SHARE PORT 1"
+msgstr "GAMEPAD 1 Y TECLADO COMPARTEN EL PUERTO 1"
+
+msgctxt "setting_input_share_port1_help"
+msgid "The keyboard plays on port 1 together with the gamepad that joined port 1. Off: the keyboard joins its own port with START."
+msgstr "El teclado juega en el puerto 1 junto con el gamepad que se unió al puerto 1. Apagado: el teclado se une a su propio puerto con START."
+
+msgctxt "setting_input_hotkey_mode"
+msgid "HOTKEY ENABLE"
+msgstr "HABILITAR HOTKEYS"
+
+msgctxt "setting_input_hotkey_mode_help"
+msgid "How HOTKEY ENABLE works on gamepads. HOLD: hotkeys work while it is held. DOUBLE TAP: tap it twice, then one hotkey works."
+msgstr "Cómo funciona HABILITAR HOTKEYS en los gamepads. MANTENER: los hotkeys funcionan mientras está apretado. DOBLE TOQUE: tócalo dos veces y funciona un hotkey."
+
+msgctxt "value_hotkey_hold"
+msgid "HOLD"
+msgstr "MANTENER"
+
+msgctxt "value_hotkey_double_tap"
+msgid "DOUBLE TAP"
+msgstr "DOBLE TOQUE"
+
+msgctxt "input_tab_settings"
+msgid "SETTINGS"
+msgstr "AJUSTES"
+
+msgctxt "input_tab_retropad"
+msgid "RETROPAD"
+msgstr "RETROPAD"
+
+msgctxt "input_bind_all"
+msgid "BIND ALL"
+msgstr "ASIGNAR TODO"
+
+msgctxt "input_bind_all_help"
+msgid "Asks for every control below in turn; nothing pressed for 5 seconds skips one, Esc stops."
+msgstr "Pide cada control de abajo en orden; si no presionas nada en 5 segundos se salta, Esc termina."
+
+msgctxt "input_reset"
+msgid "RESET"
+msgstr "RESET"
+
+msgctxt "input_mapping"
+msgid "MAPPING"
+msgstr "CONTROL"
+
+
+msgctxt "input_joined"
+msgid "%s: PORT %d"
+msgstr "%s: PUERTO %d"
+
+msgctxt "input_left"
+msgid "%s DISCONNECTED (PORT %d)"
+msgstr "%s DESCONECTADO (PUERTO %d)"
+
+msgctxt "quick_menu_tab_controls"
+msgid "CONTROLS"
+msgstr "CONTROLES"
+
+msgctxt "quick_menu_no_ports"
+msgid "NOBODY HAS JOINED: PRESS START ON A CONTROLLER"
+msgstr "NADIE SE UNIÓ: PRESIONA START EN UN CONTROL"
+
+msgctxt "input_port"
+msgid "PORT"
+msgstr "PUERTO"
+
+msgctxt "input_port_empty"
+msgid "PRESS START TO JOIN"
+msgstr "PRESIONA START PARA UNIRTE"
+
+msgctxt "input_leave"
+msgid "LEAVE"
+msgstr "SALIR"
+
+msgctxt "input_move_up"
+msgid "MOVE UP"
+msgstr "SUBIR"
+
+msgctxt "input_keyboard_shared"
+msgid "KEYBOARD (SHARED)"
+msgstr "TECLADO (COMPARTIDO)"

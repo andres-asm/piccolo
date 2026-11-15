@@ -19,6 +19,7 @@ add_executable(piccolo
     src/piccolo_settings.cpp
     src/settings_ui.cpp
     src/settings_window.cpp
+    src/input_window.cpp
     src/image_window.cpp
     src/piccolo_window.cpp
     src/piccolo_text.cpp

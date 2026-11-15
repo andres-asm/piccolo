@@ -1015,3 +1015,25 @@ void retro_ui_scrollbars(int32_t scale)
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tabs by PAGE LEFT / PAGE RIGHT
+// ---------------------------------------------------------------------------
+
+static int g_page_request = 0;
+
+void retro_ui_set_page_request(int delta)
+{
+    g_page_request = delta;
+}
+
+int retro_ui_tab_switch(int current, int count)
+{
+    if (g_page_request == 0 || count <= 0 || !ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+    {
+        return -1;
+    }
+    int target = (current + g_page_request + count) % count;   // wraps around
+    g_page_request = 0;
+    return target;
+}

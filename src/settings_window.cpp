@@ -32,78 +32,11 @@ static const char* with_id(char* buffer, size_t size, const char* text, const ch
     return buffer;
 }
 
-// GLOBAL / THIS CORE / THIS GAME, only the ones that exist right now.
+// GLOBAL / THIS CORE / THIS GAME (settings_ui_scope).
 static void draw_scope(SettingsWindow* window, const SettingsWindowContext* context)
 {
-    const Localization* strings = context->strings;
-    bool has_core = context->core_name[0] != '\0';
-    bool has_game = has_core && context->game_name[0] != '\0';
-    if (window->choose_scope)
-    {
-        // The most specific layer already in use, so changes keep going there.
-        window->choose_scope = false;
-        window->scope = SettingLayer::global;
-        if (has_game && settings_layer_has_values(context->settings, SettingLayer::game))
-        {
-            window->scope = SettingLayer::game;
-        }
-        else if (has_core && settings_layer_has_values(context->settings, SettingLayer::core))
-        {
-            window->scope = SettingLayer::core;
-        }
-    }
-    if ((window->scope == SettingLayer::core && !has_core) || (window->scope == SettingLayer::game && !has_game))
-    {
-        window->scope = SettingLayer::global;   // the game stopped
-    }
-    if (!has_core)
-    {
-        ImGui::TextDisabled("%s: %s", piccolo_text(strings, Str::scope), piccolo_text(strings, Str::scope_global));
-        retro_ui_item_tooltip(piccolo_text(strings, Str::scope_start_game_help));
-        return;
-    }
-
-    char core_label[400] = {};
-    char game_label[600] = {};
-    std::snprintf(core_label, sizeof(core_label), "%s (%s)###core", piccolo_text(strings, Str::scope_core),
-                  context->core_name);
-    std::snprintf(game_label, sizeof(game_label), "%s (%s)###game", piccolo_text(strings, Str::scope_game),
-                  context->game_name);
-    char global_label[200] = {};
-    with_id(global_label, sizeof(global_label), piccolo_text(strings, Str::scope_global), "global");
-    // The combo shows the label without its "###" part.
-    const char* preview = window->scope == SettingLayer::core   ? core_label
-                          : window->scope == SettingLayer::game ? game_label
-                                                                : global_label;
-    char preview_text[600] = {};
-    std::snprintf(preview_text, sizeof(preview_text), "%s", preview);
-    char* hidden = std::strstr(preview_text, "###");
-    if (hidden != nullptr)
-    {
-        *hidden = '\0';
-    }
-
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(piccolo_text(strings, Str::scope));
-    retro_ui_item_tooltip(piccolo_text(strings, Str::scope_help));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (retro_ui_begin_combo("##scope", preview_text))
-    {
-        if (ImGui::Selectable(global_label, window->scope == SettingLayer::global))
-        {
-            window->scope = SettingLayer::global;
-        }
-        if (ImGui::Selectable(core_label, window->scope == SettingLayer::core))
-        {
-            window->scope = SettingLayer::core;
-        }
-        if (has_game && ImGui::Selectable(game_label, window->scope == SettingLayer::game))
-        {
-            window->scope = SettingLayer::game;
-        }
-        ImGui::EndCombo();
-    }
+    settings_ui_scope(context->settings, context->strings, context->core_name, context->game_name, &window->scope,
+                      &window->choose_scope);
 }
 
 static void draw_general(const SettingsUiContext* ui, const SettingsWindowContext* context)
@@ -347,6 +280,12 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     if (!ImGui::BeginTabBar("tabs"))
     {
         return;
+    }
+    int target = retro_ui_tab_switch(static_cast<int>(window->tab), 4);
+    if (target >= 0)
+    {
+        window->tab = static_cast<SettingsTab>(target);
+        window->select_tab = true;
     }
     ImGuiTabItemFlags general_flags =
         window->select_tab && window->tab == SettingsTab::general ? ImGuiTabItemFlags_SetSelected : 0;

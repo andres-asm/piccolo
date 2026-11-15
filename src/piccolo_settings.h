@@ -8,6 +8,7 @@
 
 #include <cstdint>
 
+#include "input_bindings.h"
 #include "audio_output.h"
 #include "frame_timing.h"
 #include "piccolo_text.h"
@@ -21,6 +22,8 @@ constexpr const char* PICCOLO_PAUSE_IN_MENU = "pause_in_menu";
 constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
+constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
+constexpr const char* PICCOLO_INPUT_HOTKEY_MODE = "input_hotkey_mode";
 constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";
@@ -139,6 +142,9 @@ bool piccolo_settings_complete_ui_theme(Settings* settings);
 // The interface color settings in table order, for the Interface tab.
 uint32_t piccolo_settings_ui_color_count();
 const char* piccolo_settings_ui_color_key(uint32_t index);
+
+// The Input settings (SETTINGS > INPUT) as the input layer's.
+void piccolo_settings_input(const Settings* settings, InputSettings* input);
 
 // The Sound settings as audio_output's config.
 void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);

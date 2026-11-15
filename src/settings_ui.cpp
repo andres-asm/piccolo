@@ -384,3 +384,77 @@ bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* k
     ImGui::PopID();
     return changed;
 }
+
+void settings_ui_scope(Settings* settings, const Localization* strings, const char* core_name, const char* game_name,
+                       SettingLayer* scope, bool* choose_scope)
+{
+    bool has_core = core_name[0] != '\0';
+    bool has_game = has_core && game_name[0] != '\0';
+    if (*choose_scope)
+    {
+        // The most specific layer already in use, so changes keep going there.
+        *choose_scope = false;
+        *scope = SettingLayer::global;
+        if (has_game && settings_layer_has_values(settings, SettingLayer::game))
+        {
+            *scope = SettingLayer::game;
+        }
+        else if (has_core && settings_layer_has_values(settings, SettingLayer::core))
+        {
+            *scope = SettingLayer::core;
+        }
+    }
+    if ((*scope == SettingLayer::core && !has_core) || (*scope == SettingLayer::game && !has_game))
+    {
+        *scope = SettingLayer::global;   // the game stopped
+    }
+    if (!has_core)
+    {
+        ImGui::TextDisabled("%s: %s", piccolo_text(strings, Str::scope), piccolo_text(strings, Str::scope_global));
+        retro_ui_item_tooltip(piccolo_text(strings, Str::scope_start_game_help));
+        return;
+    }
+
+    char core_label[400] = {};
+    char game_label[600] = {};
+    std::snprintf(core_label, sizeof(core_label), "%s (%s)###core", piccolo_text(strings, Str::scope_core),
+                  core_name);
+    std::snprintf(game_label, sizeof(game_label), "%s (%s)###game", piccolo_text(strings, Str::scope_game),
+                  game_name);
+    char global_label[200] = {};
+    std::snprintf(global_label, sizeof(global_label), "%s###global", piccolo_text(strings, Str::scope_global));
+    // The combo shows the label without its "###" part.
+    const char* preview = *scope == SettingLayer::core   ? core_label
+                          : *scope == SettingLayer::game ? game_label
+                                                                : global_label;
+    char preview_text[600] = {};
+    std::snprintf(preview_text, sizeof(preview_text), "%s", preview);
+    char* hidden = std::strstr(preview_text, "###");
+    if (hidden != nullptr)
+    {
+        *hidden = '\0';
+    }
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::scope));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::scope_help));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (retro_ui_begin_combo("##scope", preview_text))
+    {
+        if (ImGui::Selectable(global_label, *scope == SettingLayer::global))
+        {
+            *scope = SettingLayer::global;
+        }
+        if (ImGui::Selectable(core_label, *scope == SettingLayer::core))
+        {
+            *scope = SettingLayer::core;
+        }
+        if (has_game && ImGui::Selectable(game_label, *scope == SettingLayer::game))
+        {
+            *scope = SettingLayer::game;
+        }
+        ImGui::EndCombo();
+    }
+}
+

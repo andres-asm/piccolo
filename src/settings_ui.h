@@ -51,3 +51,9 @@ const char* settings_ui_scope_name(const Localization* strings, SettingLayer sco
 
 // The label column's width: the widest label of the rows that have one.
 float settings_ui_label_width(const Settings* settings, const Localization* strings);
+
+// The SCOPE selector: GLOBAL / THIS CORE (name) / THIS GAME (name), only the
+// ones that exist now. With *choose_scope set (just opened) it picks the most
+// specific layer already in use, so changes keep going there, and clears it.
+void settings_ui_scope(Settings* settings, const Localization* strings, const char* core_name, const char* game_name,
+                       SettingLayer* scope, bool* choose_scope);

@@ -155,6 +155,13 @@ bool retro_ui_collapsing_header(const char* label, int flags);
 // triangle. Same return value and EndCombo() rule. Use inside the theme.
 bool retro_ui_begin_combo(const char* label, const char* preview);
 
+// Tabs by PAGE LEFT / PAGE RIGHT (L / R on a gamepad, Page Up / Page Down on
+// the keyboard): piccolo hands this frame's request (-1, +1 or 0), and each
+// tab bar asks for the tab to select now. Only the focused window acts on
+// it; the request is used once. Returns the index or -1.
+void retro_ui_set_page_request(int delta);
+int  retro_ui_tab_switch(int current, int count);
+
 // Every window's vertical scroll bar in the theme's style (a sunken track,
 // a raised grip), drawn over ImGui's. Call once a frame after all windows,
 // before the frame is drawn.

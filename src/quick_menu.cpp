@@ -24,8 +24,15 @@ static ImVec4 color_of(uint32_t argb)
                   static_cast<float>(argb & 0xFFu) / 255.0f, static_cast<float>(argb >> 24) / 255.0f);
 }
 
+void quick_menu_open_controls(QuickMenu* menu, uint32_t slot)
+{
+    quick_menu_open(menu, slot);
+    menu->open_on_tab = 2;
+}
+
 void quick_menu_open(QuickMenu* menu, uint32_t slot)
 {
+    menu->open_on_tab = 0;
     menu->open = true;
     menu->slot = slot >= LIBRETRO_STATE_SLOT_FIRST && slot <= LIBRETRO_STATE_SLOT_LAST ? slot : LIBRETRO_STATE_SLOT_FIRST;
     menu->refresh = true;
@@ -248,6 +255,73 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     return action;
 }
 
+// CONTROLS: the ports, who is on each (the keyboard too, when it shares
+// port 1), MOVE UP and LEAVE. START on a controller joins it.
+static void draw_controls_tab(const QuickMenuContext* context, float block)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    float label_width = 60.0f * block;
+    bool anybody = false;
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    {
+        ImGui::PushID(static_cast<int>(p));
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("%s %u", piccolo_text(strings, Str::input_port), static_cast<unsigned>(p + 1));
+        ImGui::SameLine(label_width);
+        int32_t controller = input->ports[p];
+        bool keyboard_here = p == 0 && input->settings.keyboard_shares_port1;
+        if (controller < 0)
+        {
+            if (keyboard_here)
+            {
+                ImGui::TextUnformatted(piccolo_text(strings, Str::input_keyboard_shared));
+            }
+            else
+            {
+                ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_port_empty));
+            }
+            ImGui::PopID();
+            continue;
+        }
+        anybody = true;
+        if (keyboard_here)
+        {
+            ImGui::Text("%s + %s", input->controllers[static_cast<size_t>(controller)].name.c_str(),
+                        piccolo_text(strings, Str::input_keyboard_shared));
+        }
+        else
+        {
+            ImGui::TextUnformatted(input->controllers[static_cast<size_t>(controller)].name.c_str());
+        }
+        const char* leave = piccolo_text(strings, Str::input_leave);
+        const char* up = piccolo_text(strings, Str::input_move_up);
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float pad = ImGui::GetStyle().FramePadding.x * 2.0f;
+        float width = ImGui::CalcTextSize(leave).x + pad + (p > 0 ? ImGui::CalcTextSize(up).x + pad + spacing : 0.0f);
+        float x = ImGui::GetWindowContentRegionMax().x - width;
+        ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
+        if (p > 0)
+        {
+            if (retro_ui_button(up))
+            {
+                input_swap_ports(input, p, p - 1);
+            }
+            ImGui::SameLine();
+        }
+        if (retro_ui_button(leave))
+        {
+            input_leave(input, static_cast<uint32_t>(controller));
+        }
+        ImGui::PopID();
+    }
+    if (!anybody && !input->settings.keyboard_shares_port1)
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::quick_menu_no_ports));
+    }
+}
+
 QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context, ImFont* pixel_font, int32_t scale)
 {
     if (!menu->open)
@@ -296,20 +370,32 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
         char label[200] = {};
         if (ImGui::BeginTabBar("quick_tabs"))
         {
+            int tab_count = 3;
+            int target = appearing ? menu->open_on_tab : retro_ui_tab_switch(menu->tab, tab_count);
             // SAVESTATES first: it's what the menu is for. Opening it again starts there.
             std::snprintf(label, sizeof(label), "%s###states", piccolo_text(strings, Str::quick_menu_tab_states));
-            if (ImGui::BeginTabItem(label, nullptr, appearing ? ImGuiTabItemFlags_SetSelected : 0))
+            if (ImGui::BeginTabItem(label, nullptr, target == 0 ? ImGuiTabItemFlags_SetSelected : 0))
             {
+                menu->tab = 0;
                 action = draw_states_tab(menu, context, block, appearing);
                 ImGui::EndTabItem();
             }
             std::snprintf(label, sizeof(label), "%s###core_options", piccolo_text(strings, Str::tab_core_options));
-            if (context->core_options_state != nullptr && ImGui::BeginTabItem(label))
+            if (context->core_options_state != nullptr &&
+                ImGui::BeginTabItem(label, nullptr, target == 1 ? ImGuiTabItemFlags_SetSelected : 0))
             {
+                menu->tab = 1;
                 CoreOptionsUiContext core = context->core_options;
                 core.strings = strings;
                 core.label_width = 80.0f * block;   // SAVE TO / SECTION; the options size their own column
                 core_options_ui_draw_running(context->core_options_state, &core);
+                ImGui::EndTabItem();
+            }
+            std::snprintf(label, sizeof(label), "%s###controls", piccolo_text(strings, Str::quick_menu_tab_controls));
+            if (context->input != nullptr && ImGui::BeginTabItem(label, nullptr, target == 2 ? ImGuiTabItemFlags_SetSelected : 0))
+            {
+                menu->tab = 2;
+                draw_controls_tab(context, block);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
