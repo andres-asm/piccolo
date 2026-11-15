@@ -891,8 +891,9 @@ void retro_ui_text_shadows(ImDrawData* draw_data, int32_t scale)
 // Scroll bars
 // ---------------------------------------------------------------------------
 
-// One window's vertical scroll bar drawn over ImGui's: a sunken track in the
-// field color and a raised grip like a button (pressed while dragged). The
+// One window's vertical scroll bar drawn over ImGui's: a track in the field
+// color and a grip like a button (pressed while dragged); with the button
+// edges, the track is sunken and the grip raised. The
 // grip's size and place are worked out as ImGui does (ScrollbarEx).
 static void draw_scrollbar(ImGuiWindow* window, float block)
 {
@@ -926,14 +927,18 @@ static void draw_scrollbar(ImGuiWindow* window, float block)
     ImDrawList* draw_list = window->DrawList;
     draw_list->PushClipRect(frame.Min, frame.Max, false);
     draw_list->PushTexture(ImGui::GetIO().Fonts->TexRef);
-    // The track, sunken: dark top and left, light bottom and right.
+    // The track; sunken (dark top and left, light bottom and right) only in
+    // a theme whose buttons have a raised edge: the flat ones stay flat.
     draw_list->AddRectFilled(frame.Min, frame.Max, to_imgui_u32(g_palette.field_face));
-    ImU32 dark = to_imgui_u32(g_palette.panel_dark);
-    ImU32 light = to_imgui_u32(g_palette.panel_light);
-    draw_list->AddRectFilled(frame.Min, ImVec2(frame.Max.x, frame.Min.y + block), dark);
-    draw_list->AddRectFilled(frame.Min, ImVec2(frame.Min.x + block, frame.Max.y), dark);
-    draw_list->AddRectFilled(ImVec2(frame.Min.x, frame.Max.y - block), frame.Max, light);
-    draw_list->AddRectFilled(ImVec2(frame.Max.x - block, frame.Min.y), frame.Max, light);
+    if (g_palette.button_light != g_palette.button_dark)
+    {
+        ImU32 dark = to_imgui_u32(g_palette.panel_dark);
+        ImU32 light = to_imgui_u32(g_palette.panel_light);
+        draw_list->AddRectFilled(frame.Min, ImVec2(frame.Max.x, frame.Min.y + block), dark);
+        draw_list->AddRectFilled(frame.Min, ImVec2(frame.Min.x + block, frame.Max.y), dark);
+        draw_list->AddRectFilled(ImVec2(frame.Min.x, frame.Max.y - block), frame.Max, light);
+        draw_list->AddRectFilled(ImVec2(frame.Max.x - block, frame.Min.y), frame.Max, light);
+    }
     // The grip.
     ImVec2 min(track.Min.x, grip_y);
     ImVec2 max(track.Max.x, grip_y + grip);
