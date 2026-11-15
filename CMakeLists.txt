@@ -57,6 +57,13 @@ endif()
 
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
+# piccolo's version (docs/roadmap-piccolo.md in multitap): piccolo_version.h,
+# PICCOLO_VERSION. The branch suffix is piccolo's own branch.
+set(PICCOLO_VERSION_BASE 0.3)
+multitap_version(PICCOLO_VERSION ${PICCOLO_VERSION_BASE} "${CMAKE_CURRENT_SOURCE_DIR}")
+multitap_write_version_header("${PICCOLO_GENERATED}" piccolo PICCOLO_VERSION "${PICCOLO_VERSION}")
+message(STATUS "piccolo ${PICCOLO_VERSION}")
+
 multitap_set_project_flags(piccolo)
 multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 

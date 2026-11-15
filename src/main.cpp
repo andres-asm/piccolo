@@ -24,7 +24,9 @@
 #include "app_shell.h"
 #include "frame_delay.h"
 #include "game_mode.h"
+#include "host_libretro_version.h"
 #include "picture.h"
+#include "piccolo_version.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "piccolo_window.h"
@@ -1119,6 +1121,7 @@ static void app_draw_debug_ui(App* app)
     ImGui::SetNextWindowPos(ImVec2(40.0f, 80.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("piccolo", &app->show_debug_window);
 
+    ImGui::Text("piccolo %s, host-libretro %s", PICCOLO_VERSION, HOST_LIBRETRO_VERSION);
     ImGui::Text("GPU: %s", gpu->deviceName);
     ImGui::Text("Vulkan %u.%u.%u", VK_API_VERSION_MAJOR(gpu->apiVersion), VK_API_VERSION_MINOR(gpu->apiVersion),
                 VK_API_VERSION_PATCH(gpu->apiVersion));
@@ -1159,6 +1162,8 @@ int main(int argc, char** argv)
 {
     (void)argc;
     (void)argv;
+
+    SDL_Log("piccolo %s, host-libretro %s", PICCOLO_VERSION, HOST_LIBRETRO_VERSION);
 
     // The session, catalog and file picker are large (paths, file lists): off the stack.
     App* app = new App{};
