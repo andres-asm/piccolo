@@ -50,6 +50,11 @@ void retro_ui_end_window();
 // line-drawn one. Same return value. Use inside the theme.
 bool retro_ui_checkbox(const char* label, bool* value);
 
+// ImGui::CollapsingHeader with the pixel font's arrows (right = closed, down
+// = open) instead of ImGui's line-drawn triangle. Same return value. Use
+// inside the theme.
+bool retro_ui_collapsing_header(const char* label, int flags);
+
 // ImGui::BeginCombo with the pixel font's down arrow instead of ImGui's own
 // triangle. Same return value and EndCombo() rule. Use inside the theme.
 bool retro_ui_begin_combo(const char* label, const char* preview);

@@ -69,7 +69,7 @@ static void draw_controls(const SettingsUiContext* context)
 {
     char header[200] = {};
     std::snprintf(header, sizeof(header), "%s###crop", piccolo_text(context->strings, Str::image_section_crop));
-    if (ImGui::CollapsingHeader(header, ImGuiTreeNodeFlags_DefaultOpen))
+    if (retro_ui_collapsing_header(header, ImGuiTreeNodeFlags_DefaultOpen))
     {
         for (int32_t i = 0; i < CROP_KEY_COUNT; i++)
         {

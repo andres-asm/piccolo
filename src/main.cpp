@@ -28,6 +28,7 @@
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "piccolo_window.h"
+#include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
 #include "settings_window.h"
@@ -138,6 +139,9 @@ struct App
     bool             safe_start_open = false;
     bool             safe_start_confirmed = false;    // the next start skips the check (answered)
     FilePickerChoice safe_start_pending = {};
+
+    QuickMenu quick_menu;              // F1 while a game runs
+    bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
@@ -326,7 +330,8 @@ static void set_status(App* app, const char* text)
 // queued audio is dropped so resuming doesn't play stale sound.
 static void update_pause(App* app)
 {
-    bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open || app->settings_window.image_open;
+    bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
+                     app->settings_window.image_open || app->quick_menu.open;
     bool pause_for_menu = menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU);
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
     bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
@@ -529,6 +534,30 @@ static void start_game(App* app, const FilePickerChoice* choice)
     set_status(app, app->session.message);
 }
 
+// Saves the session's slot with a thumbnail of the picture as shown: the
+// Picture settings' crop and aspect, at x1 (core_session.h).
+static bool save_state_with_thumbnail(App* app)
+{
+    StateThumbnail thumbnail = {};
+    const LibretroVideoFrame* video = &app->session.host->video;
+    if (game_running(app) && video->width > 0 && video->height > 0)
+    {
+        ViewportInput input = {};
+        input.frame_width = video->width;
+        input.frame_height = video->height;
+        input.core_aspect = static_cast<double>(app->session.host->av_info.geometry.aspect_ratio);
+        piccolo_settings_viewport(&app->settings, &input);
+        thumbnail.crop = input.crop;
+        if (!viewport_picture_size(&input, 1, &thumbnail.width, &thumbnail.height))
+        {
+            thumbnail.width = 0;
+        }
+    }
+    bool saved = core_session_save_state(&app->session, &thumbnail);
+    quick_menu_refresh(&app->quick_menu);
+    return saved;
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -548,7 +577,7 @@ static void handle_menu_action(App* app, MenuAction action)
             }
             break;
         case MenuAction::save_state:
-            if (core_session_save_state(&app->session))
+            if (save_state_with_thumbnail(app))
             {
                 app->menu_visible = false;
             }
@@ -819,7 +848,11 @@ static void app_handle_events(App* app)
                     // Close the topmost window first (IMAGE SETTINGS, SETTINGS,
                     // LOAD GAME); otherwise show/hide the menu (it stays up when
                     // nothing runs).
-                    if (app->settings_window.image_open)
+                    if (app->quick_menu.open)
+                    {
+                        app->quick_menu.open = false;
+                    }
+                    else if (app->settings_window.image_open)
                     {
                         app->settings_window.image_open = false;
                     }
@@ -843,6 +876,16 @@ static void app_handle_events(App* app)
                     if (event.key.mod & SDL_KMOD_ALT)
                     {
                         toggle_fullscreen(app);
+                    }
+                    break;
+                case SDLK_F1:
+                    if (app->quick_menu.open)
+                    {
+                        app->quick_menu.open = false;
+                    }
+                    else if (game_running(app))
+                    {
+                        quick_menu_open(&app->quick_menu, app->session.state_slot);
                     }
                     break;
                 case SDLK_F2:
@@ -1151,6 +1194,16 @@ int main(int argc, char** argv)
     while (app->running)
     {
         app_handle_events(app);
+        if (app->pending_close_game)
+        {
+            app->pending_close_game = false;
+            save_core_options(app);
+            core_session_stop(&app->session, &app->shell);   // writes save RAM
+            remove_running_marker(app);   // a proper end
+            update_settings_context(app);
+            app->menu_visible = true;
+            set_status(app, piccolo_text(&app->strings, Str::status_game_closed));
+        }
         if (app->has_pending_start)
         {
             app->has_pending_start = false;
@@ -1222,6 +1275,53 @@ int main(int argc, char** argv)
                 app->has_pending_start = true;   // see pending_start
             }
             draw_settings(app);
+            if (!game_running(app))
+            {
+                app->quick_menu.open = false;
+            }
+            QuickMenuContext quick = {};
+            quick.strings = &app->strings;
+            quick.session = &app->session;
+            quick.core_options_state = &app->settings_window.core_options;
+            quick.core_options.session = &app->session;
+            quick.core_options.store = &app->option_store;
+            quick.core_options.cache = &app->option_cache;
+            quick.core_options.running_core = app->core_name;
+            quick.core_options.game = app->game_name;
+            size_t quick_folder = app->option_store.directory_section.find("/dir:");
+            quick.core_options.folder =
+                quick_folder != std::string::npos ? app->option_store.directory_section.c_str() + quick_folder + 5 : "";
+            uint32_t slot_before = app->quick_menu.slot;
+            QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
+            if (app->quick_menu.slot != slot_before || app->quick_menu.open)
+            {
+                app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot
+            }
+            switch (quick_action)
+            {
+            case QuickMenuAction::save:
+                save_state_with_thumbnail(app);
+                set_status(app, app->session.message);
+                break;
+            case QuickMenuAction::load:
+                if (core_session_load_state(&app->session))
+                {
+                    app->quick_menu.open = false;   // back to the game
+                }
+                set_status(app, app->session.message);
+                break;
+            case QuickMenuAction::reset:
+                libretro_host_reset(app->session.host);
+                set_status(app, piccolo_text(&app->strings, Str::status_reset));
+                app->quick_menu.open = false;
+                break;
+            case QuickMenuAction::close_game:
+                app->pending_close_game = true;   // the texture may be in this frame already
+                app->quick_menu.open = false;
+                break;
+            case QuickMenuAction::none:
+                break;
+            }
             if (app->safe_start_open)
             {
                 SafeStartChoice answer = safe_start_window_draw(app->pixel_font, app->ui_scale, &app->strings,
@@ -1260,6 +1360,7 @@ int main(int argc, char** argv)
             }
 
             core_session_upload_video(&app->session, &app->shell);
+            quick_menu_upload(&app->quick_menu, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
@@ -1286,6 +1387,7 @@ int main(int argc, char** argv)
     {
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
     }
+    quick_menu_destroy(&app->quick_menu, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);
     delete app;

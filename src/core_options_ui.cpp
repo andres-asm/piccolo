@@ -193,21 +193,37 @@ static const char* value_label(const LibretroOption* option, uint32_t index)
     return label != nullptr ? label : option->values[index];
 }
 
+static const char* option_label(const LibretroOption* option, bool in_category)
+{
+    const char* label = in_category && option->label_in_category != nullptr ? option->label_in_category : option->label;
+    return label != nullptr ? label : option->key;
+}
+
 static void draw_option(const CoreOptionsUiState* state, const CoreOptionsUiContext* context,
-                        const LibretroOption* option, bool in_category)
+                        const LibretroOption* option, bool in_category, float label_width)
 {
     ImGui::PushID(option->key);
     draw_marker(context, option->key);
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
     float start = ImGui::GetCursorPosX();
-    const char* label = in_category && option->label_in_category != nullptr ? option->label_in_category : option->label;
-    ImGui::TextUnformatted(label != nullptr ? label : option->key);
+    // Labels longer than the column are cut, not drawn over the combo (the
+    // whole label is in the tooltip with the core's help).
+    const char* label = option_label(option, in_category);
+    ImVec2 text_min = ImGui::GetCursorScreenPos();
+    float column = label_width - ImGui::GetStyle().ItemSpacing.x;
+    ImGui::PushClipRect(text_min, ImVec2(text_min.x + column, text_min.y + ImGui::GetFrameHeight()), true);
+    ImGui::TextUnformatted(label);
+    ImGui::PopClipRect();
     if (option->info != nullptr)
     {
-        ImGui::SetItemTooltip("%s", option->info);
+        ImGui::SetItemTooltip("%s\n\n%s", label, option->info);
     }
-    ImGui::SameLine(start + context->label_width);
+    else
+    {
+        ImGui::SetItemTooltip("%s", label);
+    }
+    ImGui::SameLine(start + label_width);
 
     // The value as it resolves at the edited layer (or the core's default).
     const char* at_layer = core_options_store_get_at(context->store, state->layer, option->key, nullptr);
@@ -249,8 +265,83 @@ static void draw_option(const CoreOptionsUiState* state, const CoreOptionsUiCont
     ImGui::PopID();
 }
 
-// The running core's options: uncategorized first, then a section per category.
-static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* context)
+static bool in_section(const LibretroOptions* options, const LibretroOption* option, const std::string& section)
+{
+    bool known_category = false;
+    for (uint32_t c = 0; option->category_key != nullptr && c < options->category_count; c++)
+    {
+        known_category = known_category || std::strcmp(options->categories[c].key, option->category_key) == 0;
+    }
+    if (!known_category)
+    {
+        return section.empty();   // no category (or one the core didn't declare): GENERAL
+    }
+    return section == option->category_key;
+}
+
+// SECTION: GENERAL (options without a category) and each category, one at a
+// time (a long list in one scroll was hard to use). Hidden when the core has
+// no categories.
+static void draw_section_combo(CoreOptionsUiState* state, const CoreOptionsUiContext* context)
+{
+    const LibretroOptions* options = &context->session->host->options;
+    bool has_general = false;
+    for (uint32_t i = 0; i < options->count; i++)
+    {
+        has_general = has_general || (options->options[i].visible && in_section(options, &options->options[i], ""));
+    }
+    // A section that no longer exists (another core): the first one.
+    bool known = state->section.empty() && has_general;
+    for (uint32_t c = 0; !known && c < options->category_count; c++)
+    {
+        known = state->section == options->categories[c].key;
+    }
+    if (!known)
+    {
+        state->section = has_general || options->category_count == 0 ? "" : options->categories[0].key;
+    }
+    if (options->category_count == 0)
+    {
+        return;
+    }
+
+    const char* general = piccolo_text(context->strings, Str::core_options_general);
+    const char* preview = general;
+    for (uint32_t c = 0; c < options->category_count; c++)
+    {
+        if (state->section == options->categories[c].key)
+        {
+            preview = options->categories[c].label;
+        }
+    }
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(context->strings, Str::core_options_section));
+    ImGui::SameLine(start + context->label_width);
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    if (retro_ui_begin_combo("##section", preview))
+    {
+        if (has_general && ImGui::Selectable(general, state->section.empty()))
+        {
+            state->section.clear();
+        }
+        for (uint32_t c = 0; c < options->category_count; c++)
+        {
+            char label[300] = {};
+            std::snprintf(label, sizeof(label), "%s###section%u", options->categories[c].label, c);
+            if (ImGui::Selectable(label, state->section == options->categories[c].key))
+            {
+                state->section = options->categories[c].key;
+            }
+        }
+        ImGui::EndCombo();
+    }
+}
+
+// The running core's options: SAVE TO, SECTION, then that section's options
+// in their own scrolling area: the rest of the window (`fill`), or 60% of it
+// when more follows below (STORED VALUES in the settings tab).
+static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* context, bool fill)
 {
     const LibretroOptions* options = &context->session->host->options;
     draw_layer_combo(state, context);
@@ -259,37 +350,36 @@ static void draw_live(CoreOptionsUiState* state, const CoreOptionsUiContext* con
         ImGui::TextDisabled("%s", piccolo_text(context->strings, Str::core_options_none));
         return;
     }
+    draw_section_combo(state, context);
+
+    // The label column fits this section's labels, up to half the width.
+    bool categorized = !state->section.empty();
+    float widest = 0.0f;
     for (uint32_t i = 0; i < options->count; i++)
     {
         const LibretroOption* option = &options->options[i];
-        bool has_category = false;
-        for (uint32_t c = 0; option->category_key != nullptr && c < options->category_count; c++)
+        if (option->visible && in_section(options, option, state->section))
         {
-            has_category = has_category || std::strcmp(options->categories[c].key, option->category_key) == 0;
-        }
-        if (option->visible && !has_category)
-        {
-            draw_option(state, context, option, false);
+            float width = ImGui::CalcTextSize(option_label(option, categorized)).x;
+            widest = width > widest ? width : widest;
         }
     }
-    for (uint32_t c = 0; c < options->category_count; c++)
+    float label_width = widest + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+    float most = ImGui::GetContentRegionAvail().x * 0.5f;
+    label_width = label_width < most ? label_width : most;
+
+    float height = ImGui::GetContentRegionAvail().y * (fill ? 1.0f : 0.6f);
+    float minimum = ImGui::GetFrameHeightWithSpacing() * 4.0f;
+    ImGui::BeginChild("options", ImVec2(0.0f, height > minimum ? height : minimum));
+    for (uint32_t i = 0; i < options->count; i++)
     {
-        const LibretroOptionCategory* category = &options->categories[c];
-        char header[300] = {};
-        std::snprintf(header, sizeof(header), "%s###category%u", category->label, c);
-        if (!ImGui::CollapsingHeader(header))
+        const LibretroOption* option = &options->options[i];
+        if (option->visible && in_section(options, option, state->section))
         {
-            continue;
-        }
-        for (uint32_t i = 0; i < options->count; i++)
-        {
-            const LibretroOption* option = &options->options[i];
-            if (option->visible && option->category_key != nullptr && std::strcmp(option->category_key, category->key) == 0)
-            {
-                draw_option(state, context, option, true);
-            }
+            draw_option(state, context, option, categorized, label_width);
         }
     }
+    ImGui::EndChild();
 }
 
 static const CachedCoreOption* cached_option(const std::vector<CachedCoreOption>* cached, const std::string& key)
@@ -327,7 +417,7 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
     const char* core = state->selected_core.c_str();
     std::vector<std::string> sections;
     core_options_store_sections_of(context->store, core, &sections);
-    if (!ImGui::CollapsingHeader(piccolo_text(strings, Str::core_options_stored), ImGuiTreeNodeFlags_DefaultOpen))
+    if (!retro_ui_collapsing_header(piccolo_text(strings, Str::core_options_stored), ImGuiTreeNodeFlags_DefaultOpen))
     {
         return;
     }
@@ -428,6 +518,14 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
     }
 }
 
+void core_options_ui_draw_running(CoreOptionsUiState* state, const CoreOptionsUiContext* context)
+{
+    if (running(context))
+    {
+        draw_live(state, context, true);
+    }
+}
+
 void core_options_ui_draw(CoreOptionsUiState* state, const CoreOptionsUiContext* context)
 {
     std::vector<std::string> cores;
@@ -450,7 +548,7 @@ void core_options_ui_draw(CoreOptionsUiState* state, const CoreOptionsUiContext*
 
     if (running(context) && state->selected_core == context->running_core)
     {
-        draw_live(state, context);
+        draw_live(state, context, false);
     }
     else
     {

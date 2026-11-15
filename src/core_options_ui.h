@@ -6,7 +6,7 @@
 //   CORE     [ SNES9X (RUNNING)                v ]
 //   SAVE TO  [ THIS GAME (SUPER MARIO WORLD)   v ]       only for the running core
 //     C CONSOLE REGION   [ AUTO               v ] [RESET]
-//     > SYSTEM                                            a section per category
+//   SECTION  [ SYSTEM                          v ]       one category at a time
 //   v STORED VALUES                                       any core, even one that won't start
 //     FOR THE CORE                           [DELETE SECTION]
 //       CONSOLE REGION = PAL                 [DELETE]
@@ -33,6 +33,7 @@ struct CoreOptionsUiState
     std::string     selected_core;          // "" = the running one (or the first cached)
     CoreOptionLayer layer = CoreOptionLayer::core;
     bool            choose_layer = true;    // pick the most specific layer in use on the next draw
+    std::string     section;                // category key shown; "" = the options without a category
 };
 
 struct CoreOptionsUiContext
@@ -49,3 +50,7 @@ struct CoreOptionsUiContext
 
 // Draws the tab's contents (inside the settings window's theme).
 void core_options_ui_draw(CoreOptionsUiState* state, const CoreOptionsUiContext* context);
+
+// Only the running core's options (SAVE TO and the options), e.g. for the
+// quick menu. Nothing when no core runs.
+void core_options_ui_draw_running(CoreOptionsUiState* state, const CoreOptionsUiContext* context);

@@ -390,6 +390,28 @@ bool retro_ui_checkbox(const char* label, bool* value)
     return changed;
 }
 
+bool retro_ui_collapsing_header(const char* label, int flags)
+{
+    // ImGui draws the bar and the highlight; its arrow and label are made
+    // invisible (both use the text color) and ours drawn in their place.
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    bool open = ImGui::CollapsingHeader(label, flags);
+    ImGui::PopStyleColor();
+
+    ImVec2 bar = ImGui::GetItemRectMin();
+    const ImGuiStyle& style = ImGui::GetStyle();
+    uint32_t color = to_imgui_u32(ImGui::IsItemHovered() ? TEXT_HIGHLIGHT : TEXT_NORMAL);
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    // Whole pixels, so the glyphs stay sharp. ImGui puts the label after the
+    // arrow's square (font size) and three frame paddings.
+    float x = static_cast<float>(static_cast<int32_t>(bar.x + style.FramePadding.x));
+    float y = static_cast<float>(static_cast<int32_t>(bar.y + style.FramePadding.y));
+    draw_list->AddText(ImVec2(x, y), color, open ? PIXEL_FONT_UTF8_ARROW_DOWN : PIXEL_FONT_UTF8_ARROW_RIGHT);
+    float text_x = static_cast<float>(static_cast<int32_t>(bar.x + ImGui::GetFontSize() + style.FramePadding.x * 3.0f));
+    draw_list->AddText(ImVec2(text_x, y), color, label, ImGui::FindRenderedTextEnd(label));
+    return open;
+}
+
 // ---------------------------------------------------------------------------
 
 bool retro_ui_begin_combo(const char* label, const char* preview)

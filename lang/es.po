@@ -905,3 +905,51 @@ msgstr "Borra todas las opciones guardadas de este core (core, carpetas y juegos
 msgctxt "safe_start_cancel"
 msgid "CANCEL"
 msgstr "CANCELAR"
+
+msgctxt "quick_menu_title"
+msgid "QUICK MENU"
+msgstr "MENÚ RÁPIDO"
+
+msgctxt "quick_menu_slot"
+msgid "SLOT"
+msgstr "SLOT"
+
+msgctxt "quick_menu_empty"
+msgid "EMPTY"
+msgstr "VACÍO"
+
+msgctxt "quick_menu_save"
+msgid "SAVE"
+msgstr "GUARDAR"
+
+msgctxt "quick_menu_load"
+msgid "LOAD"
+msgstr "CARGAR"
+
+msgctxt "quick_menu_reset"
+msgid "RESET"
+msgstr "REINICIAR"
+
+msgctxt "quick_menu_close_game"
+msgid "CLOSE GAME"
+msgstr "CERRAR JUEGO"
+
+msgctxt "quick_menu_keys"
+msgid "ARROWS OR 1-9: SLOT. S: SAVE. L: LOAD. F1 OR ESC: BACK TO THE GAME."
+msgstr "FLECHAS O 1-9: SLOT. S: GUARDAR. L: CARGAR. F1 O ESC: VOLVER AL JUEGO."
+
+msgctxt "status_game_closed"
+msgid "GAME CLOSED"
+msgstr "JUEGO CERRADO"
+
+msgctxt "core_options_section"
+msgid "SECTION"
+msgstr "SECCIÓN"
+
+msgctxt "core_options_general"
+msgid "GENERAL"
+msgstr "GENERAL"
+
+msgctxt "quick_menu_tab_states"
+msgid "SAVESTATES"
+msgstr "SAVESTATES"

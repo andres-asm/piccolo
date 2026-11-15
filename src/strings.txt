@@ -104,6 +104,8 @@ core_options_core = CORE
 core_options_running = RUNNING
 core_options_save_to = SAVE TO
 core_options_save_to_help = WHERE CHANGES GO. A FOLDER VALUE WINS OVER THE CORE'S, A GAME VALUE OVER BOTH.
+core_options_section = SECTION
+core_options_general = GENERAL
 core_options_layer_core = THIS CORE
 core_options_layer_folder = THIS FOLDER
 core_options_layer_game = THIS GAME
@@ -135,6 +137,18 @@ safe_start_defaults_help = The core's own option values for this start only. Not
 safe_start_delete = DELETE STORED OPTIONS
 safe_start_delete_help = Deletes every option stored for this core (core, folders and games), then starts with its defaults.
 safe_start_cancel = CANCEL
+
+# QUICK MENU window
+quick_menu_title = QUICK MENU
+quick_menu_tab_states = SAVESTATES
+quick_menu_slot = SLOT
+quick_menu_empty = EMPTY
+quick_menu_save = SAVE
+quick_menu_load = LOAD
+quick_menu_reset = RESET
+quick_menu_close_game = CLOSE GAME
+quick_menu_keys = ARROWS OR 1-9: SLOT. S: SAVE. L: LOAD. F1 OR ESC: BACK TO THE GAME.
+status_game_closed = GAME CLOSED
 
 # IMAGE SETTINGS window
 image_title = IMAGE SETTINGS
