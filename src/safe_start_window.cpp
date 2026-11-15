@@ -43,23 +43,23 @@ SafeStartChoice safe_start_window_draw(ImFont* pixel_font, int32_t scale, const 
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
 
-        if (ImGui::Button(piccolo_text(strings, Str::safe_start_stored)))
+        if (retro_ui_button(piccolo_text(strings, Str::safe_start_stored)))
         {
             choice = SafeStartChoice::stored;
         }
         ImGui::SameLine();
-        if (ImGui::Button(piccolo_text(strings, Str::safe_start_defaults)))
+        if (retro_ui_button(piccolo_text(strings, Str::safe_start_defaults)))
         {
             choice = SafeStartChoice::defaults;
         }
         retro_ui_item_tooltip(piccolo_text(strings, Str::safe_start_defaults_help));
-        if (ImGui::Button(piccolo_text(strings, Str::safe_start_delete)))
+        if (retro_ui_button(piccolo_text(strings, Str::safe_start_delete)))
         {
             choice = SafeStartChoice::delete_stored;
         }
         retro_ui_item_tooltip(piccolo_text(strings, Str::safe_start_delete_help));
         ImGui::SameLine();
-        if (ImGui::Button(piccolo_text(strings, Str::safe_start_cancel)))
+        if (retro_ui_button(piccolo_text(strings, Str::safe_start_cancel)))
         {
             choice = SafeStartChoice::cancel;
         }

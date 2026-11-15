@@ -312,7 +312,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         float right = load_width + (can_run_alone ? alone_width + ImGui::GetStyle().ItemSpacing.x : 0.0f);
         ImGui::SameLine(ImGui::GetContentRegionMax().x - right);
         ImGui::PushID("alone");
-        bool start_alone = can_run_alone && ImGui::Button(alone);
+        bool start_alone = can_run_alone && retro_ui_button(alone);
         ImGui::PopID();
         if (start_alone)
         {
@@ -324,7 +324,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         }
         ImGui::BeginDisabled(picker->selected_file < 0);
         ImGui::PushID("load");
-        bool load_clicked = ImGui::Button(load);
+        bool load_clicked = retro_ui_button(load);
         ImGui::PopID();
         if (load_clicked && picker->selected_file >= 0)
         {

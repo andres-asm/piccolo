@@ -36,13 +36,13 @@
 #include "settings_file.h"
 #include "core_catalog.h"
 #include "core_session.h"
+#include "debug_ui.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
 #include "vk_swapchain.h"
 
-static const ClearColor CLEAR_COLOR = { 0.0f, 0.0f, 0.0f, 1.0f };   // around the game picture
 
 struct App
 {
@@ -258,6 +258,13 @@ static void apply_folders(App* app)
         core_catalog_init(&app->catalog, cores.c_str(), cache_path.c_str());
         core_catalog_scan(&app->catalog, nullptr);
     }
+}
+
+// The theme's text shadows, added to what ImGui is about to draw.
+static void add_text_shadows(ImDrawData* draw_data, void* user)
+{
+    const App* app = static_cast<const App*>(user);
+    retro_ui_text_shadows(draw_data, app->ui_scale);
 }
 
 static void save_settings(App* app)
@@ -619,6 +626,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;   // handled where the menu bar is drawn (it needs the index)
         case MenuAction::general:
             settings_window_open(&app->settings_window, SettingsTab::general);
+            break;
+        case MenuAction::interface:
+            settings_window_open(&app->settings_window, SettingsTab::interface);
             break;
         case MenuAction::video:
             settings_window_open(&app->settings_window, SettingsTab::video);
@@ -1151,6 +1161,7 @@ int main(int argc, char** argv)
         delete app;
         return 1;
     }
+    debug_ui_set_draw_data_hook(add_text_shadows, app);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
     {
@@ -1178,6 +1189,7 @@ int main(int argc, char** argv)
         io.IniFilename = app->imgui_ini.c_str();
         app->settings_path = app->paths.settings + "/piccolo.cfg";
         settings_load(&app->settings, app->settings_path.c_str());
+        piccolo_settings_complete_ui_theme(&app->settings);
         apply_folders(app);
         load_last_used(app);
         app->recent_path = app->paths.settings + "/recent.cfg";
@@ -1236,6 +1248,14 @@ int main(int argc, char** argv)
         app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
         update_window(app);
         update_language(app);
+        RetroUiPalette palette = {};
+        piccolo_settings_palette(&app->settings, &palette);   // the Interface settings, live
+        retro_ui_set_palette(&palette);
+        // BACKGROUND behind the menu; while a game runs, black around its picture.
+        uint32_t back = game_running(app) ? 0xFF000000u : palette.background;
+        ClearColor background = {static_cast<float>((back >> 16) & 0xFFu) / 255.0f,
+                                 static_cast<float>((back >> 8) & 0xFFu) / 255.0f,
+                                 static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
@@ -1382,13 +1402,19 @@ int main(int argc, char** argv)
                 app_draw_debug_ui(app);
             }
 
+            bool ui_up = app->menu_visible || !game_running(app) || app->picker.open || app->settings_window.open ||
+                         app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
+                         app->safe_start_open || app->show_debug_window;
+            retro_ui_scrollbars(app->ui_scale);
+            retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
+
             core_session_upload_video(&app->session, &app->shell);
             quick_menu_upload(&app->quick_menu, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
             }
-            if (!app_shell_present(&app->shell, CLEAR_COLOR))
+            if (!app_shell_present(&app->shell, background))
             {
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
                 break;

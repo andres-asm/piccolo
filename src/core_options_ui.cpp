@@ -257,7 +257,7 @@ static void draw_option(const CoreOptionsUiState* state, const CoreOptionsUiCont
     if (stored_here)
     {
         ImGui::SameLine(ImGui::GetContentRegionMax().x - reset_width);
-        if (ImGui::Button(reset))
+        if (retro_ui_button(reset))
         {
             core_session_reset_option(context->session, state->layer, option->key);
         }
@@ -453,9 +453,9 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
             std::snprintf(title, sizeof(title), "%s: %s", piccolo_text(strings, Str::core_options_section_game),
                           colon != std::string::npos ? name.c_str() + colon + 1 : name.c_str());
         }
-        ImGui::SeparatorText(title);
+        retro_ui_separator_text(title);
         const char* delete_section = piccolo_text(strings, Str::core_options_delete_section);
-        if (ImGui::SmallButton(delete_section))
+        if (retro_ui_button(delete_section))
         {
             changed = core_options_store_remove_section(context->store, name.c_str());
         }
@@ -493,7 +493,7 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
                 }
             }
             ImGui::SameLine(ImGui::GetContentRegionMax().x - delete_width);
-            if (ImGui::Button(delete_text))
+            if (retro_ui_button(delete_text))
             {
                 changed = core_options_store_remove(context->store, name.c_str(), entry->key.c_str());
             }
@@ -503,7 +503,7 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
     }
 
     ImGui::Spacing();
-    if (!changed && ImGui::Button(piccolo_text(strings, Str::core_options_delete_all)))
+    if (!changed && retro_ui_button(piccolo_text(strings, Str::core_options_delete_all)))
     {
         for (size_t s = 0; s < sections.size(); s++)
         {
@@ -583,7 +583,9 @@ void core_options_manager_draw(bool* open, CoreOptionsUiState* state, const Core
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing,
                             ImVec2(0.5f, 0.5f));
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+    // The list scrolls in its own area (a scrolling window jumped back to the top).
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
     char title[200] = {};
     std::snprintf(title, sizeof(title), "%s###core_options_manager",
                   piccolo_text(context->strings, Str::core_options_manager_title));
@@ -596,10 +598,14 @@ void core_options_manager_draw(bool* open, CoreOptionsUiState* state, const Core
         }
         CoreOptionsUiContext manager = *context;
         manager.label_width = 50.0f * block;   // CORE
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::BeginChild("content", ImVec2(0.0f, 0.0f));
         if (manager.store != nullptr && manager.cache != nullptr)
         {
             core_options_ui_draw(state, &manager);
         }
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
         retro_ui_end_window();
     }
     ImGui::End();

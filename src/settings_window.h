@@ -4,7 +4,7 @@
 //
 //   +- SETTINGS ------------------------------------------+
 //   | SCOPE [ THIS CORE (SNES9X)                       v ] |   only while a game runs
-//   | [GENERAL] [VIDEO] [SOUND]                           |
+//   | [GENERAL] [INTERFACE] [VIDEO] [SOUND]               |
 //   |   [PICTURE] [DISPLAY] [SYNC]                        |
 //   |   ASPECT RATIO  [ CORE PROVIDED            v ]      |
 //   | C SCALING       [ INTEGER (OVER)           v ] [RESET]
@@ -30,6 +30,7 @@ struct ImFont;
 enum class SettingsTab
 {
     general,
+    interface,
     video,
     sound,
 };

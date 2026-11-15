@@ -17,6 +17,7 @@ enum class MenuAction
     load_state,
     quit,
     general,
+    interface,
     video,
     sound,
     input,

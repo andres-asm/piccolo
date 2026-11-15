@@ -969,3 +969,299 @@ msgstr "HERRAMIENTAS"
 msgctxt "menu_options_manager"
 msgid "OPTIONS MANAGER..."
 msgstr "ADMINISTRAR OPCIONES..."
+
+msgctxt "setting_ui_menu_boxes"
+msgid "MENU TITLE BOXES"
+msgstr "CAJAS EN LOS MENÚS"
+
+msgctxt "setting_ui_menu_boxes_help"
+msgid "A raised box behind each menu title on the bar."
+msgstr "Una caja en relieve detrás de cada título de menú en la barra."
+
+msgctxt "ui_theme"
+msgid "THEME"
+msgstr "TEMA"
+
+msgctxt "ui_theme_help"
+msgid "Sets every color below at once. Change them one by one for your own."
+msgstr "Cambia todos los colores de abajo a la vez. Cámbialos uno por uno para hacer el tuyo."
+
+msgctxt "theme_piccolo"
+msgid "PICCOLO"
+msgstr "PICCOLO"
+
+msgctxt "theme_classic"
+msgid "CLASSIC"
+msgstr "CLÁSICO"
+
+msgctxt "theme_modern"
+msgid "MODERN"
+msgstr "MODERNO"
+
+msgctxt "section_colors"
+msgid "COLORS"
+msgstr "COLORES"
+
+msgctxt "tab_interface"
+msgid "INTERFACE"
+msgstr "INTERFAZ"
+
+msgctxt "setting_ui_color_bar"
+msgid "BAR"
+msgstr "LA BARRA"
+
+msgctxt "setting_ui_color_bar_help"
+msgid "The menu bar, at its top and bottom edges."
+msgstr "La barra de menú, en sus bordes de arriba y abajo."
+
+msgctxt "setting_ui_color_bar_center"
+msgid "BAR (CENTER)"
+msgstr "LA BARRA (CENTRO)"
+
+msgctxt "setting_ui_color_bar_center_help"
+msgid "The middle of the menu bar. Different from BAR: a gradient."
+msgstr "El centro de la barra de menú. Distinto de LA BARRA: un degradado."
+
+msgctxt "setting_ui_color_bar_light"
+msgid "BAR EDGE (LIGHT)"
+msgstr "BORDE DE LA BARRA (CLARO)"
+
+msgctxt "setting_ui_color_bar_light_help"
+msgid "The bar's raised edge, top."
+msgstr "El borde en relieve de la barra, arriba."
+
+msgctxt "setting_ui_color_bar_dark"
+msgid "BAR EDGE (DARK)"
+msgstr "BORDE DE LA BARRA (OSCURO)"
+
+msgctxt "setting_ui_color_bar_dark_help"
+msgid "The bar's raised edge, bottom."
+msgstr "El borde en relieve de la barra, abajo."
+
+msgctxt "setting_ui_color_menu_box"
+msgid "MENU TITLE BOXES"
+msgstr "CAJAS DE LOS MENÚS"
+
+msgctxt "setting_ui_color_menu_box_help"
+msgid "The boxes behind the menu titles (with MENU TITLE BOXES on)."
+msgstr "Las cajas detrás de los títulos de menú (con CAJAS EN LOS MENÚS)."
+
+msgctxt "setting_ui_color_menu_box_light"
+msgid "BOX EDGE (LIGHT)"
+msgstr "BORDE DE LAS CAJAS (CLARO)"
+
+msgctxt "setting_ui_color_menu_box_light_help"
+msgid "The boxes' raised edge, top and left."
+msgstr "El borde en relieve de las cajas, arriba e izquierda."
+
+msgctxt "setting_ui_color_menu_box_dark"
+msgid "BOX EDGE (DARK)"
+msgstr "BORDE DE LAS CAJAS (OSCURO)"
+
+msgctxt "setting_ui_color_menu_box_dark_help"
+msgid "The boxes' raised edge, bottom and right."
+msgstr "El borde en relieve de las cajas, abajo y derecha."
+
+msgctxt "setting_ui_color_menu"
+msgid "MENUS"
+msgstr "MENÚS"
+
+msgctxt "setting_ui_color_menu_help"
+msgid "The background of an open menu."
+msgstr "El fondo de un menú abierto."
+
+msgctxt "setting_ui_color_window"
+msgid "WINDOWS"
+msgstr "VENTANAS"
+
+msgctxt "setting_ui_color_window_help"
+msgid "Window backgrounds."
+msgstr "El fondo de las ventanas."
+
+msgctxt "setting_ui_color_window_light"
+msgid "WINDOW EDGE (LIGHT)"
+msgstr "BORDE DE LAS VENTANAS (CLARO)"
+
+msgctxt "setting_ui_color_window_light_help"
+msgid "The windows' edge."
+msgstr "El borde de las ventanas."
+
+msgctxt "setting_ui_color_window_dark"
+msgid "WINDOW EDGE (DARK)"
+msgstr "BORDE DE LAS VENTANAS (OSCURO)"
+
+msgctxt "setting_ui_color_window_dark_help"
+msgid "Window borders and separators."
+msgstr "Los bordes y separadores de las ventanas."
+
+msgctxt "setting_ui_color_field"
+msgid "FIELDS"
+msgstr "CAMPOS"
+
+msgctxt "setting_ui_color_field_help"
+msgid "Fields, lists and inactive tabs."
+msgstr "Los campos, las listas y las pestañas inactivas."
+
+msgctxt "setting_ui_color_field_hover"
+msgid "FIELDS (HOVER)"
+msgstr "CAMPOS (BAJO EL MOUSE)"
+
+msgctxt "setting_ui_color_field_hover_help"
+msgid "A field under the mouse."
+msgstr "Un campo bajo el mouse."
+
+msgctxt "setting_ui_color_highlight"
+msgid "HIGHLIGHT"
+msgstr "RESALTADO"
+
+msgctxt "setting_ui_color_highlight_help"
+msgid "Hovered, selected and pressed things."
+msgstr "Lo que está bajo el mouse, elegido o presionado."
+
+msgctxt "setting_ui_color_text"
+msgid "TEXT"
+msgstr "TEXTO"
+
+msgctxt "setting_ui_color_text_help"
+msgid "Text."
+msgstr "El texto."
+
+msgctxt "setting_ui_color_text_highlight"
+msgid "TEXT (HIGHLIGHT)"
+msgstr "TEXTO (RESALTADO)"
+
+msgctxt "setting_ui_color_text_highlight_help"
+msgid "Text on the highlight, check marks."
+msgstr "El texto resaltado y las marcas."
+
+msgctxt "setting_ui_color_text_disabled"
+msgid "TEXT (DISABLED)"
+msgstr "TEXTO (DESACTIVADO)"
+
+msgctxt "setting_ui_color_text_disabled_help"
+msgid "Greyed-out text and notes."
+msgstr "El texto desactivado y las notas."
+
+msgctxt "setting_ui_color_text_shadow"
+msgid "TEXT SHADOW"
+msgstr "SOMBRA DEL TEXTO"
+
+msgctxt "setting_ui_color_text_shadow_help"
+msgid "The shadow under menu and status text."
+msgstr "La sombra bajo el texto de los menús y la línea de estado."
+
+msgctxt "setting_ui_shadows"
+msgid "DROP SHADOWS"
+msgstr "SOMBRAS"
+
+msgctxt "setting_ui_shadows_help"
+msgid "Shadows under windows, open menus and menu text."
+msgstr "Sombras bajo las ventanas, los menús abiertos y el texto de los menús."
+
+msgctxt "setting_ui_color_background"
+msgid "BACKGROUND"
+msgstr "FONDO"
+
+msgctxt "setting_ui_color_background_help"
+msgid "Behind the game and the menu."
+msgstr "Detrás del juego y del menú."
+
+msgctxt "setting_ui_color_title"
+msgid "TITLE BARS (TOP)"
+msgstr "BARRAS DE TÍTULO (ARRIBA)"
+
+msgctxt "setting_ui_color_title_help"
+msgid "Window title bars, at the top."
+msgstr "Las barras de título de las ventanas, arriba."
+
+msgctxt "setting_ui_color_title_bottom"
+msgid "TITLE BARS (BOTTOM)"
+msgstr "BARRAS DE TÍTULO (ABAJO)"
+
+msgctxt "setting_ui_color_title_bottom_help"
+msgid "Window title bars, at the bottom. Different from the top: a gradient."
+msgstr "Las barras de título de las ventanas, abajo. Distinto de arriba: un degradado."
+
+msgctxt "setting_ui_color_check"
+msgid "CHECK MARKS"
+msgstr "MARCAS DE CHECK"
+
+msgctxt "setting_ui_color_check_help"
+msgid "The mark in a checked box."
+msgstr "La marca de una casilla activada."
+
+msgctxt "setting_ui_color_section"
+msgid "SECTION TITLES"
+msgstr "TÍTULOS DE SECCIÓN"
+
+msgctxt "setting_ui_color_section_help"
+msgid "The titles that divide a window into sections."
+msgstr "Los títulos que dividen una ventana en secciones."
+
+msgctxt "menu_interface"
+msgid "INTERFACE..."
+msgstr "INTERFAZ..."
+
+msgctxt "setting_ui_theme_cursor"
+msgid "THEME CURSOR"
+msgstr "CURSOR DEL TEMA"
+
+msgctxt "setting_ui_theme_cursor_help"
+msgid "A mouse cursor drawn in the theme's style instead of the system's."
+msgstr "Un cursor dibujado con el estilo del tema en vez del cursor del sistema."
+
+msgctxt "setting_ui_color_button"
+msgid "BUTTONS"
+msgstr "BOTONES"
+
+msgctxt "setting_ui_color_button_help"
+msgid "Buttons, check boxes and scroll bar grips, at the top."
+msgstr "Los botones, las casillas y las barras de desplazamiento, arriba."
+
+msgctxt "setting_ui_color_button_bottom"
+msgid "BUTTONS (BOTTOM)"
+msgstr "BOTONES (ABAJO)"
+
+msgctxt "setting_ui_color_button_bottom_help"
+msgid "Buttons at the bottom: with a different color than BUTTONS, a gradient."
+msgstr "Los botones abajo: con un color distinto de BOTONES, un degradado."
+
+msgctxt "setting_ui_color_button_light"
+msgid "BUTTON EDGE (LIGHT)"
+msgstr "BORDE DE LOS BOTONES (CLARO)"
+
+msgctxt "setting_ui_color_button_light_help"
+msgid "Buttons' raised edge, top and left."
+msgstr "El borde en relieve de los botones, arriba e izquierda."
+
+msgctxt "setting_ui_color_button_dark"
+msgid "BUTTON EDGE (DARK)"
+msgstr "BORDE DE LOS BOTONES (OSCURO)"
+
+msgctxt "setting_ui_color_button_dark_help"
+msgid "Buttons' raised edge, bottom and right."
+msgstr "El borde en relieve de los botones, abajo y derecha."
+
+msgctxt "setting_ui_color_button_text"
+msgid "BUTTON TEXT"
+msgstr "TEXTO DE LOS BOTONES"
+
+msgctxt "setting_ui_color_button_text_help"
+msgid "The text on buttons."
+msgstr "El texto de los botones."
+
+msgctxt "setting_ui_color_field_text"
+msgid "FIELD TEXT"
+msgstr "TEXTO DE LOS CAMPOS"
+
+msgctxt "setting_ui_color_field_text_help"
+msgid "Text in fields and in closed lists."
+msgstr "El texto de los campos y de las listas cerradas."
+
+msgctxt "setting_ui_color_cursor"
+msgid "CURSOR"
+msgstr "CURSOR"
+
+msgctxt "setting_ui_color_cursor_help"
+msgid "The theme's mouse cursor (with THEME CURSOR on)."
+msgstr "El cursor del tema (con CURSOR DEL TEMA)."

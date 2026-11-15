@@ -147,7 +147,7 @@ static void draw_slots(QuickMenu* menu, float block, bool appearing)
         }
         char label[16] = {};
         std::snprintf(label, sizeof(label), "%u", slot);
-        if (ImGui::Button(label, ImVec2(size, size)) || ImGui::IsItemFocused())
+        if (retro_ui_button_sized(label, size, size) || ImGui::IsItemFocused())
         {
             menu->slot = slot;
         }
@@ -219,24 +219,24 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     }
     ImGui::Spacing();
     bool keys = !io.WantTextInput && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-    if (ImGui::Button(piccolo_text(strings, Str::quick_menu_save)) || (keys && ImGui::IsKeyPressed(ImGuiKey_S, false)))
+    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_save)) || (keys && ImGui::IsKeyPressed(ImGuiKey_S, false)))
     {
         action = QuickMenuAction::save;
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(!info->used);
-    if (ImGui::Button(piccolo_text(strings, Str::quick_menu_load)) ||
+    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_load)) ||
         (info->used && keys && ImGui::IsKeyPressed(ImGuiKey_L, false)))
     {
         action = QuickMenuAction::load;
     }
     ImGui::EndDisabled();
     ImGui::Spacing();
-    if (ImGui::Button(piccolo_text(strings, Str::quick_menu_reset)))
+    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_reset)))
     {
         action = QuickMenuAction::reset;
     }
-    if (ImGui::Button(piccolo_text(strings, Str::quick_menu_close_game)))
+    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_close_game)))
     {
         action = QuickMenuAction::close_game;
     }

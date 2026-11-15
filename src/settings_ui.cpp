@@ -77,7 +77,7 @@ bool settings_ui_reset_button(const SettingsUiContext* context, const char* key)
     float width = ImGui::CalcTextSize(reset).x + ImGui::GetStyle().FramePadding.x * 2.0f;
     ImGui::SameLine(ImGui::GetContentRegionMax().x - width);
     ImGui::PushID("reset");
-    bool clicked = ImGui::Button(reset);
+    bool clicked = retro_ui_button(reset);
     ImGui::PopID();
     Str help = context->scope == SettingLayer::global ? Str::reset_help_global : Str::reset_help_override;
     retro_ui_item_tooltip(piccolo_text(context->strings, help));
@@ -148,7 +148,10 @@ static bool integer_widget(const SettingsUiContext* context, const SettingDescri
 {
     int number = static_cast<int>(std::strtol(value, nullptr, 10));
     ImGui::SetNextItemWidth(widget_width(context));
-    if (!ImGui::InputInt("##value", &number, descriptor->step > 0 ? descriptor->step : 1, 8))
+    retro_ui_push_field_text();
+    bool edited = ImGui::InputInt("##value", &number, descriptor->step > 0 ? descriptor->step : 1, 8);
+    retro_ui_pop_field_text();
+    if (!edited)
     {
         return false;
     }
@@ -173,6 +176,42 @@ static bool real_widget(const SettingsUiContext* context, const SettingDescripto
     return settings_set_real(context->settings, context->scope, descriptor->key, rounded);
 }
 
+// The color as it resolves at the edited scope (0xFFRRGGBB).
+static uint32_t settings_get_color_at(const SettingsUiContext* context, const char* key)
+{
+    uint32_t argb = 0xFF000000u;
+    const char* value = settings_get_at(context->settings, context->scope, key, nullptr);
+    if (value != nullptr)
+    {
+        settings_color_from_text(value, &argb);
+    }
+    return argb;
+}
+
+// A swatch (click: ImGui's color picker) and the value as #RRGGBB.
+static bool color_widget(const SettingsUiContext* context, const SettingDescriptor* descriptor)
+{
+    uint32_t argb = settings_get_color_at(context, descriptor->key);
+    float rgb[3] = {static_cast<float>((argb >> 16) & 0xFFu) / 255.0f, static_cast<float>((argb >> 8) & 0xFFu) / 255.0f,
+                    static_cast<float>(argb & 0xFFu) / 255.0f};
+    bool changed = false;
+    if (ImGui::ColorEdit3("##value", rgb, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel |
+                                             ImGuiColorEditFlags_NoOptions | ImGuiColorEditFlags_NoAlpha))
+    {
+        uint32_t picked = 0xFF000000u;
+        for (int i = 0; i < 3; i++)
+        {
+            float channel = rgb[i] < 0.0f ? 0.0f : (rgb[i] > 1.0f ? 1.0f : rgb[i]);
+            picked |= static_cast<uint32_t>(channel * 255.0f + 0.5f) << (16 - 8 * i);
+        }
+        changed = settings_set_color(context->settings, context->scope, descriptor->key, picked);
+    }
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("#%06X", static_cast<unsigned>(argb & 0xFFFFFFu));
+    return changed;
+}
+
 static bool path_widget(const SettingsUiContext* context, const SettingDescriptor* descriptor, const char* value,
                         const char* hint)
 {
@@ -181,7 +220,9 @@ static bool path_widget(const SettingsUiContext* context, const SettingDescripto
     char buffer[LIBRETRO_PATH_MAX] = {};
     std::snprintf(buffer, sizeof(buffer), "%s", value);
     ImGui::SetNextItemWidth(widget_width(context));
+    retro_ui_push_field_text();
     ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer));
+    retro_ui_pop_field_text();
     if (!ImGui::IsItemDeactivatedAfterEdit())
     {
         return false;
@@ -206,7 +247,12 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
 
     ImGui::PushID(key);
     settings_ui_marker(context, key);
-    ImGui::BeginDisabled(global_only_here);
+    // Only when it is: ImGui counts BeginDisabled(false) too, and its color
+    // swatches then draw with a saved opacity that may be 0 (invisible).
+    if (global_only_here)
+    {
+        ImGui::BeginDisabled();
+    }
     if (descriptor->type == SettingType::boolean)
     {
         ImGui::SameLine();
@@ -241,11 +287,17 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
         case SettingType::text:
             changed = path_widget(context, descriptor, value, hint);
             break;
+        case SettingType::color:
+            changed = color_widget(context, descriptor);
+            break;
         case SettingType::boolean:
             break;
         }
     }
-    ImGui::EndDisabled();
+    if (global_only_here)
+    {
+        ImGui::EndDisabled();
+    }
     if (global_only_here)
     {
         // A disabled item needs AllowWhenDisabled for its tooltip.

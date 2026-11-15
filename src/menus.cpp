@@ -23,6 +23,7 @@ static const MenuItem GAME_ITEMS[] = {
 
 static const MenuItem CONFIG_ITEMS[] = {
     { Str::menu_general, MenuAction::general },
+    { Str::menu_interface, MenuAction::interface },
     { Str::menu_video,   MenuAction::video },
     { Str::menu_input,   MenuAction::input },
     { Str::menu_sound,   MenuAction::sound },
@@ -83,6 +84,7 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::load_state: return "LOAD STATE";
         case MenuAction::quit:       return "QUIT";
         case MenuAction::general:    return "GENERAL";
+        case MenuAction::interface:  return "INTERFACE";
         case MenuAction::video:      return "VIDEO";
         case MenuAction::sound:      return "SOUND";
         case MenuAction::input:      return "INPUT";

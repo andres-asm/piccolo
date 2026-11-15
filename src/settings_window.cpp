@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <SDL3/SDL.h>
+
 #include "imgui.h"
 
 #include "piccolo_settings.h"
@@ -112,7 +114,7 @@ static void draw_general(const SettingsUiContext* ui, const SettingsWindowContex
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
     settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
     ImGui::TextDisabled("%s", context->game_mode);
-    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_folders));
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_folders));
     settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SAVES, context->paths->saves.c_str());
@@ -140,7 +142,7 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
                   crop_at_scope(ui, PICCOLO_VIDEO_CROP_LEFT), crop_at_scope(ui, PICCOLO_VIDEO_CROP_RIGHT));
     ImGui::Spacing();
     char button[200] = {};
-    if (ImGui::Button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::image_settings_button), "image")))
+    if (retro_ui_button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::image_settings_button), "image")))
     {
         window->image_open = true;
     }
@@ -155,7 +157,7 @@ static void draw_display(const SettingsUiContext* ui, const SettingsWindowContex
 {
     settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN, nullptr);
     settings_ui_row(ui, PICCOLO_DISPLAY_FULLSCREEN_TYPE, nullptr);
-    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_window));
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_window));
     settings_ui_row(ui, PICCOLO_WINDOW_MODE, nullptr);
     if (settings_get_enum(ui->settings, PICCOLO_WINDOW_MODE) == PICCOLO_WINDOW_FIXED)
     {
@@ -206,7 +208,7 @@ static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const
 {
     settings_ui_row(ui, PICCOLO_VIDEO_TIMING, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_CATCH_UP, nullptr);
-    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_low_latency));
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_low_latency));
     draw_latency_preset(ui);
     settings_ui_row(ui, PICCOLO_LATENCY_FRAMES_IN_FLIGHT, nullptr);
     settings_ui_row(ui, PICCOLO_LATENCY_WAIT_FOR_PRESENT, nullptr);
@@ -234,7 +236,7 @@ static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const
         if (context->frame_delay_found)
         {
             char button[200] = {};
-            if (ImGui::Button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::frame_delay_search_again),
+            if (retro_ui_button(with_id(button, sizeof(button), piccolo_text(ui->strings, Str::frame_delay_search_again),
                                       "search_delay")))
             {
                 window->search_frame_delay = true;
@@ -255,7 +257,7 @@ static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext*
     settings_ui_row(ui, PICCOLO_AUDIO_LATENCY, nullptr);
     ImGui::TextDisabled("%s", context->audio_latency);
 
-    ImGui::SeparatorText(piccolo_text(ui->strings, Str::section_advanced));
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_advanced));
     settings_ui_row(ui, PICCOLO_AUDIO_RATE_CONTROL, nullptr);
     // The limit only matters with rate control on: greyed out without it, the stored value kept.
     const char* drc = settings_get_at(ui->settings, ui->scope, PICCOLO_AUDIO_RATE_CONTROL, nullptr);
@@ -263,6 +265,79 @@ static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext*
     settings_ui_row(ui, PICCOLO_AUDIO_MAX_DEVIATION, nullptr);
     ImGui::EndDisabled();
     settings_ui_row(ui, PICCOLO_AUDIO_QUALITY, nullptr);
+}
+
+// THEME: sets every interface color. Not a setting itself: it shows the
+// theme the colors match, or CUSTOM. The interface is global only.
+static void draw_theme_preset(const SettingsUiContext* ui)
+{
+    RetroUiTheme current = piccolo_settings_ui_theme(ui->settings);
+    bool global = ui->scope == SettingLayer::global;
+    ImGui::PushID("ui_theme");
+    ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!global);
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(ui->strings, Str::ui_theme));
+    retro_ui_item_tooltip(piccolo_text(ui->strings, Str::ui_theme_help));
+    ImGui::SameLine(start + ui->label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (retro_ui_begin_combo("##theme", piccolo_text(ui->strings, piccolo_settings_ui_theme_name(current))))
+    {
+        for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
+        {
+            RetroUiTheme theme = static_cast<RetroUiTheme>(i);
+            ImGui::PushID(static_cast<int>(i));
+            bool picked = ImGui::Selectable(piccolo_text(ui->strings, piccolo_settings_ui_theme_name(theme)), theme == current);
+            ImGui::PopID();
+            if (picked)
+            {
+                piccolo_settings_apply_ui_theme(ui->settings, theme);
+            }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::EndDisabled();
+    if (!global && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        retro_ui_tooltip(piccolo_text(ui->strings, Str::global_only_help));
+    }
+    ImGui::PopID();
+}
+
+// The interface settings are global only, so this tab edits the global
+// layer whatever the scope (on a core or game scope everything here would
+// be disabled).
+static void draw_interface(const SettingsUiContext* context)
+{
+    SettingsUiContext global = *context;
+    global.scope = SettingLayer::global;
+    const SettingsUiContext* ui = &global;
+    draw_theme_preset(ui);
+    settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
+    settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);
+    settings_ui_row(ui, PICCOLO_UI_THEME_CURSOR, nullptr);
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_colors));
+    for (uint32_t i = 0; i < piccolo_settings_ui_color_count(); i++)
+    {
+        settings_ui_row(ui, piccolo_settings_ui_color_key(i), nullptr);
+    }
+}
+
+// A tab's contents scroll on their own, under the scope and tabs, which stay
+// put (the window itself doesn't scroll: a scrolling window with this layout
+// jumped back to the top, as the core options list in the quick menu did).
+static void begin_tab_content()
+{
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+    ImGui::BeginChild("content", ImVec2(0.0f, 0.0f));
+}
+
+static void end_tab_content()
+{
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
@@ -275,6 +350,8 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     }
     ImGuiTabItemFlags general_flags =
         window->select_tab && window->tab == SettingsTab::general ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags interface_flags =
+        window->select_tab && window->tab == SettingsTab::interface ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags video_flags =
         window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags sound_flags =
@@ -284,7 +361,18 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
                             general_flags))
     {
         window->tab = SettingsTab::general;
+        begin_tab_content();
         draw_general(ui, context);
+        end_tab_content();
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_interface), "interface"), nullptr,
+                            interface_flags))
+    {
+        window->tab = SettingsTab::interface;
+        begin_tab_content();
+        draw_interface(ui);
+        end_tab_content();
         ImGui::EndTabItem();
     }
     if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_video), "video"), nullptr,
@@ -295,17 +383,23 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         {
             if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_picture), "picture")))
             {
+                begin_tab_content();
                 draw_picture(window, ui, context);
+                end_tab_content();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_display), "display")))
             {
+                begin_tab_content();
                 draw_display(ui, context);
+                end_tab_content();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_sync), "sync")))
             {
+                begin_tab_content();
                 draw_sync(window, ui, context);
+                end_tab_content();
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -316,7 +410,9 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
                             sound_flags))
     {
         window->tab = SettingsTab::sound;
+        begin_tab_content();
         draw_sound(ui, context);
+        end_tab_content();
         ImGui::EndTabItem();
     }
     ImGui::EndTabBar();
@@ -343,8 +439,9 @@ void settings_window_draw(SettingsWindow* window, const SettingsWindowContext* c
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing,
                                 ImVec2(0.5f, 0.5f));
 
-        ImGuiWindowFlags flags =
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+                                 ImGuiWindowFlags_NoScrollWithMouse;
         char title[200] = {};
         if (ImGui::Begin(with_id(title, sizeof(title), piccolo_text(context->strings, Str::settings_title), "settings"),
                          nullptr, flags))

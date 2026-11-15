@@ -14,6 +14,62 @@
 
 struct ImFont;
 
+// The colors of the whole UI (0xAARRGGBB; alpha is always FF). Themes are
+// palettes (decided by Andrés, 2026-11-14): PICCOLO (the original colors),
+// CLASSIC (a blue gradient bar with grey boxes behind the menu titles) and
+// MODERN (flat, the dropdowns the same color as the bar); every color can
+// also be set on its own in SETTINGS > INTERFACE.
+struct RetroUiPalette
+{
+    uint32_t background;       // behind the game and the menu
+    bool     shadows;          // drop shadows under windows, open menus and menu text
+    uint32_t bar_face;         // the menu bar, top and bottom...
+    uint32_t bar_center;       // ...and its middle (a vertical gradient; the same = flat)
+    uint32_t bar_light;        // the bar's raised edge
+    uint32_t bar_dark;
+    bool     menu_boxes;       // a box behind each menu title on the bar
+    uint32_t menu_box_face;
+    uint32_t menu_box_light;   // also an open menu's raised edge
+    uint32_t menu_box_dark;
+    uint32_t menu_face;        // a dropdown menu's background
+    uint32_t panel_face;       // windows
+    uint32_t panel_light;
+    uint32_t panel_dark;
+    uint32_t field_face;       // fields, lists, inactive tabs
+    uint32_t field_hover;
+    uint32_t highlight;        // hovered / selected / pressed
+    uint32_t text;
+    uint32_t text_highlight;
+    uint32_t text_disabled;
+    uint32_t text_shadow;      // menu text's shadow; window shadows are it at 25% opacity
+    uint32_t title_top;        // window title bars, top...
+    uint32_t title_bottom;     // ...and bottom (a vertical gradient; the same = flat)
+    uint32_t check;            // check marks
+    uint32_t section;          // section titles in windows
+    uint32_t button_face;      // buttons, check boxes and scroll bar grips, raised: top...
+    uint32_t button_light;
+    uint32_t button_dark;
+    uint32_t button_text;
+    uint32_t field_text;       // text in fields and combo boxes
+    bool     theme_cursor;     // draw our own mouse cursor (the system's is hidden)
+    uint32_t cursor;           // its color (a gradient to a darker shade at the bottom)
+    uint32_t button_bottom;    // ...and bottom of buttons (a vertical gradient; the same = flat)
+};
+
+enum class RetroUiTheme
+{
+    piccolo,
+    classic,
+    modern,
+    count,
+};
+
+// The built-in palette of a theme.
+const RetroUiPalette* retro_ui_theme_palette(RetroUiTheme theme);
+
+// The palette everything is drawn with from now on (copied).
+void retro_ui_set_palette(const RetroUiPalette* palette);
+
 // The scale for a window: about 640 retro pixels across, at least 1.
 int32_t retro_ui_scale_for_width(float window_width);
 
@@ -46,6 +102,17 @@ void retro_ui_begin_window(int32_t scale);
 bool retro_ui_close_button();
 void retro_ui_end_window();
 
+// ImGui::Button, raised (the palette's button colors and edges) with its
+// label drawn shadowed (with the palette's shadows). Same return value. Use
+// inside the theme. _sized: a given size (0 = fit the label, like ImGui).
+bool retro_ui_button(const char* label);
+bool retro_ui_button_sized(const char* label, float width, float height);
+
+// The theme's mouse cursor, when the palette has one: hides the system's and
+// draws ours at the mouse. Call once per frame, after the UI; `visible`: the
+// UI is up (while a game plays without it, the theme cursor isn't drawn).
+void retro_ui_cursor(int32_t scale, bool visible);
+
 // ImGui::Checkbox with the pixel font's check mark instead of ImGui's
 // line-drawn one. Same return value. Use inside the theme.
 bool retro_ui_checkbox(const char* label, bool* value);
@@ -58,6 +125,13 @@ constexpr float RETRO_UI_TOOLTIP_CHARACTERS = 40.0f;
 void retro_ui_item_tooltip(const char* text);
 void retro_ui_tooltip(const char* text);
 
+// Text inside a field (InputText, InputInt...) in the palette's field color.
+void retro_ui_push_field_text();
+void retro_ui_pop_field_text();
+
+// ImGui::SeparatorText in the palette's section color.
+void retro_ui_separator_text(const char* label);
+
 // ImGui::CollapsingHeader with the pixel font's arrows (right = closed, down
 // = open) instead of ImGui's line-drawn triangle. Same return value. Use
 // inside the theme.
@@ -66,3 +140,14 @@ bool retro_ui_collapsing_header(const char* label, int flags);
 // ImGui::BeginCombo with the pixel font's down arrow instead of ImGui's own
 // triangle. Same return value and EndCombo() rule. Use inside the theme.
 bool retro_ui_begin_combo(const char* label, const char* preview);
+
+// Every window's vertical scroll bar in the theme's style (a sunken track,
+// a raised grip), drawn over ImGui's. Call once a frame after all windows,
+// before the frame is drawn.
+void retro_ui_scrollbars(int32_t scale);
+
+// With the palette's shadows: a drop shadow under every letter ImGui will
+// draw, `scale` pixels down and right, in the text shadow color. For
+// debug_ui_set_draw_data_hook(), between finishing the frame and drawing it.
+struct ImDrawData;
+void retro_ui_text_shadows(ImDrawData* draw_data, int32_t scale);
