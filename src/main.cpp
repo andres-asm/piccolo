@@ -39,6 +39,7 @@
 #include "core_session.h"
 #include "debug_ui.h"
 #include "file_picker.h"
+#include "glyph_viewer.h"
 #include "input_glyphs.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -156,6 +157,7 @@ struct App
     // Big picture UI (UI MODE setting): HOME while no game runs, and the
     // button glyphs of the device used last for its hints.
     InputGlyphs    glyphs;
+    GlyphViewer    glyph_viewer;   // TEMPORARY: every glyph on screen (debug window)
     BigPictureHome home = {};
     char           home_core_path[LIBRETRO_PATH_MAX] = {};   // last_core when home_core was worked out
     char           home_core[128] = {};                      // its short name ("snes9x")
@@ -941,6 +943,9 @@ static void app_handle_events(App* app)
                         app->menu_visible = !app->menu_visible;
                     }
                     break;
+                case SDLK_F9:
+                    app->glyph_viewer.open = !app->glyph_viewer.open;   // TEMPORARY glyph viewer
+                    break;
                 case SDLK_F11:
                     toggle_fullscreen(app);
                     break;
@@ -1201,6 +1206,7 @@ static void app_draw_debug_ui(App* app)
     }
     ImGui::Separator();
     ImGui::Checkbox("Dear ImGui demo window", &app->show_imgui_demo);
+    ImGui::Checkbox("Glyph viewer (temporary)", &app->glyph_viewer.open);
 
     ImGui::End();
 
@@ -1493,16 +1499,18 @@ int main(int argc, char** argv)
             {
                 app_draw_debug_ui(app);
             }
+            glyph_viewer_draw(&app->glyph_viewer);
 
             bool ui_up = app->menu_visible || !game_running(app) || app->picker.open || app->settings_window.open ||
                          app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
-                         app->safe_start_open || app->show_debug_window;
+                         app->safe_start_open || app->show_debug_window || app->glyph_viewer.open;
             retro_ui_scrollbars(app->ui_scale);
             retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
 
             core_session_upload_video(&app->session, &app->shell);
             quick_menu_upload(&app->quick_menu, &app->shell);
             input_glyphs_upload(&app->glyphs, &app->shell);
+            glyph_viewer_upload(&app->glyph_viewer, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
@@ -1531,6 +1539,7 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     input_glyphs_destroy(&app->glyphs, &app->shell);
+    glyph_viewer_destroy(&app->glyph_viewer, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);
     delete app;

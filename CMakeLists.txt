@@ -28,6 +28,7 @@ add_executable(piccolo
     src/quick_menu.cpp
     src/input_glyphs.cpp
     src/big_picture.cpp
+    src/glyph_viewer.cpp
 )
 
 # UI text: src/strings.txt is the one English source. The build turns it into
