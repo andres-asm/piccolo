@@ -248,7 +248,11 @@ static void draw_hints_bar(ImDrawList* draw_list, float width, float height, flo
 {
     const RetroUiPalette* palette = context->palette;
     float glyph = input_glyphs_size(context->scale);
-    float bar_h = glyph + 4.0f * block;
+    float bar_h = 14.0f * block;   // a text line and padding; glyphs are about text height
+    if (bar_h < glyph + 4.0f * block)
+    {
+        bar_h = glyph + 4.0f * block;
+    }
     float margin = 8.0f * block;
     float bar_x = margin;
     float bar_y = height - margin - bar_h;
@@ -263,7 +267,7 @@ static void draw_hints_bar(ImDrawList* draw_list, float width, float height, flo
 
     // Right to left, so the last hint ends at the bar's right padding.
     float glyph_gap = block;
-    float glyph_y = bar_y + 2.0f * block;
+    float glyph_y = static_cast<float>(static_cast<int32_t>(bar_y + (bar_h - glyph) / 2.0f));
     float right = bar_x + bar_w - 5.0f * block;
     for (int32_t i = hint_count - 1; i >= 0; i--)
     {

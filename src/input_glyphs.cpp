@@ -247,10 +247,11 @@ void input_glyphs_destroy(InputGlyphs* glyphs, AppShell* shell)
 
 float input_glyphs_size(int32_t scale)
 {
-    // About 11 retro pixels (an 8-pixel line + padding), rounded down to
-    // 32 x N; never below 16 (half size, how the pictures are meant for small UI).
-    int32_t wanted = 11 * scale;
-    int32_t size = (wanted / 32) * 32;
+    // About as tall as the text (7 retro pixels: the 5-pixel letters plus a
+    // little), rounded down to 16 x N; never below 16. Bigger, they stood out
+    // more than the words next to them (Andrés, 2026-11-15).
+    int32_t wanted = 7 * scale;
+    int32_t size = (wanted / 16) * 16;
     return static_cast<float>(size < 16 ? 16 : size);
 }
 
