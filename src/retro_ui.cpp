@@ -83,7 +83,34 @@ static void push_invisible_text()
 int32_t retro_ui_scale_for_width(float window_width)
 {
     int32_t scale = static_cast<int32_t>(window_width / 640.0f);
-    return scale < 1 ? 1 : scale;
+    if (scale < 1)
+    {
+        scale = 1;
+    }
+    // debug_ui puts the display's scale (SDL_GetWindowDisplayScale) in
+    // style.FontScaleDpi. The retro UI takes it here, in the block, and keeps
+    // it out of the font (push_pixel_font): then the font and every other
+    // metric (padding, bevels, shadows) stay in the same whole blocks.
+    int32_t display_scale = static_cast<int32_t>(ImGui::GetStyle().FontScaleDpi);
+    if (display_scale < 1)
+    {
+        display_scale = 1;
+    }
+    return scale * display_scale;
+}
+
+// The pixel font at exactly 8 x block pixels per line. ImGui multiplies every
+// font size by style.FontScaleMain x style.FontScaleDpi; the display's scale
+// is already in the block (retro_ui_scale_for_width), so it's divided out.
+static void push_pixel_font(ImFont* pixel_font, float block)
+{
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float imgui_scale = style.FontScaleMain * style.FontScaleDpi;
+    if (imgui_scale <= 0.0f)
+    {
+        imgui_scale = 1.0f;
+    }
+    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block / imgui_scale);
 }
 
 // One dropdown item drawn our way (invisible ImGui text, our shadowed label).
@@ -145,7 +172,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
     // Metrics in retro pixels x scale:
     //   bar  = 2 + 8 (font line) + 2 = 12, label padding 3,
     //   item = 8 (font line) + 2 spacing = 10, panel padding 2 (+4 text indent).
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.0f * block, 2.0f * block));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(2.0f * block, 2.0f * block));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f * block, 2.0f * block));
@@ -228,7 +255,7 @@ void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text)
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     ImGui::Begin("##retro_status", nullptr, flags);
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     use_nearest_sampler();
     // 4 retro pixels from the left and from the bottom (line = 7, glyph starts 1 down).
     ImVec2 position = ImVec2(4.0f * block, io.DisplaySize.y - (4.0f + 6.0f) * block);
@@ -296,7 +323,7 @@ constexpr int THEME_VAR_COUNT = 12;   // the PushStyleVar calls in retro_ui_push
 void retro_ui_push_theme(ImFont* pixel_font, int32_t scale)
 {
     float block = static_cast<float>(scale);
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     for (int i = 0; i < THEME_COLOR_COUNT; i++)
     {
         ImGui::PushStyleColor(THEME_COLORS[i].slot, to_imgui(THEME_COLORS[i].argb));

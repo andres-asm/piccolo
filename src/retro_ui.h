@@ -14,7 +14,9 @@
 
 struct ImFont;
 
-// The scale for a window: about 640 retro pixels across, at least 1.
+// The scale for a window: about 640 retro pixels across, at least 1, times
+// the display's scale (whole part, at least 1): 2 on a 320 dpi Android screen
+// (the SHIELD), 1 on most desktops.
 int32_t retro_ui_scale_for_width(float window_width);
 
 // The menu bar at the top of the window. Call between ImGui::NewFrame() and
