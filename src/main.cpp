@@ -75,6 +75,7 @@ struct App
     std::string    settings_path;
     SettingsWindow settings_window = {};
     bool           settings_window_was_open = false;
+    bool           options_window_was_open = false;   // the quick menu or the options manager
     std::string    cores_directory;   // the one the catalog lists now
     char           core_name[256] = {};   // for the core/game settings layers ("" = none)
     char           game_name[256] = {};
@@ -1096,6 +1097,19 @@ static void draw_settings(App* app)
     app->settings_window_was_open = open;
 }
 
+// The quick menu or the options manager closed: what was changed there in
+// the core options is written now. (While they are open it waits, so an
+// option that crashes the core at once is not kept.)
+static void save_after_options_windows(App* app)
+{
+    bool open = app->quick_menu.open || app->core_options_manager;
+    if (app->options_window_was_open && !open)
+    {
+        save_core_options(app);
+    }
+    app->options_window_was_open = open;
+}
+
 static void app_draw_debug_ui(App* app)
 {
     const ImGuiIO& io = ImGui::GetIO();
@@ -1409,6 +1423,7 @@ int main(int argc, char** argv)
             bool ui_up = app->menu_visible || !game_running(app) || app->picker.open || app->settings_window.open ||
                          app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                          app->safe_start_open || app->show_debug_window;
+            save_after_options_windows(app);
             retro_ui_scrollbars(app->ui_scale);
             retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
 

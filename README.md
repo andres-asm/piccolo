@@ -121,8 +121,8 @@ is noted in it at once). If it's still there at the next launch, that session
 crashed or hung. Starting the same core again, when it has stored options,
 asks first: STORED OPTIONS, CORE DEFAULTS THIS TIME (nothing deleted; fix the
 culprit in CORE OPTIONS), DELETE STORED OPTIONS, or CANCEL. An option changed
-in the middle of a game is only written when the game ends, another one
-starts or piccolo quits: a change that crashes the core at once is not kept.
+in the middle of a game is only written when the quick menu closes (or the
+game ends, another one starts, piccolo quits): a change that crashes the core at once is not kept.
 
 ## Interface themes
 
