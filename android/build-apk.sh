@@ -39,7 +39,8 @@ for f in "$ANDROID_JAR" "$AAPT_ANDROID_JAR" "$D8_JAR" "$JAVA_HOME/bin/javac"; do
 done
 
 echo "== native library"
-# From multitap's root CMakeLists.txt: it builds only piccolo's libmain.so for Android.
+# From multitap's root CMakeLists.txt: for Android it builds piccolo's
+# libmain.so and Test libretro.
 cmake -S "$multitap_root" -B "$build" -G Ninja -DCMAKE_TOOLCHAIN_FILE="$here/cmake/android-toolchain.cmake" \
     -DMULTITAP_BUILD_TESTS=OFF >/dev/null
 cmake --build "$build"
@@ -62,9 +63,12 @@ find "$apk_dir/classes" -name '*.class' > "$apk_dir/classes.txt"
 echo "== package"
 aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -o "$apk_dir/unaligned.apk"
 cp "$build/libmain.so" "$apk_dir/lib/arm64-v8a/libmain.so"
+# Android only extracts lib/<abi>/lib*.so when installing, hence the "lib"
+# prefix for the core (android_main.cpp looks for it under that name).
+cp "$build/test_libretro.so" "$apk_dir/lib/arm64-v8a/libtest_libretro.so"
 # Paths inside the APK are relative to the folder zip runs in.
 (cd "$apk_dir/dex" && zip -q "$apk_dir/unaligned.apk" classes.dex)
-(cd "$apk_dir" && zip -q "$apk_dir/unaligned.apk" lib/arm64-v8a/libmain.so)
+(cd "$apk_dir" && zip -q "$apk_dir/unaligned.apk" lib/arm64-v8a/libmain.so lib/arm64-v8a/libtest_libretro.so)
 zipalign -f -p 4 "$apk_dir/unaligned.apk" "$apk_dir/aligned.apk"
 
 echo "== sign"
