@@ -22,14 +22,16 @@ session) and its CMake helpers. It doesn't build on its own.
 - Save RAM and savestates are kept automatically.
 - Keyboard and gamepad as the controller (fixed mapping for now).
 - **RECENT** (the first menu entry): the last 10 games started.
-- **CONFIG > GENERAL / VIDEO / SOUND**: settings, each one global or, where it
+- **CONFIG > GENERAL / INTERFACE / VIDEO / SOUND**: settings, each one global or, where it
   makes sense, just for the running core or game (the SCOPE at the top).
   Video: aspect ratio, integer / auto scaling, filters, overscan crop (IMAGE
   SETTINGS), window and fullscreen, Vsync / Exact timing, low latency. Sound:
   output device, volume, latency, rate control, resampler quality.
-- **CORE OPTIONS** (a tab of the window any CONFIG entry opens): the running core's options, kept per
-  core, per content folder or per game, and a list of what is stored for any
-  core (see [Core options](#core-options)).
+- **CONFIG > INTERFACE**: the look (see [Interface themes](#interface-themes)).
+- **Core options**: the running core's options, kept per core, per content
+  folder or per game, changed in the quick menu; TOOLS > OPTIONS MANAGER
+  shows and deletes what is stored for any core (see
+  [Core options](#core-options)).
 - English and Spanish (GENERAL > LANGUAGE).
 
 Not there yet: input mapping, state slots, shaders, archives.
@@ -51,6 +53,7 @@ short name, the game name the content file's name without extension.
 | Can be overridden per core / game | Global only |
 |-----------------------------------|-------------|
 | PICTURE: aspect ratio, scaling, auto max offscreen, filter, position, crop (top, bottom, left, right) | GENERAL: language, pause in menu, pause on focus loss, screensaver, game mode, folders |
+| | INTERFACE: theme, menu title boxes, shadows, theme cursor, colors |
 | SYNC: timing, catch up missed frames, frames in flight, wait for present, frame delay, auto frame delay | DISPLAY: fullscreen, fullscreen type, window mode, aspect, height, scale, remember |
 | SOUND: volume, latency | SOUND: output device, mute, rate control, max speed change, resampler quality |
 
@@ -80,7 +83,7 @@ pauses while it's open). Two tabs:
   shows its thumbnail and date. SAVE (S) and LOAD (L) act on it; Enter only
   picks a slot, so nothing is loaded or overwritten by accident. Also RESET
   and CLOSE GAME.
-- **CORE OPTIONS**: the running core's options, as in SETTINGS.
+- **CORE OPTIONS**: the running core's options (see [Core options](#core-options)).
 
 Each state is `states/<core>/<game>.state<N>`, with a thumbnail next to it,
 `<game>.state<N>.png` (also written by F2): the picture as it is shown (the
@@ -88,9 +91,9 @@ Picture settings' aspect ratio and crop), at x1.
 
 ## Core options
 
-SETTINGS > CORE OPTIONS edits the running core's options live. SAVE TO picks
-where a change is kept, like the SCOPE of the other tabs but with a folder
-layer:
+The quick menu's CORE OPTIONS tab edits the running core's options live.
+SAVE TO picks where a change is kept, like the SCOPE of SETTINGS but with a
+folder layer:
 
 | Layer | Section in `settings/core_options.cfg` | Applies to |
 |-------|----------------------------------------|------------|
@@ -107,7 +110,7 @@ options, before it reads them, so options that only apply at start work too.
 
 **When an option breaks a core.** Every core's option list (names, values,
 defaults) is also kept in `settings/core_options_cache.cfg`, written as soon as
-the core declares them. So STORED VALUES, at the bottom of the tab, lists and
+the core declares them. So TOOLS > OPTIONS MANAGER lists and
 deletes what is stored for **any** core that has run before, even one that now
 crashes on start: pick it in CORE, then DELETE a value, DELETE SECTION, or
 DELETE ALL FOR THIS CORE. Keys the core no longer declares are marked.
@@ -118,8 +121,27 @@ is noted in it at once). If it's still there at the next launch, that session
 crashed or hung. Starting the same core again, when it has stored options,
 asks first: STORED OPTIONS, CORE DEFAULTS THIS TIME (nothing deleted; fix the
 culprit in CORE OPTIONS), DELETE STORED OPTIONS, or CANCEL. An option changed
-in the middle of a game is only written when SETTINGS closes, a game starts or
-piccolo quits: a change that crashes the core at once is not kept.
+in the middle of a game is only written when the game ends, another one
+starts or piccolo quits: a change that crashes the core at once is not kept.
+
+## Interface themes
+
+CONFIG > INTERFACE sets the look. THEME sets everything at once:
+
+| Theme | Look |
+|-------|------|
+| PICCOLO | blue and flat, no shadows |
+| CLASSIC | a purple background, a blue gradient menu bar with a box behind each menu title, grey menus with a magenta highlight, blue windows with gradient title bars and black fields, raised buttons and check boxes, sunken lists, drop shadows under windows and text, an orange arrow cursor |
+| MODERN | flat and dark, never a shadow; the menus are the bar's color |
+
+Every color can also be changed on its own (THEME then shows CUSTOM), as
+can MENU TITLE BOXES, DROP SHADOWS and THEME CURSOR (piccolo draws its own
+pixel arrow instead of the system's, while the menu or a window is up).
+Raised and sunken edges (buttons, check boxes, scroll bars, color swatches,
+lists) appear when a theme's button edges have two colors; with one color,
+as in PICCOLO and MODERN, everything stays flat. The background color shows
+only without a game: around a running game it's black. The interface
+settings are global and live in `settings/piccolo.cfg` (`ui_` keys).
 
 ## Automatic settings
 
@@ -182,7 +204,7 @@ cmake --build build
 | Path | What |
 |------|------|
 | `src/main.cpp` | the program: game picture, menu, Esc, actions |
-| `src/retro_ui.*` | the retro look: themed Dear ImGui widgets, bevels, drop-shadowed labels |
+| `src/retro_ui.*` | the retro look: the themes, themed Dear ImGui widgets, bevels, text shadows, scroll bars, cursor |
 | `src/pixel_font.*` | the 5x5 font (glyphs written as `#`/`.` pictures) |
 | `src/pixel_font_imgui.*` | the font as a Dear ImGui font (custom font loader) |
 | `src/file_picker.*` | the LOAD GAME window |
