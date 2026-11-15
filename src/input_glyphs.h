@@ -85,8 +85,7 @@ void input_glyphs_upload(InputGlyphs* glyphs, AppShell* shell);
 void input_glyphs_destroy(InputGlyphs* glyphs, AppShell* shell);
 
 // The size (in window pixels) glyphs are drawn at next to text at `scale`:
-// multiples of 16 (half the 32-pixel pictures), so they stay crisp, about
-// as tall as the text next to them.
+// a text line's height (24 at 1080p), at least 16.
 float input_glyphs_size(int32_t scale);
 
 // Width of an action's glyphs at `size` (0 if it has none), with `gap`

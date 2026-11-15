@@ -247,11 +247,11 @@ void input_glyphs_destroy(InputGlyphs* glyphs, AppShell* shell)
 
 float input_glyphs_size(int32_t scale)
 {
-    // About as tall as the text (7 retro pixels: the 5-pixel letters plus a
-    // little), rounded down to 16 x N; never below 16. Bigger, they stood out
-    // more than the words next to them (Andrés, 2026-11-15).
-    int32_t wanted = 7 * scale;
-    int32_t size = (wanted / 16) * 16;
+    // A text line's height (8 retro pixels), never below 16: 24 at 1080p.
+    // 32 stood out more than the words next to them, 16 was too small
+    // (Andrés, 2026-11-15). At some scales (24, 48) the 32-pixel pictures
+    // are scaled by a fraction; nearest filtering keeps them hard-edged.
+    int32_t size = 8 * scale;
     return static_cast<float>(size < 16 ? 16 : size);
 }
 
