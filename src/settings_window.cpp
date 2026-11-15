@@ -59,7 +59,7 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
     if (!has_core)
     {
         ImGui::TextDisabled("%s: %s", piccolo_text(strings, Str::scope), piccolo_text(strings, Str::scope_global));
-        ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::scope_start_game_help));
+        retro_ui_item_tooltip(piccolo_text(strings, Str::scope_start_game_help));
         return;
     }
 
@@ -85,7 +85,7 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(piccolo_text(strings, Str::scope));
-    ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::scope_help));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::scope_help));
     ImGui::SameLine();
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (retro_ui_begin_combo("##scope", preview_text))
@@ -148,7 +148,7 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     }
     if (context->image == nullptr || context->image->texture_id == 0)
     {
-        ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::image_settings_button_help));
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::image_settings_button_help));
     }
     ImGui::TextDisabled("%s", crop);
 }
@@ -183,7 +183,7 @@ static void draw_latency_preset(const SettingsUiContext* ui)
     ImGui::AlignTextToFramePadding();
     float start = ImGui::GetCursorPosX();
     ImGui::TextUnformatted(piccolo_text(ui->strings, Str::latency_preset));
-    ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::latency_preset_help));
+    retro_ui_item_tooltip(piccolo_text(ui->strings, Str::latency_preset_help));
     ImGui::SameLine(start + ui->label_width);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     if (retro_ui_begin_combo("##preset", piccolo_text(ui->strings, piccolo_settings_latency_preset_name(current))))
@@ -226,7 +226,7 @@ static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const
     ImGui::EndDisabled();
     if (!usable && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
-        ImGui::SetTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_needs_wait));
+        retro_ui_tooltip(piccolo_text(ui->strings, Str::frame_delay_needs_wait));
     }
     settings_ui_row(ui, PICCOLO_LATENCY_FRAME_DELAY_AUTO, nullptr);
     ImGui::EndDisabled();
@@ -241,7 +241,7 @@ static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const
             {
                 window->search_frame_delay = true;
             }
-            ImGui::SetItemTooltip("%s", piccolo_text(ui->strings, Str::frame_delay_search_again_help));
+            retro_ui_item_tooltip(piccolo_text(ui->strings, Str::frame_delay_search_again_help));
         }
     }
     ImGui::TextDisabled("%s", context->present_wait);

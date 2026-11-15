@@ -141,7 +141,7 @@ static void draw_layer_combo(CoreOptionsUiState* state, const CoreOptionsUiConte
     ImGui::AlignTextToFramePadding();
     float start = ImGui::GetCursorPosX();
     ImGui::TextUnformatted(piccolo_text(context->strings, Str::core_options_save_to));
-    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, Str::core_options_save_to_help));
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::core_options_save_to_help));
     ImGui::SameLine(start + context->label_width);
     ImGui::SetNextItemWidth(-FLT_MIN);
     if (retro_ui_begin_combo("##layer", layer_name(context, state->layer, preview, sizeof(preview))))
@@ -184,7 +184,7 @@ static void draw_marker(const CoreOptionsUiContext* context, const char* key)
                : (source == CoreOptionLayer::directory ? Str::core_options_marker_folder_help
                                                        : Str::core_options_marker_core_help);
     ImGui::TextColored(color_of(color), "%s", letter);
-    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, help));
+    retro_ui_item_tooltip(piccolo_text(context->strings, help));
 }
 
 static const char* value_label(const LibretroOption* option, uint32_t index)
@@ -217,11 +217,12 @@ static void draw_option(const CoreOptionsUiState* state, const CoreOptionsUiCont
     ImGui::PopClipRect();
     if (option->info != nullptr)
     {
-        ImGui::SetItemTooltip("%s\n\n%s", label, option->info);
+        std::string help = std::string(label) + "\n\n" + option->info;
+        retro_ui_item_tooltip(help.c_str());
     }
     else
     {
-        ImGui::SetItemTooltip("%s", label);
+        retro_ui_item_tooltip(label);
     }
     ImGui::SameLine(start + label_width);
 
@@ -260,7 +261,7 @@ static void draw_option(const CoreOptionsUiState* state, const CoreOptionsUiCont
         {
             core_session_reset_option(context->session, state->layer, option->key);
         }
-        ImGui::SetItemTooltip("%s", piccolo_text(context->strings, Str::reset_help_override));
+        retro_ui_item_tooltip(piccolo_text(context->strings, Str::reset_help_override));
     }
     ImGui::PopID();
 }
@@ -480,7 +481,7 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
             if (option != nullptr)
             {
                 ImGui::Text("%s = %s", option->label.c_str(), value_text);
-                ImGui::SetItemTooltip("%s", entry->key.c_str());
+                retro_ui_item_tooltip(entry->key.c_str());
             }
             else
             {
@@ -511,7 +512,7 @@ static void draw_stored(const CoreOptionsUiState* state, const CoreOptionsUiCont
         }
         changed = true;
     }
-    ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::core_options_delete_all_help));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::core_options_delete_all_help));
     if (changed && state->selected_core == context->running_core)
     {
         reapply(context);

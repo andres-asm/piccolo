@@ -52,12 +52,12 @@ SafeStartChoice safe_start_window_draw(ImFont* pixel_font, int32_t scale, const 
         {
             choice = SafeStartChoice::defaults;
         }
-        ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::safe_start_defaults_help));
+        retro_ui_item_tooltip(piccolo_text(strings, Str::safe_start_defaults_help));
         if (ImGui::Button(piccolo_text(strings, Str::safe_start_delete)))
         {
             choice = SafeStartChoice::delete_stored;
         }
-        ImGui::SetItemTooltip("%s", piccolo_text(strings, Str::safe_start_delete_help));
+        retro_ui_item_tooltip(piccolo_text(strings, Str::safe_start_delete_help));
         ImGui::SameLine();
         if (ImGui::Button(piccolo_text(strings, Str::safe_start_cancel)))
         {

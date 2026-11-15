@@ -64,7 +64,7 @@ void settings_ui_marker(const SettingsUiContext* context, const char* key)
     }
     bool core = source == SettingLayer::core;
     ImGui::TextColored(color_of(core ? MARKER_CORE : MARKER_GAME), "%s", core ? "C" : "G");
-    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, core ? Str::marker_core_help : Str::marker_game_help));
+    retro_ui_item_tooltip(piccolo_text(context->strings, core ? Str::marker_core_help : Str::marker_game_help));
 }
 
 bool settings_ui_reset_button(const SettingsUiContext* context, const char* key)
@@ -80,7 +80,7 @@ bool settings_ui_reset_button(const SettingsUiContext* context, const char* key)
     bool clicked = ImGui::Button(reset);
     ImGui::PopID();
     Str help = context->scope == SettingLayer::global ? Str::reset_help_global : Str::reset_help_override;
-    ImGui::SetItemTooltip("%s", piccolo_text(context->strings, help));
+    retro_ui_item_tooltip(piccolo_text(context->strings, help));
     if (clicked)
     {
         settings_reset(context->settings, context->scope, key);
@@ -97,7 +97,7 @@ static void label_column(const SettingsUiContext* context, const SettingDescript
     ImGui::TextUnformatted(piccolo_text_id(context->strings, descriptor->label));
     if (descriptor->help != SETTING_NO_TEXT)
     {
-        ImGui::SetItemTooltip("%s", piccolo_text_id(context->strings, descriptor->help));
+        retro_ui_item_tooltip(piccolo_text_id(context->strings, descriptor->help));
     }
     ImGui::SameLine(start + context->label_width);
 }
@@ -220,7 +220,7 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
         }
         if (descriptor->help != SETTING_NO_TEXT)
         {
-            ImGui::SetItemTooltip("%s", piccolo_text_id(context->strings, descriptor->help));
+            retro_ui_item_tooltip(piccolo_text_id(context->strings, descriptor->help));
         }
     }
     else
@@ -251,7 +251,7 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
         // A disabled item needs AllowWhenDisabled for its tooltip.
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            ImGui::SetTooltip("%s", piccolo_text(context->strings, Str::global_only_help));
+            retro_ui_tooltip(piccolo_text(context->strings, Str::global_only_help));
         }
     }
     else if (settings_ui_reset_button(context, key))
@@ -321,7 +321,7 @@ bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* k
     {
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            ImGui::SetTooltip("%s", piccolo_text(context->strings, Str::global_only_help));
+            retro_ui_tooltip(piccolo_text(context->strings, Str::global_only_help));
         }
     }
     else if (settings_ui_reset_button(context, key))

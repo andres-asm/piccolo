@@ -390,6 +390,32 @@ bool retro_ui_checkbox(const char* label, bool* value)
     return changed;
 }
 
+static void tooltip_text(const char* text)
+{
+    // The pixel font's letters all have the same advance: "M" stands for any.
+    ImGui::PushTextWrapPos(ImGui::CalcTextSize("M").x * RETRO_UI_TOOLTIP_CHARACTERS);
+    ImGui::TextUnformatted(text);
+    ImGui::PopTextWrapPos();
+}
+
+void retro_ui_item_tooltip(const char* text)
+{
+    if (ImGui::BeginItemTooltip())
+    {
+        tooltip_text(text);
+        ImGui::EndTooltip();
+    }
+}
+
+void retro_ui_tooltip(const char* text)
+{
+    if (ImGui::BeginTooltip())
+    {
+        tooltip_text(text);
+        ImGui::EndTooltip();
+    }
+}
+
 bool retro_ui_collapsing_header(const char* label, int flags)
 {
     // ImGui draws the bar and the highlight; its arrow and label are made

@@ -50,6 +50,14 @@ void retro_ui_end_window();
 // line-drawn one. Same return value. Use inside the theme.
 bool retro_ui_checkbox(const char* label, bool* value);
 
+// Tooltips that wrap at about RETRO_UI_TOOLTIP_CHARACTERS characters
+// instead of running in one line past the window. Use inside the theme.
+// retro_ui_item_tooltip: when the last item is hovered (ImGui::SetItemTooltip);
+// retro_ui_tooltip: now (ImGui::SetTooltip, the caller checked hovering).
+constexpr float RETRO_UI_TOOLTIP_CHARACTERS = 40.0f;
+void retro_ui_item_tooltip(const char* text);
+void retro_ui_tooltip(const char* text);
+
 // ImGui::CollapsingHeader with the pixel font's arrows (right = closed, down
 // = open) instead of ImGui's line-drawn triangle. Same return value. Use
 // inside the theme.
