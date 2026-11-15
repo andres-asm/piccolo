@@ -716,14 +716,245 @@ BUTTON_ORDER = ["south", "east", "west", "north",
 
 
 # ---------------------------------------------------------------------------
+# keyboard
+
+FONT5x7.update({
+    "D": ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####."],
+    "E": ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+    "F": ["#####", "#....", "#....", "####.", "#....", "#....", "#...."],
+    "G": [".####", "#....", "#....", "#.###", "#...#", "#...#", ".###."],
+    "H": ["#...#", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+    "I": [".###.", "..#..", "..#..", "..#..", "..#..", "..#..", ".###."],
+    "J": ["..###", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##.."],
+    "K": ["#...#", "#..#.", "#.#..", "##...", "#.#..", "#..#.", "#...#"],
+    "M": ["#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"],
+    "N": ["#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#"],
+    "O": [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+    "P": ["####.", "#...#", "#...#", "####.", "#....", "#....", "#...."],
+    "Q": [".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"],
+    "U": ["#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+    "V": ["#...#", "#...#", "#...#", "#...#", ".#.#.", ".#.#.", "..#.."],
+    "W": ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
+    "4": ["...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."],
+    "5": ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+    "6": [".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."],
+    "7": ["#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."],
+    "8": [".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."],
+    "9": [".###.", "#...#", "#...#", ".####", "....#", "....#", ".###."],
+    "0": [".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."],
+    "Ñ": [".##.#", "#..#.", ".....", "##..#", "#.#.#", "#..##", "#...#"],
+    "Ç": [".####", "#....", "#....", "#....", ".####", "..#..", ".##.."],
+})
+
+# accented capitals for the 3x5 font: base letter + accent row drawn above
+ACCENTS3 = {"Á": ("A", "..#"), "É": ("E", "..#"), "Í": ("I", "..#"),
+            "Ó": ("O", "..#"), "Ú": ("U", "..#"), "Ñ": ("N", "###"),
+            "Ü": ("U", "#.#"), "Ö": ("O", "#.#"), "Ä": ("A", "#.#"),
+            "À": ("A", "#.."), "È": ("E", "#.."), "Ç": ("C", None)}
+
+
+# wider letters for keycap labels, where 3px can't tell N from n
+WIDE3 = {
+    "M": ["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+    "N": ["#..#", "##.#", "#.##", "#..#", "#..#"],
+    "W": ["#...#", "#...#", "#.#.#", "##.##", "#...#"],
+}
+
+
+def glyph3(ch):
+    return WIDE3.get(ch, FONT3x5.get(ch))
+
+
+def keycap():
+    c = Canvas()
+    c.rrect(1, 1, 30, 30, 5)
+    c.rect(4, 26, 27, 26, 0)  # lip line: reads as a key, not a button
+    return c
+
+
+KEY_CY = 14.0  # label centre (above the lip)
+
+
+def key_label(c, s):
+    """Cut a label into a keycap: big letter, 5x7 word, or 3x5 lines."""
+    lines = s.split("\n")
+    if len(lines) == 1 and all(ch in FONT5x7 for ch in s) and len(s) <= 3:
+        scale = 2 if len(s) <= 2 else 1
+        c.text(s, FONT5x7, scale, C, KEY_CY)
+        return
+    # 3x5, one or more lines, accents take 2 extra rows above a line
+    heights = []
+    for ln in lines:
+        acc = any(ch in ACCENTS3 and ACCENTS3[ch][1] for ch in ln)
+        heights.append((7 if acc else 5, acc))
+    gap = 2
+    total = sum(h for h, _ in heights) + gap * (len(lines) - 1)
+    y = int(round(KEY_CY - total / 2.0))
+    for ln, (h, acc) in zip(lines, heights):
+        top = y + (2 if acc else 0)
+        bases = [ACCENTS3[ch][0] if ch in ACCENTS3 else ch for ch in ln]
+        width = sum(len(glyph3(b)[0]) + 1 for b in bases) - 1
+        if width > 26:
+            print("warning: label %r too wide (%d px)" % (ln, width))
+        bx = int(round(C - width / 2.0))
+        for ch in ln:
+            accent = None
+            base = ch
+            if ch in ACCENTS3:
+                base, accent = ACCENTS3[ch]
+            rows = glyph3(base)
+            gw = len(rows[0])
+            for ry, row in enumerate(rows):
+                for rx, px in enumerate(row):
+                    if px == "#":
+                        c.set(bx + rx, top + ry, 0)
+            if accent:
+                ax = bx + (gw - 3) // 2
+                for rx, px in enumerate(accent):
+                    if px == "#":
+                        c.set(ax + rx, top - 2, 0)
+            if ch == "Ç":
+                c.set(bx + 1, top + 5, 0)
+            bx += gw + 1
+        y += h + gap
+
+
+def k_text(s):
+    c = keycap()
+    key_label(c, s)
+    return c
+
+
+def k_arrow(d):
+    c = keycap()
+    if d in ("up", "down"):
+        c.rect(15, 9, 16, 20, 0)
+        _arrow(c, C, 8.5 if d == "up" else 19.5, d, 5.0, 0)
+    else:
+        c.rect(10, 13, 21, 14, 0)
+        _arrow(c, 9.5 if d == "left" else 22.5, KEY_CY, d, 5.0, 0)
+    return c
+
+
+def k_return():
+    c = keycap()
+    c.rect(21, 7, 22, 16, 0)
+    c.rect(11, 15, 22, 16, 0)
+    _arrow(c, 9.0, 16.0, "left", 4.5, 0)
+    return c
+
+
+def k_backspace():
+    c = keycap()
+    c.rect(11, 13, 24, 14, 0)
+    _arrow(c, 9.0, KEY_CY, "left", 5.0, 0)
+    return c
+
+
+def k_tab():
+    c = keycap()
+    c.rect(6, 13, 19, 14, 0)
+    _arrow(c, 21.0, KEY_CY, "right", 5.0, 0)
+    c.rect(24, 8, 25, 19, 0)
+    return c
+
+
+def k_shift():
+    c = keycap()
+    pts = [(C, 4.0), (26.0, 14.0), (20.5, 14.0), (20.5, 23.0),
+           (11.5, 23.0), (11.5, 14.0), (6.0, 14.0)]
+    c.poly(pts, 0)
+    border = Canvas()
+    border.poly(pts)
+    border.outline(2)
+    shape = Canvas()
+    shape.poly(pts)
+    # refill the inside of the arrow, leaving a 2px cut outline
+    for y in range(SIZE):
+        for x in range(SIZE):
+            if shape.p[y][x] and not border.p[y][x]:
+                c.p[y][x] = 1
+    return c
+
+
+def k_space():
+    c = keycap()
+    c.rect(7, 17, 24, 18, 0)
+    c.rect(7, 12, 8, 18, 0)
+    c.rect(23, 12, 24, 18, 0)
+    return c
+
+
+def keyboard_common():
+    g = {}
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        g[ch.lower()] = k_text(ch)
+    for ch in "0123456789":
+        g[ch] = k_text(ch)
+    for n in range(1, 13):
+        g["f%d" % n] = k_text("F%d" % n)
+    for d in ("up", "down", "left", "right"):
+        g[d] = k_arrow(d)
+    g["return"] = k_return()
+    g["backspace"] = k_backspace()
+    g["tab"] = k_tab()
+    g["shift"] = k_shift()
+    g["space"] = k_space()
+    return g
+
+
+# Keys whose printed label depends on the keyboard's language. A locale dir
+# overrides keyboard/common, so a locale may also replace an icon key
+# (return, shift, ...) or add keys its keyboards have (es: ñ, ç).
+# Labels: "\n" splits lines, up to 6 chars per line, accented capitals OK.
+KEYBOARD_LOCALES = {
+    "en": {
+        "escape": "ESC", "ctrl": "CTRL", "alt": "ALT", "altgr": "ALT\nGR",
+        "delete": "DEL", "insert": "INSERT", "home": "HOME", "end": "END",
+        "pageup": "PG\nUP", "pagedown": "PG\nDN", "capslock": "CAPS\nLOCK",
+        "printscreen": "PRT\nSCR",
+    },
+    "es": {
+        "escape": "ESC", "ctrl": "CTRL", "alt": "ALT", "altgr": "ALT\nGR",
+        "delete": "SUPR", "insert": "INSERT", "home": "INICIO", "end": "FIN",
+        "pageup": "RE\nPÁG", "pagedown": "AV\nPÁG",
+        "capslock": "BLOQ\nMAYÚS", "printscreen": "IMPR\nPANT",
+        "ntilde": "Ñ", "ccedilla": "Ç",
+    },
+    # Placeholders: fill in the same keys as "en" to add a language. An
+    # empty locale is not written; the GUI falls back to "en".
+    "de": {},
+    "fr": {},
+    "it": {},
+    "pt": {},
+}
+
+KEYBOARD_ORDER = (list("abcdefghijklmnopqrstuvwxyz") + list("0123456789")
+                  + ["f%d" % n for n in range(1, 13)]
+                  + ["up", "down", "left", "right", "return", "backspace",
+                     "tab", "shift", "space",
+                     "escape", "ctrl", "alt", "altgr", "delete", "insert",
+                     "home", "end", "pageup", "pagedown", "capslock",
+                     "printscreen", "ntilde", "ccedilla"])
+
+
+def build_keyboard():
+    kb = {"common": keyboard_common()}
+    for loc, labels in KEYBOARD_LOCALES.items():
+        if labels:
+            kb[loc] = dict((k, k_text(v)) for k, v in labels.items())
+    return kb
+
+
+# ---------------------------------------------------------------------------
 # contact sheet (preview only)
 
-def write_sheet(pads, path, scale=3):
+def write_sheet(pads, path, row_order, col_order, scale=3):
     cell = SIZE * scale + 8
     label_w = 60
-    cols = len(BUTTON_ORDER)
+    cols = len(col_order)
     w = label_w + cols * cell
-    h = 14 + len(PAD_ORDER) * cell
+    h = 14 + len(row_order) * cell
     img = [[(40, 40, 48)] * w for _ in range(h)]
 
     def put(x, y, col):
@@ -741,12 +972,12 @@ def write_sheet(pads, path, scale=3):
                                 put(x + (i * 4 + rx) * sc + xx,
                                     y + ry * sc + yy, col)
 
-    for ci, b in enumerate(BUTTON_ORDER):
+    for ci, b in enumerate(col_order):
         text(str(ci + 1), label_w + ci * cell + 4, 2, (150, 150, 160))
-    for ri, pad in enumerate(PAD_ORDER):
+    for ri, pad in enumerate(row_order):
         y0 = 14 + ri * cell
         text(pad, 2, y0 + cell // 2 - 5, (200, 200, 210), 2 if len(pad) < 7 else 1)
-        for ci, b in enumerate(BUTTON_ORDER):
+        for ci, b in enumerate(col_order):
             x0 = label_w + ci * cell + 4
             g = pads[pad].get(b)
             for y in range(SIZE * scale):
@@ -803,6 +1034,25 @@ A pad simply has no file for a button it lacks.
 
 Pads: nes snes n64 gc gb gba wii (classic controller) wiiu switch
 ps1 ps2 ps3 ps4 ps5 xbox xbox360 xboxone xboxseries.
+
+## Keyboard
+
+Keycaps in the same style, under `keyboard/`:
+
+- `keyboard/common/` -- language-neutral keys: `a`..`z`, `0`..`9`,
+  `f1`..`f12`, `up` `down` `left` `right`, and the icon keys `return`
+  `backspace` `tab` `shift` `space`.
+- `keyboard/<lang>/` -- keys whose printed label depends on the language
+  (same codes as piccolo's language setting): `escape` `ctrl` `alt` `altgr`
+  `delete` `insert` `home` `end` `pageup` `pagedown` `capslock`
+  `printscreen`, plus extra keys the layout has (es: `ntilde`, `ccedilla`).
+
+Lookup: `keyboard/<lang>/<key>.png`, then `keyboard/en/<key>.png`, then
+`keyboard/common/<key>.png`. A language folder may also override a common
+key.
+
+Languages: en, es. de/fr/it/pt are placeholders in `KEYBOARD_LOCALES` in the
+script: fill in their labels and re-run to add them.
 """
 
 
@@ -828,10 +1078,22 @@ def main():
             count += 1
     with open(os.path.join(out, "README.md"), "w") as f:
         f.write(README)
+    kb = build_keyboard()
+    kb_rows = ["common"] + [l for l in KEYBOARD_LOCALES if l in kb]
+    for loc in kb_rows:
+        d = os.path.join(out, "keyboard", loc)
+        os.makedirs(d, exist_ok=True)
+        for name, g in kb[loc].items():
+            assert name in KEYBOARD_ORDER, name
+            save_canvas(g, os.path.join(d, name + ".png"))
+            count += 1
     print("wrote %d glyphs to %s" % (count, os.path.normpath(out)))
     if sheet:
-        write_sheet(pads, sheet)
+        write_sheet(pads, sheet, PAD_ORDER, BUTTON_ORDER)
         print("wrote sheet", sheet)
+        kbsheet = os.path.splitext(sheet)[0] + "_keyboard.png"
+        write_sheet(kb, kbsheet, kb_rows, KEYBOARD_ORDER, 2)
+        print("wrote sheet", kbsheet)
 
 
 if __name__ == "__main__":

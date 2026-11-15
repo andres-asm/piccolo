@@ -31,3 +31,22 @@ A pad simply has no file for a button it lacks.
 
 Pads: nes snes n64 gc gb gba wii (classic controller) wiiu switch
 ps1 ps2 ps3 ps4 ps5 xbox xbox360 xboxone xboxseries.
+
+## Keyboard
+
+Keycaps in the same style, under `keyboard/`:
+
+- `keyboard/common/` -- language-neutral keys: `a`..`z`, `0`..`9`,
+  `f1`..`f12`, `up` `down` `left` `right`, and the icon keys `return`
+  `backspace` `tab` `shift` `space`.
+- `keyboard/<lang>/` -- keys whose printed label depends on the language
+  (same codes as piccolo's language setting): `escape` `ctrl` `alt` `altgr`
+  `delete` `insert` `home` `end` `pageup` `pagedown` `capslock`
+  `printscreen`, plus extra keys the layout has (es: `ntilde`, `ccedilla`).
+
+Lookup: `keyboard/<lang>/<key>.png`, then `keyboard/en/<key>.png`, then
+`keyboard/common/<key>.png`. A language folder may also override a common
+key.
+
+Languages: en, es. de/fr/it/pt are placeholders in `KEYBOARD_LOCALES` in the
+script: fill in their labels and re-run to add them.
