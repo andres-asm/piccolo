@@ -124,6 +124,18 @@ core_options_delete_all = DELETE ALL FOR THIS CORE
 core_options_delete_all_help = Back to the core's own defaults for every game. Use it when an option keeps the core from starting.
 core_options_gone = NO LONGER DECLARED
 
+# SAFE START window
+safe_start_title = SAFE START
+safe_start_crashed = DIDN'T CLOSE PROPERLY LAST TIME (A CRASH OR A HANG).
+safe_start_after_options = ITS OPTIONS HAD BEEN CHANGED IN THAT SESSION.
+safe_start_question = IT HAS STORED OPTIONS. START WITH:
+safe_start_stored = STORED OPTIONS
+safe_start_defaults = CORE DEFAULTS, THIS TIME
+safe_start_defaults_help = The core's own option values for this start only. Nothing is deleted: fix the culprit in CORE OPTIONS.
+safe_start_delete = DELETE STORED OPTIONS
+safe_start_delete_help = Deletes every option stored for this core (core, folders and games), then starts with its defaults.
+safe_start_cancel = CANCEL
+
 # IMAGE SETTINGS window
 image_title = IMAGE SETTINGS
 image_editing = EDITING

@@ -865,3 +865,43 @@ msgstr "Volver a los valores del propio core en todos los juegos. Úsalo cuando 
 msgctxt "core_options_gone"
 msgid "NO LONGER DECLARED"
 msgstr "YA NO EXISTE"
+
+msgctxt "safe_start_title"
+msgid "SAFE START"
+msgstr "ARRANQUE SEGURO"
+
+msgctxt "safe_start_crashed"
+msgid "DIDN'T CLOSE PROPERLY LAST TIME (A CRASH OR A HANG)."
+msgstr "NO SE CERRÓ BIEN LA ÚLTIMA VEZ (UN CRASH O UN CUELGUE)."
+
+msgctxt "safe_start_after_options"
+msgid "ITS OPTIONS HAD BEEN CHANGED IN THAT SESSION."
+msgstr "SUS OPCIONES SE HABÍAN CAMBIADO EN ESA SESIÓN."
+
+msgctxt "safe_start_question"
+msgid "IT HAS STORED OPTIONS. START WITH:"
+msgstr "TIENE OPCIONES GUARDADAS. ARRANCAR CON:"
+
+msgctxt "safe_start_stored"
+msgid "STORED OPTIONS"
+msgstr "OPCIONES GUARDADAS"
+
+msgctxt "safe_start_defaults"
+msgid "CORE DEFAULTS, THIS TIME"
+msgstr "VALORES DEL CORE, SOLO ESTA VEZ"
+
+msgctxt "safe_start_defaults_help"
+msgid "The core's own option values for this start only. Nothing is deleted: fix the culprit in CORE OPTIONS."
+msgstr "Los valores propios del core, solo para este arranque. No se borra nada: corrige la culpable en OPCIONES DEL CORE."
+
+msgctxt "safe_start_delete"
+msgid "DELETE STORED OPTIONS"
+msgstr "BORRAR OPCIONES GUARDADAS"
+
+msgctxt "safe_start_delete_help"
+msgid "Deletes every option stored for this core (core, folders and games), then starts with its defaults."
+msgstr "Borra todas las opciones guardadas de este core (core, carpetas y juegos) y arranca con sus valores."
+
+msgctxt "safe_start_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"

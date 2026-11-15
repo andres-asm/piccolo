@@ -29,6 +29,7 @@
 #include "piccolo_text.h"
 #include "piccolo_window.h"
 #include "recent_games.h"
+#include "safe_start_window.h"
 #include "settings_window.h"
 #include "host_fs.h"
 #include "settings_file.h"
@@ -124,6 +125,19 @@ struct App
     CoreOptionsCache option_cache;
     std::string      option_store_path;
     std::string      option_cache_path;
+
+    // Safe start (safe_start_window.h): settings/running.cfg says a game
+    // session is in progress; found at launch, that session didn't end.
+    std::string      running_marker_path;
+    bool             marker_written = false;          // this run wrote it (a session is on)
+    bool             marker_options_changed = false;  // and recorded an option change in it
+    std::string      marker_core_path;
+    std::string      marker_content_path;
+    std::string      crashed_core;                    // short name of the core whose session didn't end
+    bool             crashed_after_options = false;
+    bool             safe_start_open = false;
+    bool             safe_start_confirmed = false;    // the next start skips the check (answered)
+    FilePickerChoice safe_start_pending = {};
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
 
@@ -403,16 +417,100 @@ static void save_core_options(App* app)
     }
 }
 
+// settings/running.cfg: a game session is on (written before the core
+// loads, so a crash while loading is noticed too).
+static void write_running_marker(App* app)
+{
+    if (app->running_marker_path.empty())
+    {
+        return;
+    }
+    SettingsFile file = {};
+    settings_file_set(&file, "", "core", app->marker_core_path.c_str());
+    settings_file_set(&file, "", "content", app->marker_content_path.c_str());
+    settings_file_set(&file, "", "options_changed", app->marker_options_changed ? "true" : "false");
+    app->marker_written = settings_file_save(&file, app->running_marker_path.c_str(),
+                                             "piccolo: a game is running (removed when it ends properly)");
+}
+
+// The session ended properly.
+static void remove_running_marker(App* app)
+{
+    if (app->marker_written)
+    {
+        SDL_RemovePath(app->running_marker_path.c_str());
+        app->marker_written = false;
+    }
+    app->marker_options_changed = false;
+}
+
+// At launch: a marker left behind means the last session didn't end.
+static void check_running_marker(App* app)
+{
+    SettingsFile file = {};
+    if (app->running_marker_path.empty() || !host_fs_exists(app->running_marker_path.c_str()) ||
+        !settings_file_load(&file, app->running_marker_path.c_str()))
+    {
+        return;
+    }
+    const char* core_path = settings_file_get(&file, "", "core");
+    const char* changed = settings_file_get(&file, "", "options_changed");
+    char core[256] = {};
+    if (core_path != nullptr && libretro_core_short_name(core_path, core, sizeof(core)))
+    {
+        app->crashed_core = core;
+        app->crashed_after_options = changed != nullptr && std::strcmp(changed, "true") == 0;
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "The last session with %s didn't end properly%s", core,
+                    app->crashed_after_options ? " (its options had been changed)" : "");
+    }
+}
+
+// Ask before starting the core whose last session didn't end, when it has
+// stored options (with none there's nothing to choose).
+static bool needs_safe_start(App* app, const FilePickerChoice* choice)
+{
+    char core[256] = {};
+    if (app->crashed_core.empty() || !libretro_core_short_name(choice->core_path, core, sizeof(core)) ||
+        app->crashed_core != core)
+    {
+        return false;
+    }
+    std::vector<std::string> sections;
+    core_options_store_sections_of(&app->option_store, core, &sections);
+    if (sections.empty())
+    {
+        app->crashed_core.clear();
+        return false;
+    }
+    return true;
+}
+
 static void start_game(App* app, const FilePickerChoice* choice)
 {
+    if (!app->safe_start_confirmed && needs_safe_start(app, choice))
+    {
+        app->safe_start_pending = *choice;
+        app->safe_start_open = true;   // started (or not) when it's answered
+        return;
+    }
+    app->safe_start_confirmed = false;
+    remove_running_marker(app);   // the previous game, if any, ended properly
     save_core_options(app);   // what was changed for the previous game
     save_learned_latency(app);   // what the previous game learned
     app->game_starts++;
     auto_frame_delay_reset(&app->auto_delay);   // each game finds its own
+    app->marker_core_path = choice->core_path;
+    app->marker_content_path = choice->content_path;
+    write_running_marker(app);
     bool started = core_session_start(&app->session, &app->shell, choice->core_path, choice->content_path);
     update_settings_context(app);
+    if (!started)
+    {
+        remove_running_marker(app);   // failed cleanly: not a crash
+    }
     if (started)
     {
+        app->crashed_core.clear();   // answered (or not this core's turn): it runs again
         app->menu_visible = false;   // straight into the game
         std::snprintf(app->last_core, sizeof(app->last_core), "%s", choice->core_path);
         if (choice->content_path[0] != '\0')
@@ -1021,6 +1119,8 @@ int main(int argc, char** argv)
         recent_games_load(&app->recent, app->recent_path.c_str());
         app->audio_learned_path = app->paths.settings + "/audio_latency.cfg";
         settings_file_load(&app->audio_learned, app->audio_learned_path.c_str());
+        app->running_marker_path = app->paths.settings + "/running.cfg";
+        check_running_marker(app);
         app->option_store_path = app->paths.settings + "/core_options.cfg";
         app->option_cache_path = app->paths.settings + "/core_options_cache.cfg";
         core_options_store_load(&app->option_store, app->option_store_path.c_str());
@@ -1074,11 +1174,17 @@ int main(int argc, char** argv)
         {
             save_core_options(app);   // a core declared new options: on disk before it can crash
         }
+        if (app->marker_written && !app->marker_options_changed && app->option_store.dirty)
+        {
+            app->marker_options_changed = true;   // recorded in case this change brings the core down
+            write_running_marker(app);
+        }
         if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
         {
             set_status(app, app->session.message);
             app->menu_visible = true;
             update_settings_context(app);
+            remove_running_marker(app);   // the core shut down on its own: a proper end
         }
 
         if (app_shell_begin_frame(&app->shell))
@@ -1116,6 +1222,38 @@ int main(int argc, char** argv)
                 app->has_pending_start = true;   // see pending_start
             }
             draw_settings(app);
+            if (app->safe_start_open)
+            {
+                SafeStartChoice answer = safe_start_window_draw(app->pixel_font, app->ui_scale, &app->strings,
+                                                                app->crashed_core.c_str(), app->crashed_after_options);
+                if (answer == SafeStartChoice::delete_stored)
+                {
+                    std::vector<std::string> sections;
+                    core_options_store_sections_of(&app->option_store, app->crashed_core.c_str(), &sections);
+                    for (size_t i = 0; i < sections.size(); i++)
+                    {
+                        core_options_store_remove_section(&app->option_store, sections[i].c_str());
+                    }
+                    save_core_options(app);
+                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Safe start: deleted the stored options of %s",
+                                app->crashed_core.c_str());
+                }
+                if (answer == SafeStartChoice::defaults)
+                {
+                    app->session.skip_stored_options_once = true;
+                }
+                if (answer == SafeStartChoice::stored || answer == SafeStartChoice::defaults ||
+                    answer == SafeStartChoice::delete_stored)
+                {
+                    app->pending_start = app->safe_start_pending;   // started at the top of the next loop
+                    app->has_pending_start = true;
+                    app->safe_start_confirmed = true;
+                }
+                if (answer != SafeStartChoice::none)
+                {
+                    app->safe_start_open = false;
+                }
+            }
             if (app->show_debug_window)
             {
                 app_draw_debug_ui(app);
@@ -1142,6 +1280,7 @@ int main(int argc, char** argv)
     save_learned_latency(app);
     save_core_options(app);
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
+    remove_running_marker(app);   // quit properly (a marker found at launch stays if no game ran)
     game_mode_set(&app->game_mode, false);
     if (app->audio_ready)
     {
