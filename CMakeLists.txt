@@ -51,12 +51,16 @@ add_custom_command(TARGET piccolo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "$<TARGET_FILE_DIR:piccolo>/lang"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/glyphs"
             "$<TARGET_FILE_DIR:piccolo>/assets/glyphs"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/png"
+            "$<TARGET_FILE_DIR:piccolo>/assets/branding/png"
     VERBATIM)
 if(MULTITAP_PICCOLO_DIR)
     add_custom_target(copy_piccolo_lang ALL
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/lang" "${MULTITAP_PICCOLO_DIR}/lang"
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/glyphs"
                 "${MULTITAP_PICCOLO_DIR}/assets/glyphs"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets/branding/png"
+                "${MULTITAP_PICCOLO_DIR}/assets/branding/png"
         DEPENDS piccolo
         COMMENT "Copying piccolo's translations and glyphs to ${MULTITAP_PICCOLO_DIR}"
         VERBATIM)

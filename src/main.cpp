@@ -1174,6 +1174,34 @@ static void draw_home(App* app, const RetroUiPalette* palette)
     }
 }
 
+// The window icon from assets/branding/png next to the program: the 256
+// one, with the smaller drawings as alternates (SDL picks per size). On
+// main the icon comes through app_shell's config instead (app_icon.h); this
+// branch keeps it in piccolo until it's merged.
+static void set_window_icon(SDL_Window* window)
+{
+    const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
+    std::string folder = std::string(base != nullptr ? base : "") + "assets/branding/png/piccolo-icon-";
+    SDL_Surface* icon = SDL_LoadPNG((folder + "256.png").c_str());
+    if (icon == nullptr)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No window icon: %s", SDL_GetError());
+        return;
+    }
+    const char* const smaller[] = {"128", "64", "48", "32", "24", "16"};
+    for (int i = 0; i < 6; i++)
+    {
+        SDL_Surface* alternate = SDL_LoadPNG((folder + smaller[i] + ".png").c_str());
+        if (alternate != nullptr)
+        {
+            SDL_AddSurfaceAlternateImage(icon, alternate);
+            SDL_DestroySurface(alternate);   // the icon holds its own reference
+        }
+    }
+    SDL_SetWindowIcon(window, icon);
+    SDL_DestroySurface(icon);
+}
+
 static void app_draw_debug_ui(App* app)
 {
     const ImGuiIO& io = ImGui::GetIO();
@@ -1245,6 +1273,7 @@ int main(int argc, char** argv)
         return 1;
     }
     debug_ui_set_draw_data_hook(add_text_shadows, app);
+    set_window_icon(app->shell.window);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
     {
@@ -1510,6 +1539,7 @@ int main(int argc, char** argv)
             core_session_upload_video(&app->session, &app->shell);
             quick_menu_upload(&app->quick_menu, &app->shell);
             input_glyphs_upload(&app->glyphs, &app->shell);
+            big_picture_home_upload(&app->home, &app->shell);
             glyph_viewer_upload(&app->glyph_viewer, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
@@ -1539,6 +1569,7 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     input_glyphs_destroy(&app->glyphs, &app->shell);
+    big_picture_home_destroy(&app->home, &app->shell);
     glyph_viewer_destroy(&app->glyph_viewer, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
     app_shell_destroy(&app->shell);

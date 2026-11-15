@@ -2,9 +2,15 @@
 
 #include <cfloat>
 #include <cstdio>
+#include <cstring>
+#include <string>
+
+#include <SDL3/SDL.h>
 
 #include "imgui.h"
 
+#include "app_shell.h"
+#include "debug_ui.h"
 #include "input_glyphs.h"
 #include "piccolo_text.h"
 #include "pixel_font.h"
@@ -232,6 +238,97 @@ static float draw_logo(ImDrawList* draw_list, float center_x, float y, float blo
     return PIXEL_FONT_GLYPH_HEIGHT * pixel + shadow;
 }
 
+// The branding logo (icon + wordmark, smooth art from assets/branding):
+// loaded once from next to the program. Without it, the pixel logo above.
+static void load_logo(BigPictureHome* home)
+{
+    home->logo_tried = true;
+    const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
+    std::string path = std::string(base != nullptr ? base : "") + "assets/branding/png/piccolo-logo-dark.png";
+    SDL_Surface* png = SDL_LoadPNG(path.c_str());
+    SDL_Surface* converted = png != nullptr ? SDL_ConvertSurface(png, SDL_PIXELFORMAT_ARGB8888) : nullptr;
+    if (converted != nullptr && converted->w > 0 && converted->h > 0 && converted->w <= 4096 && converted->h <= 4096)
+    {
+        home->logo_width = static_cast<uint32_t>(converted->w);
+        home->logo_height = static_cast<uint32_t>(converted->h);
+        home->logo_pixels.resize(static_cast<size_t>(home->logo_width) * home->logo_height);
+        for (uint32_t y = 0; y < home->logo_height; y++)
+        {
+            const uint8_t* row = static_cast<const uint8_t*>(converted->pixels) + static_cast<size_t>(y) * static_cast<size_t>(converted->pitch);
+            std::memcpy(&home->logo_pixels[static_cast<size_t>(y) * home->logo_width], row,
+                        static_cast<size_t>(home->logo_width) * 4);
+        }
+        home->logo_upload_pending = true;
+    }
+    else
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "HOME: no logo at %s (%s); using the pixel one", path.c_str(), SDL_GetError());
+    }
+    SDL_DestroySurface(converted);
+    SDL_DestroySurface(png);
+}
+
+void big_picture_home_upload(BigPictureHome* home, AppShell* shell)
+{
+    if (!home->logo_upload_pending)
+    {
+        return;
+    }
+    if (home->logo_texture.image == VK_NULL_HANDLE)
+    {
+        if (!streaming_texture_create(&home->logo_texture, &shell->vulkan, home->logo_width, home->logo_height))
+        {
+            home->logo_upload_pending = false;
+            return;
+        }
+        home->logo_texture_id = debug_ui_add_texture(home->logo_texture.view);
+    }
+    if (!app_shell_acquire(shell))
+    {
+        return;   // try on the next frame
+    }
+    if (streaming_texture_upload(&home->logo_texture, renderer_command_buffer(&shell->renderer),
+                                 renderer_frame_index(&shell->renderer), home->logo_pixels.data(), home->logo_width,
+                                 home->logo_height))
+    {
+        home->logo_ready = true;
+        home->logo_pixels.clear();
+        home->logo_pixels.shrink_to_fit();   // on the GPU now
+    }
+    home->logo_upload_pending = false;
+}
+
+void big_picture_home_destroy(BigPictureHome* home, AppShell* shell)
+{
+    if (home->logo_texture.image != VK_NULL_HANDLE)
+    {
+        vkDeviceWaitIdle(shell->vulkan.device);
+        if (home->logo_texture_id != 0)
+        {
+            debug_ui_remove_texture(home->logo_texture_id);
+        }
+        streaming_texture_destroy(&home->logo_texture, &shell->vulkan);
+    }
+    home->logo_texture_id = 0;
+    home->logo_ready = false;
+}
+
+// The branding logo, LOGO_HEIGHT retro pixels tall, top centered at `y`;
+// smooth art, so drawn with linear filtering. Returns its height.
+constexpr float LOGO_HEIGHT = 40.0f;
+
+static float draw_branding_logo(const BigPictureHome* home, ImDrawList* draw_list, float center_x, float y, float block)
+{
+    float height = LOGO_HEIGHT * block;
+    float width = height * static_cast<float>(home->logo_width) / static_cast<float>(home->logo_height);
+    float left = static_cast<float>(static_cast<int32_t>(center_x - width / 2.0f));
+    draw_list->AddCallback(ImGui::GetPlatformIO().DrawCallback_SetSamplerLinear, nullptr);
+    draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(home->logo_texture_id)), ImVec2(left, y),
+                        ImVec2(left + width, y + height));
+    draw_list->AddCallback(ImGui::GetPlatformIO().DrawCallback_SetSamplerNearest, nullptr);
+    return height;
+}
+
 // ---------------------------------------------------------------------------
 // Hints bar
 // ---------------------------------------------------------------------------
@@ -342,7 +439,12 @@ BigPictureAction big_picture_home_draw(BigPictureHome* home, const BigPictureCon
     // Logo and subtitle, then the menu, then what's loaded: one column,
     // centered, a bit above the middle (the hints bar takes the bottom).
     float row_h = 13.0f * block;
-    float logo_h = PIXEL_FONT_GLYPH_HEIGHT * LOGO_BLOCK * block + 2.0f * block;
+    if (!home->logo_tried)
+    {
+        load_logo(home);
+    }
+    bool branding = home->logo_ready && home->logo_texture_id != 0;
+    float logo_h = branding ? LOGO_HEIGHT * block : PIXEL_FONT_GLYPH_HEIGHT * LOGO_BLOCK * block + 2.0f * block;
     float column_h = logo_h + 8.0f * block + 8.0f * block + 12.0f * block + row_h * HOME_ITEM_COUNT + 8.0f * block +
                      14.0f * block + 20.0f * block;
     float center_x = width / 2.0f;
@@ -351,7 +453,8 @@ BigPictureAction big_picture_home_draw(BigPictureHome* home, const BigPictureCon
     {
         y = 8.0f * block;
     }
-    y += draw_logo(draw_list, center_x, y, block) + 8.0f * block;
+    y += (branding ? draw_branding_logo(home, draw_list, center_x, y, block) : draw_logo(draw_list, center_x, y, block)) +
+         8.0f * block;
 
     const char* subtitle = piccolo_text(context->strings, Str::bp_subtitle);
     float subtitle_w = text_width(subtitle, block);
