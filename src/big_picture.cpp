@@ -275,7 +275,7 @@ static void draw_hints_bar(ImDrawList* draw_list, float width, float height, flo
         float label_w = text_width(label, block);
         right -= label_w;
         text(draw_list, right, text_y, label, palette->text, block);
-        float glyph_w = input_glyphs_width(context->glyphs, hints[i].action, glyph, glyph_gap);
+        float glyph_w = input_glyphs_width(context->glyphs, hints[i].action, glyph_gap);
         if (glyph_w > 0.0f)
         {
             right -= 3.0f * block + glyph_w;

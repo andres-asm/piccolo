@@ -106,45 +106,11 @@ void input_glyphs_set_language(InputGlyphs* glyphs, const char* language)
     glyphs->language = language;
 }
 
-// assets/glyphs/<size>/ next to the program.
-static std::string glyphs_folder(uint32_t size)
+// assets/glyphs/12/ next to the program.
+static std::string glyphs_folder()
 {
     const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
-    char folder[32] = {};
-    std::snprintf(folder, sizeof(folder), "assets/glyphs/%u/", size);
-    return std::string(base != nullptr ? base : "") + folder;
-}
-
-// The sets drawn natively (tools/make_glyphs.py), largest first.
-static const uint32_t NATIVE_SIZES[] = {32, 24, 16, 12};
-
-// The set and the whole multiple to draw it at for UI scale `scale`: as
-// close to a text line (8 retro pixels, at least 12) as possible without
-// going over; on a tie the larger set (48 = 24 x2, not 16 x3).
-// 480p 12, 720p 16, 1080p 24, 1440p 32, 4K 48.
-static void pick_size(int32_t scale, uint32_t* native, uint32_t* multiple)
-{
-    int32_t target = 8 * scale;
-    if (target < 12)
-    {
-        target = 12;
-    }
-    *native = 12;
-    *multiple = 1;
-    uint32_t best = 0;
-    for (uint32_t i = 0; i < sizeof(NATIVE_SIZES) / sizeof(NATIVE_SIZES[0]); i++)
-    {
-        for (uint32_t m = 1; m <= 8; m++)
-        {
-            uint32_t size = NATIVE_SIZES[i] * m;
-            if (size <= static_cast<uint32_t>(target) && size > best)
-            {
-                best = size;
-                *native = NATIVE_SIZES[i];
-                *multiple = m;
-            }
-        }
-    }
+    return std::string(base != nullptr ? base : "") + "assets/glyphs/12/";
 }
 
 // The keyboard picture for `key`: the language's own label first, then
@@ -166,55 +132,63 @@ static std::string keyboard_file(const InputGlyphs* glyphs, const std::string& f
     return std::string();
 }
 
-// Copies one PNG of the loaded size into the top-left of cell `slot`.
-// False (and logged) if it can't be read or has the wrong size.
-static bool load_into_slot(InputGlyphs* glyphs, const std::string& path, int32_t slot)
+// Packs one PNG into the texture at x = *next_x as picture `slot`. False
+// (and logged) if it can't be read or doesn't fit.
+static bool load_into_slot(InputGlyphs* glyphs, const std::string& path, int32_t slot, uint32_t* next_x)
 {
-    uint32_t size = glyphs->native_size;
     SDL_Surface* png = SDL_LoadPNG(path.c_str());
     SDL_Surface* converted = png != nullptr ? SDL_ConvertSurface(png, SDL_PIXELFORMAT_ARGB8888) : nullptr;
-    bool ok = converted != nullptr && converted->w == static_cast<int>(size) && converted->h == static_cast<int>(size);
+    bool ok = converted != nullptr && converted->w > 0 && converted->h > 0 &&
+              static_cast<uint32_t>(converted->h) <= INPUT_GLYPH_TEXTURE_HEIGHT &&
+              *next_x + static_cast<uint32_t>(converted->w) <= INPUT_GLYPH_TEXTURE_WIDTH;
     if (ok)
     {
-        uint32_t stride = INPUT_GLYPH_SLOTS * INPUT_GLYPH_CELL;
-        for (uint32_t y = 0; y < size; y++)
+        InputGlyphPicture* picture = &glyphs->pictures[slot];
+        picture->x = *next_x;
+        picture->width = static_cast<uint32_t>(converted->w);
+        picture->height = static_cast<uint32_t>(converted->h);
+        for (uint32_t y = 0; y < picture->height; y++)
         {
             const uint8_t* row = static_cast<const uint8_t*>(converted->pixels) + static_cast<size_t>(y) * static_cast<size_t>(converted->pitch);
-            uint32_t* target = &glyphs->pixels[static_cast<size_t>(y) * stride + static_cast<size_t>(slot) * INPUT_GLYPH_CELL];
-            std::memcpy(target, row, static_cast<size_t>(size) * 4);
+            uint32_t* target = &glyphs->pixels[static_cast<size_t>(y) * INPUT_GLYPH_TEXTURE_WIDTH + picture->x];
+            std::memcpy(target, row, static_cast<size_t>(picture->width) * 4);
         }
+        *next_x += picture->width + 1;   // a clear column between pictures (no bleeding)
     }
     else
     {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Glyphs: could not read %s (%ux%u PNG): %s", path.c_str(), size, size,
-                    SDL_GetError());
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Glyphs: could not use %s (a PNG at most %ux%u in all): %s", path.c_str(),
+                    INPUT_GLYPH_TEXTURE_WIDTH, INPUT_GLYPH_TEXTURE_HEIGHT, SDL_GetError());
     }
     SDL_DestroySurface(converted);
     SDL_DestroySurface(png);
     return ok;
 }
 
+// The whole multiple of a picture's height that's closest to a text line
+// without going over (at least 1).
+static int32_t picture_multiple(const InputGlyphs* glyphs, const InputGlyphPicture* picture)
+{
+    int32_t multiple = picture->height > 0 ? glyphs->line_height / static_cast<int32_t>(picture->height) : 1;
+    return multiple < 1 ? 1 : multiple;
+}
+
 void input_glyphs_update(InputGlyphs* glyphs, int32_t scale)
 {
-    uint32_t native = 0;
-    uint32_t multiple = 0;
-    pick_size(scale, &native, &multiple);
-    glyphs->draw_size = static_cast<float>(native * multiple);
+    glyphs->line_height = 8 * (scale < 1 ? 1 : scale);
     bool keyboard = glyphs->device == InputDeviceKind::keyboard;
-    char size_text[16] = {};
-    std::snprintf(size_text, sizeof(size_text), "%u/", native);
-    std::string key = size_text + (keyboard ? "keyboard/" + glyphs->language : glyphs->pad_folder);
+    std::string key = keyboard ? "keyboard/" + glyphs->language : glyphs->pad_folder;
     if (glyphs->loaded && key == glyphs->loaded_key)
     {
         return;
     }
     glyphs->loaded = true;
     glyphs->loaded_key = key;
-    glyphs->native_size = native;
-    glyphs->pixels.assign(static_cast<size_t>(INPUT_GLYPH_SLOTS) * INPUT_GLYPH_CELL * INPUT_GLYPH_CELL, 0u);
+    glyphs->pixels.assign(static_cast<size_t>(INPUT_GLYPH_TEXTURE_WIDTH) * INPUT_GLYPH_TEXTURE_HEIGHT, 0u);
 
-    std::string folder = glyphs_folder(native);
+    std::string folder = glyphs_folder();
     int32_t next_slot = 0;
+    uint32_t next_x = 0;
     for (int action = 0; action < static_cast<int>(GlyphAction::count); action++)
     {
         glyphs->first_slot[action] = next_slot;
@@ -224,7 +198,7 @@ void input_glyphs_update(InputGlyphs* glyphs, int32_t scale)
                                 keyboard ? files->keyboard_second : nullptr};
         for (int i = 0; i < 2; i++)
         {
-            if (names[i] == nullptr || next_slot >= static_cast<int32_t>(INPUT_GLYPH_SLOTS))
+            if (names[i] == nullptr || next_slot >= INPUT_GLYPH_PICTURES)
             {
                 continue;
             }
@@ -235,7 +209,7 @@ void input_glyphs_update(InputGlyphs* glyphs, int32_t scale)
             {
                 continue;
             }
-            if (load_into_slot(glyphs, path, next_slot))
+            if (load_into_slot(glyphs, path, next_slot, &next_x))
             {
                 glyphs->slot_count[action]++;
                 next_slot++;
@@ -253,7 +227,7 @@ void input_glyphs_upload(InputGlyphs* glyphs, AppShell* shell)
     }
     if (glyphs->texture.image == VK_NULL_HANDLE)
     {
-        if (!streaming_texture_create(&glyphs->texture, &shell->vulkan, INPUT_GLYPH_SLOTS * INPUT_GLYPH_CELL, INPUT_GLYPH_CELL))
+        if (!streaming_texture_create(&glyphs->texture, &shell->vulkan, INPUT_GLYPH_TEXTURE_WIDTH, INPUT_GLYPH_TEXTURE_HEIGHT))
         {
             glyphs->upload_pending = false;
             return;
@@ -266,7 +240,7 @@ void input_glyphs_upload(InputGlyphs* glyphs, AppShell* shell)
     }
     if (streaming_texture_upload(&glyphs->texture, renderer_command_buffer(&shell->renderer),
                                  renderer_frame_index(&shell->renderer), glyphs->pixels.data(),
-                                 INPUT_GLYPH_SLOTS * INPUT_GLYPH_CELL, INPUT_GLYPH_CELL))
+                                 INPUT_GLYPH_TEXTURE_WIDTH, INPUT_GLYPH_TEXTURE_HEIGHT))
     {
         glyphs->has_picture = true;
     }
@@ -290,39 +264,60 @@ void input_glyphs_destroy(InputGlyphs* glyphs, AppShell* shell)
 
 float input_glyphs_size(const InputGlyphs* glyphs)
 {
-    return glyphs->draw_size;
+    float tallest = 0.0f;
+    for (int action = 0; action < static_cast<int>(GlyphAction::count); action++)
+    {
+        for (int32_t i = 0; i < glyphs->slot_count[action]; i++)
+        {
+            const InputGlyphPicture* picture = &glyphs->pictures[glyphs->first_slot[action] + i];
+            float height = static_cast<float>(static_cast<int32_t>(picture->height) * picture_multiple(glyphs, picture));
+            tallest = height > tallest ? height : tallest;
+        }
+    }
+    return tallest;
 }
 
-float input_glyphs_width(const InputGlyphs* glyphs, GlyphAction action, float size, float gap)
+float input_glyphs_width(const InputGlyphs* glyphs, GlyphAction action, float gap)
 {
     int32_t count = glyphs->slot_count[static_cast<int>(action)];
-    if (count <= 0)
+    float width = 0.0f;
+    for (int32_t i = 0; i < count; i++)
     {
-        return 0.0f;
+        const InputGlyphPicture* picture = &glyphs->pictures[glyphs->first_slot[static_cast<int>(action)] + i];
+        width += static_cast<float>(static_cast<int32_t>(picture->width) * picture_multiple(glyphs, picture));
+        if (i > 0)
+        {
+            width += gap;
+        }
     }
-    return static_cast<float>(count) * size + static_cast<float>(count - 1) * gap;
+    return width;
 }
 
 float input_glyphs_draw(const InputGlyphs* glyphs, ImDrawList* draw_list, GlyphAction action, float x, float y,
-                        float size, float gap, uint32_t color)
+                        float height, float gap, uint32_t color)
 {
     int32_t count = glyphs->slot_count[static_cast<int>(action)];
     if (count <= 0 || !glyphs->has_picture || glyphs->texture_id == 0)
     {
-        return input_glyphs_width(glyphs, action, size, gap);
+        return input_glyphs_width(glyphs, action, gap);
     }
     ImU32 tint = IM_COL32((color >> 16) & 0xFFu, (color >> 8) & 0xFFu, color & 0xFFu, 0xFFu);
-    // The glyph is the top-left native_size pixels of its 32-pixel cell.
-    float texture_width = static_cast<float>(INPUT_GLYPH_SLOTS * INPUT_GLYPH_CELL);
-    float u_size = static_cast<float>(glyphs->native_size) / texture_width;
-    float v_size = static_cast<float>(glyphs->native_size) / static_cast<float>(INPUT_GLYPH_CELL);
+    float texture_width = static_cast<float>(INPUT_GLYPH_TEXTURE_WIDTH);
+    float texture_height = static_cast<float>(INPUT_GLYPH_TEXTURE_HEIGHT);
     float left = x;
     for (int32_t i = 0; i < count; i++)
     {
-        float u = static_cast<float>((glyphs->first_slot[static_cast<int>(action)] + i) * static_cast<int32_t>(INPUT_GLYPH_CELL)) / texture_width;
-        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(glyphs->texture_id)), ImVec2(left, y),
-                            ImVec2(left + size, y + size), ImVec2(u, 0.0f), ImVec2(u + u_size, v_size), tint);
-        left += size + gap;
+        const InputGlyphPicture* picture = &glyphs->pictures[glyphs->first_slot[static_cast<int>(action)] + i];
+        int32_t multiple = picture_multiple(glyphs, picture);
+        float w = static_cast<float>(static_cast<int32_t>(picture->width) * multiple);
+        float h = static_cast<float>(static_cast<int32_t>(picture->height) * multiple);
+        float top = static_cast<float>(static_cast<int32_t>(y + (height - h) / 2.0f));
+        ImVec2 uv_min(static_cast<float>(picture->x) / texture_width, 0.0f);
+        ImVec2 uv_max(static_cast<float>(picture->x + picture->width) / texture_width,
+                      static_cast<float>(picture->height) / texture_height);
+        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(glyphs->texture_id)), ImVec2(left, top),
+                            ImVec2(left + w, top + h), uv_min, uv_max, tint);
+        left += w + gap;
     }
-    return input_glyphs_width(glyphs, action, size, gap);
+    return input_glyphs_width(glyphs, action, gap);
 }

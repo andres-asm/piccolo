@@ -32,7 +32,7 @@ import struct
 import sys
 import zlib
 
-SIZES = [12, 16, 24, 32]
+SIZES = [16, 24, 32]   # drawn from the 32 designs; 12 is drawn by hand (below)
 
 DESIGN = 32      # the grid every shape below is designed on
 SIZE = DESIGN    # the size being drawn now (main() sets it per set)
@@ -1033,10 +1033,476 @@ def build_keyboard():
 
 
 # ---------------------------------------------------------------------------
+# the 12-pixel set: drawn pixel by pixel, not from the 32 designs
+#
+# At 12 pixels the shapes are bitmaps decided by hand and the labels are
+# piccolo's own 5x5 UI font (read from src/pixel_font.cpp), so the glyphs
+# match the text next to them. 12 pixels tall; 12 x N wide (N = 1, 2, 3...)
+# when a label needs it: a shape is 11 pixels (odd, so a 5-pixel letter
+# centres) plus one empty column/row on the right/bottom as spacing.
+
+PIXEL_SIZE = 12
+INNER = 11   # the shape inside the 12 cell
+
+FONT_NAMES = {"PIXEL_FONT_ARROW_UP": 0x25B2, "PIXEL_FONT_ARROW_DOWN": 0x25BC,
+              "PIXEL_FONT_ARROW_LEFT": 0x25C0, "PIXEL_FONT_ARROW_RIGHT": 0x25B6,
+              "PIXEL_FONT_CHECK": 0x2714, "PIXEL_FONT_MENU": 0x2630}
+
+_UI_FONT = None
+
+
+def ui_font():
+    """piccolo's 5x5 font: {character: 5 rows of '#'/'.'}, from pixel_font.cpp."""
+    global _UI_FONT
+    if _UI_FONT is not None:
+        return _UI_FONT
+    import re
+    here = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(here, "..", "src", "pixel_font.cpp")
+    entry = re.compile(r"\{\s*('(?:\\.|[^'\\])'|0x[0-9A-Fa-f]+|[A-Z_]+)\s*,\s*\{\s*((?:\"[.#]{5}\"\s*,?\s*){5})\}")
+    font = {}
+    with open(path, encoding="utf-8") as f:
+        for m in entry.finditer(f.read()):
+            key = m.group(1).strip()
+            rows = re.findall(r'"([.#]{5})"', m.group(2))
+            if key.startswith("'") and key.endswith("'"):
+                cp = ord(key[1:-1].encode().decode("unicode_escape"))
+            elif key.startswith("0x"):
+                cp = int(key, 16)
+            elif key in FONT_NAMES:
+                cp = FONT_NAMES[key]
+            else:
+                continue
+            font[chr(cp)] = rows
+    _UI_FONT = font
+    return font
+
+
+def ui_rows(ch):
+    """5 rows for a character; accented letters fall back to the base letter."""
+    font = ui_font()
+    if ch in font:
+        return font[ch]
+    import unicodedata
+    base = unicodedata.normalize("NFD", ch)[0]
+    return font.get(base, font["?"] if "?" in font else ["#####"] * 5)
+
+
+def ui_text_width(text):
+    return len(text) * 6 - 1 if text else 0
+
+
+def ui_text(c, text, x, y, v=0):
+    """Text in the 5x5 font, top-left at (x, y), cut out (v=0) or drawn."""
+    for i, ch in enumerate(text):
+        for ry, row in enumerate(ui_rows(ch)):
+            for rx, px_on in enumerate(row):
+                if px_on == "#":
+                    c.set(x + i * 6 + rx, y + ry, v)
+
+
+def ui_text_centred(c, text, cx, top, v=0):
+    ui_text(c, text, cx - ui_text_width(text) // 2, top, v)
+
+
+def bitmap(c, rows, x, y, v=1):
+    for ry, row in enumerate(rows):
+        for rx, ch in enumerate(row):
+            if ch == "#":
+                c.set(x + rx, y + ry, v)
+
+
+def cells_for(width, margin):
+    """How many 12-pixel cells a shape `width` + margins wide needs."""
+    need = width + 2 * margin + 1
+    return max(1, (need + PIXEL_SIZE - 1) // PIXEL_SIZE)
+
+
+CIRCLE11 = ["...#####...",
+            ".#########.",
+            ".#########.",
+            "###########",
+            "###########",
+            "###########",
+            "###########",
+            "###########",
+            ".#########.",
+            ".#########.",
+            "...#####..."]
+
+RING11 = ["...#####...",
+          ".##.....##.",
+          ".#.......#.",
+          "#.........#",
+          "#.........#",
+          "#.........#",
+          "#.........#",
+          "#.........#",
+          ".#.......#.",
+          ".##.....##.",
+          "...#####..."]
+
+DASHED11 = ["...#.#.#...",
+            ".#.......#.",
+            "...........",
+            "#.........#",
+            "...........",
+            "#.........#",
+            "...........",
+            "#.........#",
+            "...........",
+            ".#.......#.",
+            "...#.#.#..."]
+
+SYMBOLS = {   # 5x5 cut-outs for buttons that show a picture, not a letter
+    "cross":    ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
+    "circle":   [".###.", "#...#", "#...#", "#...#", ".###."],
+    "square":   ["#####", "#...#", "#...#", "#...#", "#####"],
+    "triangle": ["..#..", ".#.#.", ".#.#.", "#...#", "#####"],
+    "home":     ["..#..", ".###.", "#####", ".#.#.", ".###."],
+    "minus":    [".....", ".....", "#####", ".....", "....."],
+    "plus":     ["..#..", "..#..", "#####", "..#..", "..#.."],
+    "view":     ["###..", "#.###", "###.#", "..#.#", "..###"],
+    "share":    ["..#..", ".###.", "#.#.#", "..#..", "#####"],
+    "dot":      [".....", ".###.", ".###.", ".###.", "....."],
+}
+
+
+def p_canvas(cells=1):
+    return Canvas(PIXEL_SIZE * cells, PIXEL_SIZE)
+
+
+def p_round(label=None, symbol=None, char=None):
+    """A round button with a letter, a symbol or a font character cut out."""
+    c = p_canvas()
+    bitmap(c, CIRCLE11, 0, 0)
+    if symbol:
+        bitmap(c, SYMBOLS[symbol], 3, 3, 0)
+    elif char:
+        bitmap(c, ui_rows(char), 3, 3, 0)
+    elif label:
+        ui_text_centred(c, label, 5, 3)
+    return c
+
+
+def p_ring(fill=False):
+    c = p_canvas()
+    bitmap(c, CIRCLE11 if fill else RING11, 0, 0)
+    return c
+
+
+def p_pill(word, rows=(2, 8)):
+    """A rounded bar as wide as its word needs (whole cells)."""
+    top, bottom = rows
+    cells = cells_for(ui_text_width(word), 2)
+    c = p_canvas(cells)
+    right = PIXEL_SIZE * cells - 2
+    c.pixel_rect(0, top, right, bottom)
+    for (x, y) in ((0, top), (right, top), (0, bottom), (right, bottom)):
+        c.set(x, y, 0)
+    ui_text_centred(c, word, right // 2 + 1, (top + bottom) // 2 - 2)
+    return c
+
+
+def p_bumper(word):
+    """L / R / LB / L1: a block with a rounded top, the label cut out."""
+    cells = cells_for(ui_text_width(word), 2)
+    c = p_canvas(cells)
+    right = PIXEL_SIZE * cells - 2
+    c.pixel_rect(0, 2, right, 10)
+    for x in (0, 1, right - 1, right):
+        c.set(x, 2, 0)
+    c.set(0, 3, 0)
+    c.set(right, 3, 0)
+    ui_text_centred(c, word, right // 2 + 1, 4)
+    return c
+
+
+def p_trigger(word):
+    """ZL / LT / L2: taller, a round top."""
+    cells = cells_for(ui_text_width(word), 2)
+    c = p_canvas(cells)
+    right = PIXEL_SIZE * cells - 2
+    c.pixel_rect(0, 0, right, 10)
+    for x in (0, 1, 2, right - 2, right - 1, right):
+        c.set(x, 0, 0)
+    for x in (0, right):
+        c.set(x, 1, 0)
+        c.set(x, 2, 0)
+    ui_text_centred(c, word, right // 2 + 1, 4)
+    return c
+
+
+def p_stick(letter, press=False):
+    c = p_canvas()
+    bitmap(c, DASHED11 if press else RING11, 0, 0)
+    bitmap(c, [".#####.", "#######", "#######", "#######", "#######", "#######", ".#####."], 2, 2)
+    if letter:
+        ui_text_centred(c, letter, 5, 3)
+    return c
+
+
+ARMS = {"up": (4, 0, 6, 3), "down": (4, 7, 6, 10), "left": (0, 4, 3, 6), "right": (7, 4, 10, 6)}
+
+
+def p_dpad(active=None, sony=False):
+    """A cross; with `active`, those arms solid and the others hollow."""
+    c = p_canvas()
+    for d, (x0, y0, x1, y1) in ARMS.items():
+        c.pixel_rect(x0, y0, x1, y1)
+        if active is not None and d not in active:
+            # hollow: keep the 1-pixel edge
+            c.pixel_rect(x0 + (1 if d != "left" else 1), y0 + (1 if d != "up" else 1),
+                         x1 - (1 if d != "right" else 1), y1 - (1 if d != "down" else 1), 0)
+    if sony:
+        c.pixel_rect(4, 4, 6, 6, 0)   # separate arms around an empty centre
+    else:
+        c.pixel_rect(4, 4, 6, 6)
+    return c
+
+
+def p_dpad_set(sony=False):
+    g = {"dpad": p_dpad(None, sony)}
+    for d in ("up", "down", "left", "right"):
+        g["dpad_" + d] = p_dpad({d}, sony)
+    g["dpad_updown"] = p_dpad({"up", "down"}, sony)
+    g["dpad_leftright"] = p_dpad({"left", "right"}, sony)
+    return g
+
+
+def p_touchpad():
+    c = p_canvas(2)
+    c.pixel_rect(0, 2, 22, 9)
+    c.pixel_rect(2, 4, 20, 7, 0)
+    c.pixel_rect(10, 5, 12, 6)
+    return c
+
+
+def p_capture():
+    c = p_canvas()
+    c.pixel_rect(0, 0, 10, 10)
+    for (x, y) in ((0, 0), (10, 0), (0, 10), (10, 10)):
+        c.set(x, y, 0)
+    bitmap(c, SYMBOLS["circle"], 3, 3, 0)
+    return c
+
+
+def p_faces(kind):
+    if kind == "xbox":
+        return {"south": p_round("A"), "east": p_round("B"), "west": p_round("X"), "north": p_round("Y")}
+    if kind == "sony":
+        return {"south": p_round(symbol="cross"), "east": p_round(symbol="circle"),
+                "west": p_round(symbol="square"), "north": p_round(symbol="triangle")}
+    return {"south": p_round("B"), "east": p_round("A"), "west": p_round("Y"), "north": p_round("X")}
+
+
+def build_pixel_pads():
+    pads = {}
+    nes = {"south": p_round("B"), "east": p_round("A")}
+    nes.update(p_dpad_set())
+    nes["back"] = p_pill("SELECT")
+    nes["start"] = p_pill("START")
+    pads["nes"] = nes
+    pads["gb"] = dict(nes)
+    gba = dict(nes)
+    gba["leftshoulder"] = p_bumper("L")
+    gba["rightshoulder"] = p_bumper("R")
+    pads["gba"] = gba
+
+    snes = p_faces("nintendo")
+    snes.update(p_dpad_set())
+    snes["leftshoulder"] = p_bumper("L")
+    snes["rightshoulder"] = p_bumper("R")
+    snes["back"] = p_pill("SELECT")
+    snes["start"] = p_pill("START")
+    pads["snes"] = snes
+
+    n64 = {"south": p_round("A"), "west": p_round("B")}
+    n64.update(p_dpad_set())
+    n64["leftstick"] = p_stick("")
+    n64["rightstick"] = p_stick("C")
+    for d, ch in (("up", "▲"), ("down", "▼"), ("left", "◀"), ("right", "▶")):
+        n64["c_" + d] = p_round(char=ch)
+    n64["leftshoulder"] = p_bumper("L")
+    n64["rightshoulder"] = p_bumper("R")
+    n64["lefttrigger"] = p_trigger("Z")
+    n64["start"] = p_pill("START")
+    pads["n64"] = n64
+
+    gc = {"south": p_round("A"), "west": p_round("B"), "east": p_round("X"), "north": p_round("Y")}
+    gc.update(p_dpad_set())
+    gc["leftstick"] = p_stick("")
+    gc["rightstick"] = p_stick("C")
+    gc["rightshoulder"] = p_bumper("Z")
+    gc["lefttrigger"] = p_trigger("L")
+    gc["righttrigger"] = p_trigger("R")
+    gc["start"] = p_pill("START")
+    pads["gc"] = gc
+
+    for name, press, capture in (("wii", False, False), ("wiiu", True, False), ("switch", True, True)):
+        g = p_faces("nintendo")
+        g.update(p_dpad_set())
+        g["leftstick"] = p_stick("L")
+        g["rightstick"] = p_stick("R")
+        if press:
+            g["leftstick_press"] = p_stick("L", True)
+            g["rightstick_press"] = p_stick("R", True)
+        g["leftshoulder"] = p_bumper("L")
+        g["rightshoulder"] = p_bumper("R")
+        g["lefttrigger"] = p_trigger("ZL")
+        g["righttrigger"] = p_trigger("ZR")
+        g["back"] = p_round(symbol="minus")
+        g["start"] = p_round(symbol="plus")
+        g["guide"] = p_round(symbol="home")
+        if capture:
+            g["capture"] = p_capture()
+        pads[name] = g
+
+    def sony(back, start, guide, touch):
+        g = p_faces("sony")
+        g.update(p_dpad_set(sony=True))
+        g["leftstick"] = p_stick("L")
+        g["rightstick"] = p_stick("R")
+        g["leftstick_press"] = p_stick("L", True)
+        g["rightstick_press"] = p_stick("R", True)
+        g["leftshoulder"] = p_bumper("L1")
+        g["rightshoulder"] = p_bumper("R1")
+        g["lefttrigger"] = p_trigger("L2")
+        g["righttrigger"] = p_trigger("R2")
+        g["back"] = p_pill(back)
+        g["start"] = p_pill(start)
+        if guide:
+            g["guide"] = p_round(symbol="home")
+        if touch:
+            g["touchpad"] = p_touchpad()
+        return g
+
+    pads["ps1"] = sony("SELECT", "START", False, False)
+    pads["ps2"] = sony("SELECT", "START", False, False)
+    pads["ps3"] = sony("SELECT", "START", True, False)
+    pads["ps4"] = sony("SHARE", "OPTIONS", True, True)
+    pads["ps5"] = sony("CREATE", "OPTIONS", True, True)
+
+    def xbox_common():
+        g = p_faces("xbox")
+        g.update(p_dpad_set())
+        g["leftstick"] = p_stick("L")
+        g["rightstick"] = p_stick("R")
+        g["leftstick_press"] = p_stick("L", True)
+        g["rightstick_press"] = p_stick("R", True)
+        return g
+
+    xbox = xbox_common()
+    xbox["lefttrigger"] = p_trigger("L")
+    xbox["righttrigger"] = p_trigger("R")
+    xbox["white"] = p_ring(False)
+    xbox["black"] = p_ring(True)
+    xbox["leftshoulder"] = xbox["white"]
+    xbox["rightshoulder"] = xbox["black"]
+    xbox["back"] = p_pill("BACK")
+    xbox["start"] = p_pill("START")
+    pads["xbox"] = xbox
+
+    for name in ("xbox360", "xboxone", "xboxseries"):
+        g = xbox_common()
+        g["leftshoulder"] = p_bumper("LB")
+        g["rightshoulder"] = p_bumper("RB")
+        g["lefttrigger"] = p_trigger("LT")
+        g["righttrigger"] = p_trigger("RT")
+        g["guide"] = p_round(symbol="home")
+        if name == "xbox360":
+            g["back"] = p_round(char="◀")
+            g["start"] = p_round(char="▶")
+        else:
+            g["back"] = p_round(symbol="view")
+            g["start"] = p_round(char="☰")
+        if name == "xboxseries":
+            g["share"] = p_round(symbol="share")
+        pads[name] = g
+    return pads
+
+
+def p_keycap(label=None, icon=None, cells=None):
+    """A key: rounded block with a lip at the bottom, the label cut out."""
+    if cells is None:
+        cells = cells_for(ui_text_width(label), 2) if label else 1
+    c = p_canvas(cells)
+    right = PIXEL_SIZE * cells - 2
+    c.pixel_rect(0, 0, right, 10)
+    for (x, y) in ((0, 0), (right, 0), (0, 10), (right, 10)):
+        c.set(x, y, 0)
+    c.pixel_rect(1, 8, right - 1, 8, 0)   # the lip: reads as a key, not a button
+    if icon:
+        bitmap(c, icon, (right + 1 - len(icon[0])) // 2, 2, 0)
+    elif label:
+        ui_text_centred(c, label, right // 2 + 1, 2)
+    return c
+
+
+KEY_ICONS = {
+    "return":    ["....#", "....#", ".#..#", "#####", ".#..."],
+    "backspace": ["..#..", ".##..", "#####", ".##..", "..#.."],
+    "tab":       ["..#.#", "...##", "#####", "...##", "..#.#"],
+    "shift":     ["..#..", ".#.#.", "#...#", ".#.#.", ".###."],
+}
+
+
+def build_pixel_keyboard():
+    common = {}
+    for ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789":
+        common[ch.lower()] = p_keycap(ch)
+    for n in range(1, 13):
+        common["f%d" % n] = p_keycap("F%d" % n)
+    for d, ch in (("up", "▲"), ("down", "▼"), ("left", "◀"), ("right", "▶")):
+        common[d] = p_keycap(icon=ui_rows(ch))
+    for name, icon in KEY_ICONS.items():
+        common[name] = p_keycap(icon=icon)
+    space = p_keycap(cells=2)
+    bitmap(space, ["#.........#", "#.........#", "###########"], 6, 3, 0)
+    common["space"] = space
+    kb = {"common": common}
+    for loc, labels in KEYBOARD_LOCALES.items():
+        if labels:
+            kb[loc] = dict((k, p_keycap(v.replace("\n", ""))) for k, v in labels.items())
+    return kb
+
+
+def write_pixel_set(out, sheet):
+    base = os.path.join(out, str(PIXEL_SIZE))
+    sets = [(PAD_ORDER, build_pixel_pads(), BUTTON_ORDER, "")]
+    kb = build_pixel_keyboard()
+    count = 0
+    pads = sets[0][1]
+    for pad in PAD_ORDER:
+        d = os.path.join(base, pad)
+        os.makedirs(d, exist_ok=True)
+        for name, g in pads[pad].items():
+            assert name in BUTTON_ORDER, name
+            save_canvas(g, os.path.join(d, name + ".png"))
+            count += 1
+    kb_rows = ["common"] + [l for l in KEYBOARD_LOCALES if l in kb]
+    for loc in kb_rows:
+        d = os.path.join(base, "keyboard", loc)
+        os.makedirs(d, exist_ok=True)
+        for name, g in kb[loc].items():
+            assert name in KEYBOARD_ORDER, name
+            save_canvas(g, os.path.join(d, name + ".png"))
+            count += 1
+    print("wrote %d glyphs to %s (drawn by hand)" % (count, os.path.normpath(base)))
+    if sheet:
+        stem = os.path.splitext(sheet)[0] + "_%d" % PIXEL_SIZE
+        write_sheet(pads, stem + ".png", PAD_ORDER, BUTTON_ORDER, 6)
+        write_sheet(kb, stem + "_keyboard.png", kb_rows, KEYBOARD_ORDER, 4)
+        print("wrote sheets", stem + "*.png")
+
+
+# ---------------------------------------------------------------------------
 # contact sheet (preview only)
 
 def write_sheet(pads, path, row_order, col_order, scale=3):
-    cell = SIZE * scale + 8
+    glyph_w = max(g.w for row in pads.values() for g in row.values())
+    glyph_h = max(g.h for row in pads.values() for g in row.values())
+    cell = max(glyph_w, glyph_h) * scale + 8
     label_w = 60
     cols = len(col_order)
     w = label_w + cols * cell
@@ -1066,12 +1532,13 @@ def write_sheet(pads, path, row_order, col_order, scale=3):
         for ci, b in enumerate(col_order):
             x0 = label_w + ci * cell + 4
             g = pads[pad].get(b)
-            for y in range(SIZE * scale):
-                for x in range(SIZE * scale):
+            for y in range(glyph_h * scale):
+                for x in range(glyph_w * scale):
                     chk = ((x // (4 * scale)) + (y // (4 * scale))) % 2
                     bg = (70, 70, 80) if chk else (60, 60, 70)
                     col = bg
-                    if g is not None and g.p[y // scale][x // scale]:
+                    inside = g is not None and x // scale < g.w and y // scale < g.h
+                    if inside and g.p[y // scale][x // scale]:
                         col = (240, 220, 120) if ri % 2 else (130, 210, 240)
                     if g is None:
                         col = (45, 45, 52)
@@ -1188,6 +1655,7 @@ def main():
             sheet = args.pop(0)
         else:
             out = a
+    write_pixel_set(out, sheet)
     for size in SIZES:
         write_set(out, size, sheet)
     with open(os.path.join(out, "README.md"), "w") as f:
