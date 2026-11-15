@@ -40,6 +40,7 @@
 #include "core_session.h"
 #include "debug_ui.h"
 #include "input_bindings.h"
+#include "input_config.h"
 #include "input_sdl.h"
 #include "file_picker.h"
 #include "pixel_font.h"
@@ -55,7 +56,8 @@ struct App
     InputSdl    input_sdl = {};   // the keyboard and gamepads, from SDL
     bool        ui_keys_down[5] = {};   // gamepad interface actions given to ImGui as keys (drive_ui_with_gamepads)
     bool        ui_back_down = false;
-    bool        open_first_menu = false;   // OPEN MENU pressed: the menu bar opens its first menu this frame
+    bool        open_first_menu = false;
+    std::string input_config_path;   // settings/input.cfg   // OPEN MENU pressed: the menu bar opens its first menu this frame
     bool     running = false;
     bool     show_debug_window = false;
     bool     show_imgui_demo = false;
@@ -1364,6 +1366,12 @@ int main(int argc, char** argv)
     // Controllers: settings/gamepad_mappings.txt holds mappings for ones SDL
     // doesn't know (written by piccolo_map_gamepad).
     std::string mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
+    // settings/input.cfg first: controllers are made from its profiles as their devices appear.
+    app->input_config_path = app->paths.settings.empty() ? "" : app->paths.settings + "/input.cfg";
+    if (!app->input_config_path.empty())
+    {
+        input_config_load(&app->input, app->input_config_path.c_str());
+    }
     input_sdl_init(&app->input_sdl, &app->input, mappings_path.empty() ? nullptr : mappings_path.c_str());
     update_language(app);
     set_status(app, piccolo_text(&app->strings, Str::status_start));
@@ -1597,6 +1605,10 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
+    if (!app->input_config_path.empty())
+    {
+        input_config_save(&app->input, app->input_config_path.c_str());
+    }
     input_sdl_shutdown(&app->input_sdl);
     app_shell_destroy(&app->shell);
     delete app;
