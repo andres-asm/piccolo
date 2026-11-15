@@ -246,7 +246,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         float list_height = ImGui::GetContentRegionAvail().y - row * 2.0f;
         float files_width = ImGui::GetContentRegionAvail().x * 0.62f;
 
-        ImGui::BeginChild("files", ImVec2(files_width, list_height), ImGuiChildFlags_Borders);
+        retro_ui_begin_list("files", files_width, list_height);
         for (int32_t i = 0; i < picker->file_count; i++)
         {
             ImGui::PushID(i);
@@ -264,10 +264,10 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         {
             ImGui::TextDisabled("%s", piccolo_text(strings, Str::picker_nothing_here));
         }
-        ImGui::EndChild();
+        retro_ui_end_list();
 
         ImGui::SameLine();
-        ImGui::BeginChild("folders", ImVec2(0.0f, list_height), ImGuiChildFlags_Borders);
+        retro_ui_begin_list("folders", 0.0f, list_height);
         const char* open_folder = nullptr;
         if (ImGui::Selectable(".."))
         {
@@ -283,7 +283,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             }
             ImGui::PopID();
         }
-        ImGui::EndChild();
+        retro_ui_end_list();
         if (open_folder != nullptr)
         {
             char next[LIBRETRO_PATH_MAX] = {};

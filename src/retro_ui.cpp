@@ -598,6 +598,32 @@ bool retro_ui_button_sized(const char* label, float width, float height)
     return pressed;
 }
 
+bool retro_ui_begin_list(const char* id, float width, float height)
+{
+    // ImGui's border off; the padding a bordered child would have kept.
+    return ImGui::BeginChild(id, ImVec2(width, height), ImGuiChildFlags_AlwaysUseWindowPadding);
+}
+
+void retro_ui_end_list()
+{
+    ImGui::EndChild();
+    if (g_palette.button_light == g_palette.button_dark)
+    {
+        return;   // a flat theme: no edge
+    }
+    // Sunken, as the scroll bar's track: dark top and left, light bottom and right.
+    ImVec2 min = ImGui::GetItemRectMin();
+    ImVec2 max = ImGui::GetItemRectMax();
+    float block = retro_pixel();
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    ImU32 dark = to_imgui_u32(g_palette.panel_dark);
+    ImU32 light = to_imgui_u32(g_palette.panel_light);
+    draw_list->AddRectFilled(min, ImVec2(max.x, min.y + block), dark);
+    draw_list->AddRectFilled(min, ImVec2(min.x + block, max.y), dark);
+    draw_list->AddRectFilled(ImVec2(min.x, max.y - block), max, light);
+    draw_list->AddRectFilled(ImVec2(max.x - block, min.y), max, light);
+}
+
 void retro_ui_raised_item_edge()
 {
     if (g_palette.button_light == g_palette.button_dark)

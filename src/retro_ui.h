@@ -106,6 +106,12 @@ void retro_ui_end_window();
 // ImGui::Button, raised (the palette's button colors and edges) with its
 // label drawn shadowed (with the palette's shadows). Same return value. Use
 // inside the theme. _sized: a given size (0 = fit the label, like ImGui).
+// A scrolling list in a field-colored box (BeginChild / EndChild): sunken
+// in a theme whose buttons have a raised edge, no edge in a flat theme.
+// retro_ui_end_list() always goes with retro_ui_begin_list().
+bool retro_ui_begin_list(const char* id, float width, float height);   // 0 = the space left
+void retro_ui_end_list();
+
 // The raised edge of a button around the last item (e.g. a color swatch),
 // in a theme whose buttons have one; nothing in a flat theme.
 void retro_ui_raised_item_edge();
