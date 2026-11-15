@@ -26,6 +26,9 @@ session) and its CMake helpers. It doesn't build on its own.
   Video: aspect ratio, integer / auto scaling, filters, overscan crop (IMAGE
   SETTINGS), window and fullscreen, Vsync / Exact timing, low latency. Sound:
   output device, volume, latency, rate control, resampler quality.
+- **CONFIG > SETTINGS > CORE OPTIONS**: the running core's options, kept per
+  core, per content folder or per game, and a list of what is stored for any
+  core (see [Core options](#core-options)).
 - English and Spanish (GENERAL > LANGUAGE).
 
 Not there yet: input mapping, state slots, shaders, archives.
@@ -66,6 +69,41 @@ Other state piccolo keeps (not per core or game): `settings/last_used.cfg`
 (last core and folder, window size and position), `settings/recent.cfg` (the
 RECENT list), `settings/imgui.ini` (window layout) and `core_info_cache.cfg`.
 
+## Core options
+
+SETTINGS > CORE OPTIONS edits the running core's options live. SAVE TO picks
+where a change is kept, like the SCOPE of the other tabs but with a folder
+layer:
+
+| Layer | Section in `settings/core_options.cfg` | Applies to |
+|-------|----------------------------------------|------------|
+| THIS CORE | `[snes9x]` | every game on the core |
+| THIS FOLDER | `[snes9x/dir:Super Nintendo]` | games in a folder with that name (by name, not path: moving the library keeps it) |
+| THIS GAME | `[snes9x/game:Super Mario World (USA)]` | one game |
+
+The most specific layer wins (game, folder, core, then the core's own
+default), so a core that runs several systems (GBA and GBC) can keep them
+apart. Only values that differ from the layer below are written. Markers in
+front of an option: **C** core, **D** folder, **G** game; RESET removes it from
+the layer being edited. The stored values reach the core as it declares its
+options, before it reads them, so options that only apply at start work too.
+
+**When an option breaks a core.** Every core's option list (names, values,
+defaults) is also kept in `settings/core_options_cache.cfg`, written as soon as
+the core declares them. So STORED VALUES, at the bottom of the tab, lists and
+deletes what is stored for **any** core that has run before, even one that now
+crashes on start: pick it in CORE, then DELETE a value, DELETE SECTION, or
+DELETE ALL FOR THIS CORE. Keys the core no longer declares are marked.
+
+**Safe start.** piccolo writes `settings/running.cfg` before a game loads and
+removes it when the game ends properly (an option change during the session
+is noted in it at once). If it's still there at the next launch, that session
+crashed or hung. Starting the same core again, when it has stored options,
+asks first: STORED OPTIONS, CORE DEFAULTS THIS TIME (nothing deleted; fix the
+culprit in CORE OPTIONS), DELETE STORED OPTIONS, or CANCEL. An option changed
+in the middle of a game is only written when SETTINGS closes, a game starts or
+piccolo quits: a change that crashes the core at once is not kept.
+
 ## Automatic settings
 
 piccolo tunes a few things by itself, so the out-of-the-box experience is low
@@ -101,6 +139,9 @@ and next to `piccolo.exe` on Windows.
 | `settings/recent.cfg` | the RECENT list |
 | `settings/audio_latency.cfg` | automatic audio latency learned per core |
 | `settings/frame_delay.cfg` | automatic frame delay found per game |
+| `settings/core_options.cfg` | core options per core, folder and game |
+| `settings/core_options_cache.cfg` | each core's option list (to clean a core that won't start) |
+| `settings/running.cfg` | only while a game runs (safe start) |
 | `settings/imgui.ini` | window layout |
 | `core_info_cache.cfg` | what each core said about itself (refreshed when a core file changes) |
 
