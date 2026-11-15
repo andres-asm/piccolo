@@ -39,6 +39,8 @@
 #include "core_catalog.h"
 #include "core_session.h"
 #include "debug_ui.h"
+#include "input_bindings.h"
+#include "input_sdl.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -49,6 +51,11 @@
 struct App
 {
     AppShell shell = {};
+    InputSystem input = {};       // controllers, ports, hotkeys (input_bindings.h)
+    InputSdl    input_sdl = {};   // the keyboard and gamepads, from SDL
+    bool        ui_keys_down[5] = {};   // gamepad interface actions given to ImGui as keys (drive_ui_with_gamepads)
+    bool        ui_back_down = false;
+    bool        open_first_menu = false;   // OPEN MENU pressed: the menu bar opens its first menu this frame
     bool     running = false;
     bool     show_debug_window = false;
     bool     show_imgui_demo = false;
@@ -532,6 +539,17 @@ static void start_game(App* app, const FilePickerChoice* choice)
     if (started)
     {
         app->crashed_core.clear();   // answered (or not this core's turn): it runs again
+        // The controller that started the game plays on port 1 right away.
+        input_leave_all(&app->input);
+        int32_t starter = input_first_controller(&app->input, app->input_sdl.last_active_device);
+        const InputDevice* starter_device = input_devices_find_const(&app->input.devices, app->input_sdl.last_active_device);
+        if (starter >= 0 && starter_device != nullptr && !input_devices_looks_fake(starter_device) &&
+            input_join(&app->input, static_cast<uint32_t>(starter)))
+        {
+            // A START still held from starting it isn't the game's.
+            app->input.controllers[static_cast<size_t>(starter)].quiet_until_start_released = true;
+            SDL_Log("Port 1: %s", app->input.controllers[static_cast<size_t>(starter)].name.c_str());
+        }
         app->menu_visible = false;   // straight into the game
         std::snprintf(app->last_core, sizeof(app->last_core), "%s", choice->core_path);
         if (choice->content_path[0] != '\0')
@@ -854,6 +872,159 @@ static void refresh_audio_devices(App* app)
     }
 }
 
+// A menu or a dialog is up: the controllers drive it, not the game.
+static bool ui_is_up(const App* app)
+{
+    return app->menu_visible || !game_running(app) || app->picker.open || app->settings_window.open ||
+           app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
+           app->safe_start_open || app->show_debug_window;
+}
+
+// Escape / BACK: close the topmost window first (IMAGE SETTINGS, SETTINGS,
+// LOAD GAME...); otherwise show/hide the menu (it stays up when nothing runs).
+static void close_topmost_or_toggle_menu(App* app)
+{
+    {
+        if (app->quick_menu.open)
+        {
+            app->quick_menu.open = false;
+        }
+        else if (app->core_options_manager)
+        {
+            app->core_options_manager = false;
+        }
+        else if (app->settings_window.image_open)
+        {
+            app->settings_window.image_open = false;
+        }
+        else if (app->settings_window.open)
+        {
+            app->settings_window.open = false;
+        }
+        else if (app->picker.open)
+        {
+            app->picker.open = false;
+        }
+        else if (game_running(app))
+        {
+            app->menu_visible = !app->menu_visible;
+        }
+    }
+}
+
+// The hotkeys of this frame (input_bindings: keyboard F1 / F2 / F4 / Escape,
+// or HOTKEY ENABLE + a button on a gamepad).
+static void app_handle_hotkeys(App* app, const InputFrame* frame)
+{
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_menu)])
+    {
+        close_topmost_or_toggle_menu(app);
+    }
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_quick_menu)])
+    {
+        if (app->quick_menu.open)
+        {
+            app->quick_menu.open = false;
+        }
+        else if (game_running(app))
+        {
+            quick_menu_open(&app->quick_menu, app->session.state_slot);
+            app->core_options_state.choose_layer = true;   // SAVE TO: the most specific layer in use
+        }
+    }
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_save_state)])
+    {
+        handle_menu_action(app, MenuAction::save_state);
+    }
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_load_state)])
+    {
+        handle_menu_action(app, MenuAction::load_state);
+    }
+}
+
+// Gamepads drive the menus and dialogs as the keyboard does: their
+// interface actions become ImGui's arrow keys and Space (activate); BACK
+// closes an open list or popup, otherwise the topmost window (as Escape).
+struct UiKey
+{
+    InputAction action;
+    ImGuiKey    key;
+};
+
+static const UiKey UI_KEYS[] = {
+    {InputAction::ui_up, ImGuiKey_UpArrow},
+    {InputAction::ui_down, ImGuiKey_DownArrow},
+    {InputAction::ui_left, ImGuiKey_LeftArrow},
+    {InputAction::ui_right, ImGuiKey_RightArrow},
+    {InputAction::ui_accept, ImGuiKey_Space},
+};
+constexpr size_t UI_KEY_COUNT = sizeof(UI_KEYS) / sizeof(UI_KEYS[0]);
+
+static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    for (size_t i = 0; i < UI_KEY_COUNT; i++)
+    {
+        uint32_t action = static_cast<uint32_t>(UI_KEYS[i].action);
+        bool down = ui_up && frame->gamepad_held[action];
+        if (down != app->ui_keys_down[i])
+        {
+            io.AddKeyEvent(UI_KEYS[i].key, down);
+            app->ui_keys_down[i] = down;
+        }
+    }
+    uint32_t back = static_cast<uint32_t>(InputAction::ui_back);
+    bool back_down = ui_up && frame->gamepad_held[back];
+    if (back_down && !app->ui_back_down)
+    {
+        if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+        {
+            io.AddKeyEvent(ImGuiKey_Escape, true);   // a list or popup closes first
+            io.AddKeyEvent(ImGuiKey_Escape, false);
+        }
+        else
+        {
+            close_topmost_or_toggle_menu(app);
+        }
+    }
+    app->ui_back_down = back_down;
+
+    // OPEN MENU (START on a gamepad): the menu bar's first menu, when the bar
+    // is up and nothing else is open on top of it.
+    bool bar_alone = (app->menu_visible || !game_running(app)) && !app->picker.open && !app->settings_window.open &&
+                     !app->settings_window.image_open && !app->quick_menu.open && !app->core_options_manager &&
+                     !app->safe_start_open && !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
+    if (bar_alone && frame->pressed[static_cast<uint32_t>(InputAction::ui_open_menu)])
+    {
+        app->open_first_menu = true;
+    }
+}
+
+// Once per loop, after the events: what the controllers say (ports,
+// hotkeys), handed to the core session before it runs frames.
+static void app_update_input(App* app)
+{
+    bool ui_up = ui_is_up(app);
+    app->input.settings.game_has_input = !ui_up;
+    app->input.settings.core_takes_keyboard = app->session.keyboard.game_focus;
+    InputFrame frame = {};
+    input_update(&app->input, SDL_GetTicks(), &frame);
+    if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
+    {
+        SDL_Log("Port %d: %s", frame.joined_port + 1,
+                app->input.controllers[static_cast<size_t>(frame.joined_controller)].name.c_str());
+    }
+    app_handle_hotkeys(app, &frame);
+    drive_ui_with_gamepads(app, &frame, ui_up);
+    core_session_set_pads(&app->session, frame.pad_buttons, frame.analog);
+    app->session.fast_forward_held =
+        game_running(app) && frame.held[static_cast<uint32_t>(InputAction::hotkey_fast_forward)];
+    if (app->session.host != nullptr)
+    {
+        input_sdl_rumble(&app->input_sdl, &app->input, app->session.host->rumble, LIBRETRO_MAX_PORTS);
+    }
+}
+
 static void app_handle_events(App* app)
 {
     SDL_Event event;
@@ -864,6 +1035,7 @@ static void app_handle_events(App* app)
             continue;   // the core's keyboard (game focus)
         }
         app_shell_process_event(&app->shell, &event);
+        input_sdl_handle_event(&app->input_sdl, &app->input, &event);
 
         if ((event.type == SDL_EVENT_AUDIO_DEVICE_ADDED || event.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) &&
             !event.adevice.recording)
@@ -886,35 +1058,6 @@ static void app_handle_events(App* app)
         {
             switch (event.key.key)
             {
-                case SDLK_ESCAPE:
-                    // Close the topmost window first (IMAGE SETTINGS, SETTINGS,
-                    // LOAD GAME); otherwise show/hide the menu (it stays up when
-                    // nothing runs).
-                    if (app->quick_menu.open)
-                    {
-                        app->quick_menu.open = false;
-                    }
-                    else if (app->core_options_manager)
-                    {
-                        app->core_options_manager = false;
-                    }
-                    else if (app->settings_window.image_open)
-                    {
-                        app->settings_window.image_open = false;
-                    }
-                    else if (app->settings_window.open)
-                    {
-                        app->settings_window.open = false;
-                    }
-                    else if (app->picker.open)
-                    {
-                        app->picker.open = false;
-                    }
-                    else if (game_running(app))
-                    {
-                        app->menu_visible = !app->menu_visible;
-                    }
-                    break;
                 case SDLK_F11:
                     toggle_fullscreen(app);
                     break;
@@ -923,23 +1066,6 @@ static void app_handle_events(App* app)
                     {
                         toggle_fullscreen(app);
                     }
-                    break;
-                case SDLK_F1:
-                    if (app->quick_menu.open)
-                    {
-                        app->quick_menu.open = false;
-                    }
-                    else if (game_running(app))
-                    {
-                        quick_menu_open(&app->quick_menu, app->session.state_slot);
-                        app->core_options_state.choose_layer = true;   // SAVE TO: the most specific layer in use
-                    }
-                    break;
-                case SDLK_F2:
-                    handle_menu_action(app, MenuAction::save_state);
-                    break;
-                case SDLK_F4:
-                    handle_menu_action(app, MenuAction::load_state);
                     break;
                 default:
                     break;
@@ -1235,6 +1361,10 @@ int main(int argc, char** argv)
     {
         io.IniFilename = nullptr;
     }
+    // Controllers: settings/gamepad_mappings.txt holds mappings for ones SDL
+    // doesn't know (written by piccolo_map_gamepad).
+    std::string mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
+    input_sdl_init(&app->input_sdl, &app->input, mappings_path.empty() ? nullptr : mappings_path.c_str());
     update_language(app);
     set_status(app, piccolo_text(&app->strings, Str::status_start));
 
@@ -1297,7 +1427,13 @@ int main(int argc, char** argv)
             app->marker_options_changed = true;   // recorded in case this change brings the core down
             write_running_marker(app);
         }
-        if (core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app)) == CoreSessionFrame::shut_down)
+        app_update_input(app);
+        CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app));
+        if (ran != CoreSessionFrame::skipped || !game_running(app))
+        {
+            input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
+        }
+        if (ran == CoreSessionFrame::shut_down)
         {
             set_status(app, app->session.message);
             app->menu_visible = true;
@@ -1319,7 +1455,8 @@ int main(int argc, char** argv)
                 MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
                                                       app->recent_label_pointers.data(),
                                                       static_cast<int32_t>(app->recent_label_pointers.size()),
-                                                      &recent_picked);
+                                                      &recent_picked, app->open_first_menu);
+                app->open_first_menu = false;
                 if (action == MenuAction::recent_game && recent_picked >= 0)
                 {
                     // Started at the top of the next loop, like LOAD GAME (see pending_start).
@@ -1425,9 +1562,7 @@ int main(int argc, char** argv)
                 app_draw_debug_ui(app);
             }
 
-            bool ui_up = app->menu_visible || !game_running(app) || app->picker.open || app->settings_window.open ||
-                         app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
-                         app->safe_start_open || app->show_debug_window;
+            bool ui_up = ui_is_up(app);
             save_after_options_windows(app);
             retro_ui_scrollbars(app->ui_scale);
             retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
@@ -1462,6 +1597,7 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
+    input_sdl_shutdown(&app->input_sdl);
     app_shell_destroy(&app->shell);
     delete app;
     return 0;

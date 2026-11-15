@@ -72,6 +72,12 @@ add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
 target_link_libraries(pixel_font_preview PRIVATE piccolo_font)
 multitap_set_project_flags(pixel_font_preview)
 
+# Maps a controller SDL doesn't know as a gamepad into settings/gamepad_mappings.txt
+# (a stopgap until CONFIG > INPUT does it inside piccolo).
+add_executable(piccolo_map_gamepad tools/map_gamepad.cpp)
+target_link_libraries(piccolo_map_gamepad PRIVATE frontend_common)
+multitap_set_project_flags(piccolo_map_gamepad)
+
 if(MULTITAP_BUILD_TESTS)
     # Table well formed, no character defined twice, no two glyphs identical.
     add_test(NAME piccolo_pixel_font COMMAND pixel_font_preview --check)

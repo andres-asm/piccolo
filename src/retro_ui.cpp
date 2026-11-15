@@ -217,8 +217,14 @@ static bool menu_item(const char* label)
 
 // The RECENT menu: first on the bar, a hamburger glyph as its label.
 static bool recent_menu(const Localization* strings, const char* const* recent, int32_t recent_count,
-                        int32_t* recent_picked, float block)
+                        int32_t* recent_picked, float block, bool open_now)
 {
+    if (open_now)
+    {
+        // As a click on it would (BeginMenu finds its popup open), with the
+        // keyboard / gamepad focus on its first item.
+        ImGui::OpenPopupEx(ImGui::GetID(PIXEL_FONT_UTF8_MENU), ImGuiPopupFlags_None);
+    }
     ImDrawList* bar_draw_list = ImGui::GetWindowDrawList();
     ImGuiWindow* bar = ImGui::GetCurrentWindow();
     float bar_top = bar->Pos.y;
@@ -239,6 +245,10 @@ static bool recent_menu(const Localization* strings, const char* const* recent, 
     use_nearest_sampler();
     draw_window_shadow(block);
     draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, g_palette.menu_box_light, g_palette.menu_box_dark, true);
+    if (open_now)
+    {
+        ImGui::SetKeyboardFocusHere();
+    }
     bool picked = false;
     if (recent_count == 0)
     {
@@ -262,7 +272,8 @@ static bool recent_menu(const Localization* strings, const char* const* recent, 
 }
 
 MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localization* strings,
-                             const char* const* recent, int32_t recent_count, int32_t* recent_picked)
+                             const char* const* recent, int32_t recent_count, int32_t* recent_picked,
+                             bool open_first_menu)
 {
     MenuAction picked = MenuAction::none;
     float block = static_cast<float>(scale);
@@ -295,7 +306,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
         use_nearest_sampler();
         draw_bevel(ImGui::GetWindowPos(), ImGui::GetWindowSize(), block, g_palette.bar_light, g_palette.bar_dark, false);
 
-        if (recent_menu(strings, recent, recent_count, recent_picked, block))
+        if (recent_menu(strings, recent, recent_count, recent_picked, block, open_first_menu))
         {
             picked = MenuAction::recent_game;
         }
