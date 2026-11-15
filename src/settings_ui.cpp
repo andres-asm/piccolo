@@ -206,6 +206,7 @@ static bool color_widget(const SettingsUiContext* context, const SettingDescript
         }
         changed = settings_set_color(context->settings, context->scope, descriptor->key, picked);
     }
+    retro_ui_raised_item_edge();
     ImGui::SameLine();
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("#%06X", static_cast<unsigned>(argb & 0xFFFFFFu));

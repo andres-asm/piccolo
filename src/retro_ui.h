@@ -52,8 +52,9 @@ struct RetroUiPalette
     uint32_t button_text;
     uint32_t field_text;       // text in fields and combo boxes
     bool     theme_cursor;     // draw our own mouse cursor (the system's is hidden)
-    uint32_t cursor;           // its color (a gradient to a darker shade at the bottom)
+    uint32_t cursor;           // its color...
     uint32_t button_bottom;    // ...and bottom of buttons (a vertical gradient; the same = flat)
+    uint32_t cursor_edge;      // ...and its top / right edge (the same = flat)
 };
 
 enum class RetroUiTheme
@@ -105,6 +106,10 @@ void retro_ui_end_window();
 // ImGui::Button, raised (the palette's button colors and edges) with its
 // label drawn shadowed (with the palette's shadows). Same return value. Use
 // inside the theme. _sized: a given size (0 = fit the label, like ImGui).
+// The raised edge of a button around the last item (e.g. a color swatch),
+// in a theme whose buttons have one; nothing in a flat theme.
+void retro_ui_raised_item_edge();
+
 bool retro_ui_button(const char* label);
 bool retro_ui_button_sized(const char* label, float width, float height);
 

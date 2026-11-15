@@ -1265,3 +1265,11 @@ msgstr "CURSOR"
 msgctxt "setting_ui_color_cursor_help"
 msgid "The theme's mouse cursor (with THEME CURSOR on)."
 msgstr "El cursor del tema (con CURSOR DEL TEMA)."
+
+msgctxt "setting_ui_color_cursor_edge"
+msgid "CURSOR EDGE"
+msgstr "BORDE DEL CURSOR"
+
+msgctxt "setting_ui_color_cursor_edge_help"
+msgid "The cursor's top and right edge: with the same color as CURSOR, a flat cursor."
+msgstr "El borde de arriba y derecho del cursor: con el mismo color que CURSOR, un cursor plano."

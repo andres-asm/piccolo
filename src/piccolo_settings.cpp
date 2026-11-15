@@ -285,8 +285,10 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_ui_color_button_text), .help = text_id(Str::setting_ui_color_button_text_help)},
     {.key = PICCOLO_UI_COLOR_FIELD_TEXT, .type = SettingType::color, .default_value = "#E0E6F0",
      .label = text_id(Str::setting_ui_color_field_text), .help = text_id(Str::setting_ui_color_field_text_help)},
-    {.key = PICCOLO_UI_COLOR_CURSOR, .type = SettingType::color, .default_value = "#F07030",
+    {.key = PICCOLO_UI_COLOR_CURSOR, .type = SettingType::color, .default_value = "#8CB4F0",
      .label = text_id(Str::setting_ui_color_cursor), .help = text_id(Str::setting_ui_color_cursor_help)},
+    {.key = PICCOLO_UI_COLOR_CURSOR_EDGE, .type = SettingType::color, .default_value = "#8CB4F0",
+     .label = text_id(Str::setting_ui_color_cursor_edge), .help = text_id(Str::setting_ui_color_cursor_edge_help)},
 
     // Sound. Volume and latency overridable per core / game (plan-milestones,
     // milestone 2); the device and the advanced ones are global.
@@ -511,6 +513,7 @@ static const char* const UI_COLOR_KEYS[] = {
     PICCOLO_UI_COLOR_BUTTON_TEXT,
     PICCOLO_UI_COLOR_FIELD_TEXT,
     PICCOLO_UI_COLOR_CURSOR,
+    PICCOLO_UI_COLOR_CURSOR_EDGE,
 };
 constexpr uint32_t UI_COLOR_COUNT = sizeof(UI_COLOR_KEYS) / sizeof(UI_COLOR_KEYS[0]);
 
@@ -579,6 +582,8 @@ static uint32_t* palette_color(RetroUiPalette* palette, uint32_t index)
         return &palette->field_text;
     case 29:
         return &palette->cursor;
+    case 30:
+        return &palette->cursor_edge;
     default:
         return &palette->text;
     }

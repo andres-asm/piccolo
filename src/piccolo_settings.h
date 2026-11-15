@@ -62,6 +62,7 @@ constexpr const char* PICCOLO_UI_COLOR_BUTTON_DARK = "ui_color_button_dark";
 constexpr const char* PICCOLO_UI_COLOR_BUTTON_TEXT = "ui_color_button_text";
 constexpr const char* PICCOLO_UI_COLOR_FIELD_TEXT = "ui_color_field_text";
 constexpr const char* PICCOLO_UI_COLOR_CURSOR = "ui_color_cursor";
+constexpr const char* PICCOLO_UI_COLOR_CURSOR_EDGE = "ui_color_cursor_edge";
 constexpr const char* PICCOLO_UI_COLOR_BAR = "ui_color_bar";
 constexpr const char* PICCOLO_UI_COLOR_BAR_CENTER = "ui_color_bar_center";
 constexpr const char* PICCOLO_UI_COLOR_BAR_LIGHT = "ui_color_bar_light";

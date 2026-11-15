@@ -21,7 +21,7 @@ static const RetroUiPalette THEMES[] = {
      0xFFE0E6F0u, 0xFFFFFFFFu, 0xFF8090B0u, 0xFF101828u,
      0xFF34507Cu, 0xFF34507Cu,
      0xFFFFFFFFu, 0xFFE0E6F0u,
-     0xFF34507Cu, 0xFF34507Cu, 0xFF34507Cu, 0xFFE0E6F0u, 0xFFE0E6F0u, false, 0xFFF07030u, 0xFF34507Cu},
+     0xFF34507Cu, 0xFF34507Cu, 0xFF34507Cu, 0xFFE0E6F0u, 0xFFE0E6F0u, false, 0xFF8CB4F0u, 0xFF34507Cu, 0xFF8CB4F0u},
     // CLASSIC: purple background, a deep blue gradient bar with grey boxes
     // behind the menu titles, grey menus with a magenta highlight, blue
     // windows with black fields, drop shadows everywhere.
@@ -33,7 +33,7 @@ static const RetroUiPalette THEMES[] = {
      0xFFCECFCEu, 0xFFFFFFFFu, 0xFF8C8682u, 0xFF292521u,
      0xFF7C76A6u, 0xFF383C5Fu,
      0xFFB01818u, 0xFF9C9C68u,
-     0xFF7C76A6u, 0xFFA29EC8u, 0xFF262840u, 0xFFCECFCEu, 0xFF00E000u, true, 0xFFF07030u, 0xFF383C5Fu},
+     0xFF7C76A6u, 0xFFA29EC8u, 0xFF262840u, 0xFFCECFCEu, 0xFF00E000u, true, 0xFFF56F37u, 0xFF383C5Fu, 0xFFF64D25u},
     // MODERN: flat and dark, never a shadow; the menus are the bar's color.
     {0xFF000000u, false,
      0xFF1E222Au, 0xFF1E222Au, 0xFF1E222Au, 0xFF1E222Au,
@@ -43,7 +43,7 @@ static const RetroUiPalette THEMES[] = {
      0xFFE6E9EFu, 0xFFFFFFFFu, 0xFF7D8494u, 0xFF0F1115u,
      0xFF1E222Au, 0xFF1E222Au,
      0xFFFFFFFFu, 0xFFE6E9EFu,
-     0xFF2E3440u, 0xFF2E3440u, 0xFF2E3440u, 0xFFE6E9EFu, 0xFFE6E9EFu, false, 0xFFFFFFFFu, 0xFF2E3440u},
+     0xFF2E3440u, 0xFF2E3440u, 0xFF2E3440u, 0xFFE6E9EFu, 0xFFE6E9EFu, false, 0xFFB4BAC6u, 0xFF2E3440u, 0xFFB4BAC6u},
 };
 
 static RetroUiPalette g_palette = THEMES[0];
@@ -598,6 +598,15 @@ bool retro_ui_button_sized(const char* label, float width, float height)
     return pressed;
 }
 
+void retro_ui_raised_item_edge()
+{
+    if (g_palette.button_light == g_palette.button_dark)
+    {
+        return;   // a flat theme
+    }
+    draw_raised(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), retro_pixel());
+}
+
 bool retro_ui_button(const char* label)
 {
     return retro_ui_button_sized(label, 0.0f, 0.0f);
@@ -628,20 +637,17 @@ bool retro_ui_checkbox(const char* label, bool* value)
     return changed;
 }
 
-// The theme cursor: an arrow, 8 x 12 retro pixels, '#' filled.
+// The theme cursor: an arrow, 8 x 8 retro pixels, the tip at the top left.
+// 'e' is the edge (cursor_edge), 'o' the body (cursor).
 static const char* const CURSOR_SHAPE[] = {
-    "#.......",
-    "##......",
-    "###.....",
-    "####....",
-    "#####...",
-    "######..",
-    "#######.",
-    "########",
-    "####....",
-    "##.##...",
-    "#...##..",
-    "....##..",
+    "eeeee...",
+    "ooee....",
+    "oooe....",
+    "ooooe...",
+    "o..oee..",
+    "....oee.",
+    ".....oee",
+    "......o.",
 };
 constexpr int CURSOR_ROWS = static_cast<int>(sizeof(CURSOR_SHAPE) / sizeof(CURSOR_SHAPE[0]));
 
@@ -664,23 +670,24 @@ void retro_ui_cursor(int32_t scale, bool visible)
     ImDrawList* draw_list = ImGui::GetForegroundDrawList();
     ImVec2 tip(static_cast<float>(static_cast<int32_t>(io.MousePos.x)), static_cast<float>(static_cast<int32_t>(io.MousePos.y)));
     ImU32 shadow = (to_imgui_u32(g_palette.text_shadow) & ~IM_COL32_A_MASK) | (128u << IM_COL32_A_SHIFT);
+    ImU32 body = to_imgui_u32(g_palette.cursor);
+    ImU32 edge = to_imgui_u32(g_palette.cursor_edge);
+    // With the palette's shadows: the shape again, 2 pixels down and right.
     for (int pass = g_palette.shadows ? 0 : 1; pass < 2; pass++)
     {
         float offset = pass == 0 ? 2.0f * block : 0.0f;
         for (int row = 0; row < CURSOR_ROWS; row++)
         {
-            // Top to bottom: the color to 60% of it (a gradient).
-            float shade = 1.0f - 0.4f * static_cast<float>(row) / static_cast<float>(CURSOR_ROWS - 1);
-            ImVec4 base = to_imgui(g_palette.cursor);
-            ImU32 color = pass == 0 ? shadow
-                                    : ImGui::ColorConvertFloat4ToU32(ImVec4(base.x * shade, base.y * shade, base.z * shade, 1.0f));
             for (int column = 0; CURSOR_SHAPE[row][column] != '\0'; column++)
             {
-                if (CURSOR_SHAPE[row][column] == '#')
+                char cell = CURSOR_SHAPE[row][column];
+                if (cell == '.')
                 {
-                    ImVec2 min(tip.x + offset + static_cast<float>(column) * block, tip.y + offset + static_cast<float>(row) * block);
-                    draw_list->AddRectFilled(min, ImVec2(min.x + block, min.y + block), color);
+                    continue;
                 }
+                ImU32 color = pass == 0 ? shadow : (cell == 'e' ? edge : body);
+                ImVec2 min(tip.x + offset + static_cast<float>(column) * block, tip.y + offset + static_cast<float>(row) * block);
+                draw_list->AddRectFilled(min, ImVec2(min.x + block, min.y + block), color);
             }
         }
     }
