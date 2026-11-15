@@ -66,6 +66,15 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
 // "D-PAD UP", "LEFT STICK RIGHT", "L2"... (button names from SDL's labels).
 void input_window_source_label(const InputSdl* sdl, const InputDevice* device, InputSource source, char* out, size_t out_size);
 
+// A binding's sources in `width`: all of them ("D-PAD UP, LEFT STICK UP"),
+// or when they don't fit the first and how many more ("D-PAD UP +1") with
+// all of them in the tooltip; NONE when there's none.
+void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputSource* sources, float width,
+                               const Localization* strings);
+
+// Waiting for a binding: PRESS A BUTTON (4) / PRESS A KEY (4).
+void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Localization* strings);
+
 // The defaults a controller goes back to with RESET / DEFAULTS: the
 // keyboard's or a gamepad's, none for the keyboard's extra players.
 void input_window_controller_defaults(const InputSystem* input, uint32_t controller, InputBindingSet* set);

@@ -155,6 +155,11 @@ bool retro_ui_collapsing_header(const char* label, int flags);
 // triangle. Same return value and EndCombo() rule. Use inside the theme.
 bool retro_ui_begin_combo(const char* label, const char* preview);
 
+// Text that must stand out (the row being bound): the section title color
+// (yellow in CLASSIC), or the highlight color where that is the text color.
+void retro_ui_push_section_text();
+void retro_ui_pop_section_text();
+
 // Tabs by PAGE LEFT / PAGE RIGHT (L / R on a gamepad, Page Up / Page Down on
 // the keyboard): piccolo hands this frame's request (-1, +1 or 0), and each
 // tab bar asks for the tab to select now. Only the focused window acts on

@@ -58,9 +58,19 @@ struct App
     InputSdl    input_sdl = {};   // the keyboard and gamepads, from SDL
     bool        ui_keys_down[5] = {};   // gamepad interface actions given to ImGui as keys (drive_ui_with_gamepads)
     bool        ui_back_down = false;
+    uint64_t    ui_back_since_ms = 0;      // BACK / SELECT held since (0 = not held)
+    bool        ui_back_done = false;      // this hold already closed a window
     bool        open_first_menu = false;
     std::string input_config_path;   // settings/input.cfg
-    InputWindow input_window = {};   // CONFIG > INPUT   // OPEN MENU pressed: the menu bar opens its first menu this frame
+    InputWindow input_window = {};   // CONFIG > INPUT
+
+    // HOLD START TO REMAP: a controller plays a core's device it hasn't
+    // played before (no decided InputCoreProfile).
+    bool     remap_prompt = false;
+    uint32_t remap_prompt_controller = 0;
+    uint32_t remap_prompt_port = 0;
+    uint64_t remap_prompt_started_ms = 0;
+    uint64_t remap_prompt_start_held_ms = 0;   // when START began being held (0 = not held)   // OPEN MENU pressed: the menu bar opens its first menu this frame
     bool     running = false;
     bool     show_debug_window = false;
     bool     show_imgui_demo = false;
@@ -359,8 +369,9 @@ static void set_status(App* app, const char* text)
 static void update_pause(App* app)
 {
     bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
-                     app->settings_window.image_open || app->quick_menu.open || app->core_options_manager;
-    bool pause_for_menu = menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU);
+                     app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
+                     app->input_window.open;
+    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
     bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
     if (pause && !app->session.paused)
@@ -891,7 +902,7 @@ static bool any_window_open(const App* app)
 // A menu or a dialog is up: the controllers drive it, not the game.
 static bool ui_is_up(const App* app)
 {
-    return app->menu_visible || !game_running(app) || any_window_open(app);
+    return app->menu_visible || !game_running(app) || any_window_open(app) || app->remap_prompt;
 }
 
 // Escape / BACK: close the topmost window first (IMAGE SETTINGS, SETTINGS,
@@ -981,6 +992,8 @@ static const UiKey UI_KEYS[] = {
 };
 constexpr size_t UI_KEY_COUNT = sizeof(UI_KEYS) / sizeof(UI_KEYS[0]);
 
+constexpr uint64_t UI_BACK_HOLD_MS = 600;   // hold BACK (or SELECT alone) this long to close a window
+
 static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -994,19 +1007,31 @@ static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up
             app->ui_keys_down[i] = down;
         }
     }
+    // BACK: a tap closes an open list or popup; a window closes only when
+    // BACK, or SELECT by itself, is held (a tap of the button the game
+    // calls A must not close a window by accident).
     uint32_t back = static_cast<uint32_t>(InputAction::ui_back);
     bool back_down = ui_up && frame->gamepad_held[back];
-    if (back_down && !app->ui_back_down)
+    bool hold_down = ui_up && (back_down || frame->gamepad_enable_alone);
+    uint64_t now = SDL_GetTicks();
+    if (back_down && !app->ui_back_down && ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
     {
-        if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
-        {
-            io.AddKeyEvent(ImGuiKey_Escape, true);   // a list or popup closes first
-            io.AddKeyEvent(ImGuiKey_Escape, false);
-        }
-        else
-        {
-            close_topmost_or_toggle_menu(app);
-        }
+        io.AddKeyEvent(ImGuiKey_Escape, true);
+        io.AddKeyEvent(ImGuiKey_Escape, false);
+    }
+    if (!hold_down)
+    {
+        app->ui_back_since_ms = 0;
+        app->ui_back_done = false;
+    }
+    else if (app->ui_back_since_ms == 0)
+    {
+        app->ui_back_since_ms = now;
+    }
+    else if (!app->ui_back_done && now - app->ui_back_since_ms >= UI_BACK_HOLD_MS)
+    {
+        app->ui_back_done = true;   // once per hold
+        close_topmost_or_toggle_menu(app);
     }
     app->ui_back_down = back_down;
 
@@ -1019,6 +1044,120 @@ static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up
     {
         app->open_first_menu = true;
     }
+}
+
+// HOLD START TO REMAP: the first controller on a port playing a core's
+// device it hasn't played before. START held 1 s opens the remap in the
+// quick menu; 5 s without it keeps the RetroPad and remembers that.
+constexpr uint64_t REMAP_PROMPT_MS = 5000;
+constexpr uint64_t REMAP_HOLD_MS = 1000;
+
+static void update_remap_prompt(App* app, uint64_t now_ms)
+{
+    InputSystem* input = &app->input;
+    if (!game_running(app) || input->core_name.empty())
+    {
+        app->remap_prompt = false;
+        return;
+    }
+    if (app->remap_prompt)
+    {
+        uint32_t controller = app->remap_prompt_controller;
+        bool held = input_controller_action_held(input, controller, InputAction::pad_start);
+        if (!held)
+        {
+            app->remap_prompt_start_held_ms = 0;
+        }
+        else if (app->remap_prompt_start_held_ms == 0)
+        {
+            app->remap_prompt_start_held_ms = now_ms;
+        }
+        if (held && now_ms - app->remap_prompt_start_held_ms >= REMAP_HOLD_MS)
+        {
+            app->remap_prompt = false;
+            quick_menu_open_remap(&app->quick_menu, app->session.state_slot, app->remap_prompt_port, controller);
+        }
+        else if (now_ms - app->remap_prompt_started_ms >= REMAP_PROMPT_MS)
+        {
+            app->remap_prompt = false;
+            InputCoreProfile* profile = input_core_profile_for(input, input->core_name.c_str(),
+                                                               input->port_devices[app->remap_prompt_port],
+                                                               input_controller_profile_id(input, controller));
+            profile->decided = true;   // the RetroPad, remembered
+            if (!app->input_config_path.empty())
+            {
+                input_config_save(input, app->input_config_path.c_str());
+            }
+        }
+        return;
+    }
+    if (ui_is_up(app))
+    {
+        return;   // asked when the game is playing
+    }
+    for (uint32_t port = 0; port < INPUT_PORT_COUNT; port++)
+    {
+        int32_t candidates[2] = {input->ports[port], -1};
+        if (port == 0)
+        {
+            for (uint32_t c = 0; c < input->controllers.size(); c++)
+            {
+                candidates[1] = input_controller_shares_port1(input, c) ? static_cast<int32_t>(c) : candidates[1];
+            }
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            if (candidates[i] < 0)
+            {
+                continue;
+            }
+            uint32_t controller = static_cast<uint32_t>(candidates[i]);
+            const InputCoreProfile* profile = input_core_profile(input, input->core_name.c_str(), input->port_devices[port],
+                                                                 input_controller_profile_id(input, controller));
+            if (profile == nullptr || !profile->decided)
+            {
+                app->remap_prompt = true;
+                app->remap_prompt_controller = controller;
+                app->remap_prompt_port = port;
+                app->remap_prompt_started_ms = now_ms;
+                app->remap_prompt_start_held_ms = 0;
+                return;
+            }
+        }
+    }
+}
+
+// The prompt as a line at the top of the window.
+static void draw_remap_prompt(App* app)
+{
+    if (!app->remap_prompt)
+    {
+        return;
+    }
+    const LibretroHost* host = app->session.host;
+    uint32_t port = app->remap_prompt_port;
+    const char* device = libretro_input_controller_name(&host->input_info, port, host->port_devices[port]);
+    uint64_t now = SDL_GetTicks();
+    uint64_t elapsed = now - app->remap_prompt_started_ms;
+    int left = static_cast<int>((REMAP_PROMPT_MS - (elapsed < REMAP_PROMPT_MS ? elapsed : REMAP_PROMPT_MS) + 999) / 1000);
+    char text[400] = {};
+    std::snprintf(text, sizeof(text), piccolo_text(&app->strings, Str::remap_prompt), device != nullptr ? device : "RETROPAD",
+                  static_cast<int>(port + 1), app->input.controllers[app->remap_prompt_controller].name.c_str(), left);
+    retro_ui_push_theme(app->pixel_font, app->ui_scale);
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, 16.0f * static_cast<float>(app->ui_scale)), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(1.0f);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
+                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    if (ImGui::Begin("##remap_prompt", nullptr, flags))
+    {
+        retro_ui_begin_window(app->ui_scale);
+        ImGui::TextUnformatted(text);
+        retro_ui_end_window();
+    }
+    ImGui::End();
+    retro_ui_pop_theme();
 }
 
 // Once per loop, after the events: what the controllers say (ports,
@@ -1037,6 +1176,7 @@ static void app_update_input(App* app)
     app->input.settings.core_takes_keyboard = app->session.keyboard.game_focus;
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
+    update_remap_prompt(app, SDL_GetTicks());
     char message[300] = {};
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {
@@ -1086,7 +1226,7 @@ static void app_handle_events(App* app)
         }
         // While INPUT waits for a key (SET), keys are the binding's, not ImGui's.
         bool key_event = event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_TEXT_INPUT;
-        if (!(key_event && app->input_window.capturing))
+        if (!(key_event && (app->input_window.capturing || app->quick_menu.capturing)))
         {
             app_shell_process_event(&app->shell, &event);
         }
@@ -1290,6 +1430,11 @@ static void save_after_options_windows(App* app)
     {
         save_core_options(app);
         save_settings(app);   // a port's DEVICE (CONTROLS)
+        if (app->quick_menu.input_dirty && !app->input_config_path.empty())
+        {
+            input_config_save(&app->input, app->input_config_path.c_str());   // a remap (CONTROLS)
+            app->quick_menu.input_dirty = false;
+        }
     }
     app->options_window_was_open = open;
 }
@@ -1554,7 +1699,10 @@ int main(int argc, char** argv)
             quick.host = app->session.host;
             quick.settings = &app->settings;
             uint32_t slot_before = app->quick_menu.slot;
+            quick.sdl = &app->input_sdl;
+            quick.now_ms = SDL_GetTicks();
             QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
+            draw_remap_prompt(app);
             if (app->quick_menu.slot != slot_before || app->quick_menu.open)
             {
                 app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot

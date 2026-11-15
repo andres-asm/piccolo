@@ -24,6 +24,7 @@
 #include "core_options_ui.h"
 #include "core_session.h"
 #include "input_bindings.h"
+#include "input_sdl.h"
 #include "settings.h"
 #include "localization.h"
 #include "vk_texture.h"
@@ -45,6 +46,18 @@ struct QuickMenu
     bool          open = false;
     int           tab = 0;              // 0 SAVESTATES, 1 CORE OPTIONS, 2 CONTROLS (for PAGE LEFT / RIGHT)
     int           open_on_tab = 0;      // the tab it opens on
+
+    // CONTROLS can show the remap of one port's controller for the running
+    // core and that port's device: its controls by the game's names, SET,
+    // BIND ALL, USE RETROPAD. Changes mark input_dirty (piccolo saves input.cfg).
+    bool          remap = false;
+    uint32_t      remap_port = 0;
+    uint32_t      remap_controller = 0;
+    bool          capturing = false;
+    InputAction   capture_action = InputAction::pad_b;
+    uint64_t      capture_started_ms = 0;
+    bool          bind_all = false;
+    bool          input_dirty = false;
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]
     bool          refresh = true;   // read the slots again on the next draw
@@ -71,13 +84,19 @@ struct QuickMenuContext
     InputSystem*         input = nullptr;   // CONTROLS: who plays on which port
     LibretroHost*        host = nullptr;    // CONTROLS: the core's devices per port, and the one plugged in
     Settings*            settings = nullptr;   // CONTROLS: the device picked is kept per core
+    const InputSdl*      sdl = nullptr;        // CONTROLS: button names
+    uint64_t             now_ms = 0;
 };
 
-// Opens on `slot` (the session's current slot), on the SAVESTATES tab.
+// Opens on `slot` (the session's current slot), on the tab it was last closed on.
 void quick_menu_open(QuickMenu* menu, uint32_t slot);
 
 // Opens on the CONTROLS tab (a controller went away: rearrange the ports).
 void quick_menu_open_controls(QuickMenu* menu, uint32_t slot);
+
+// Opens on CONTROLS showing the remap of `controller` on `port` (HOLD START
+// TO REMAP was held).
+void quick_menu_open_remap(QuickMenu* menu, uint32_t slot, uint32_t port, uint32_t controller);
 
 // The slots changed on disk (a state was saved): read them again.
 void quick_menu_refresh(QuickMenu* menu);

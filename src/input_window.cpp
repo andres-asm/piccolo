@@ -15,6 +15,9 @@
 
 // SET gives up after this long without a key or button.
 constexpr uint64_t CAPTURE_TIMEOUT_MS = 5000;
+// BIND ALL waits this long before taking the next control, so one press
+// doesn't land on two.
+constexpr uint64_t BIND_ALL_COOL_OFF_MS = 500;
 constexpr uint16_t HID_ESCAPE = 41;
 
 // The label of each InputAction, in its order.
@@ -161,7 +164,7 @@ void input_window_controller_defaults(const InputSystem* input, uint32_t control
     bool first = input_first_controller(input, device->id) == static_cast<int32_t>(controller);
     if (device->kind == InputDeviceKind::gamepad || first)
     {
-        input_default_bindings(device->kind, set);   // more keyboard players start with no keys
+        input_default_bindings_for(device, set);   // more keyboard players start with no keys
     }
 }
 
@@ -172,20 +175,6 @@ void input_window_controller_defaults(const InputSystem* input, uint32_t control
 static float button_width(const char* label)
 {
     return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-}
-
-// Moves the cursor so `width` fits at the right end of the line.
-static void align_right(float width)
-{
-    float x = ImGui::GetWindowContentRegionMax().x - width;
-    if (x > ImGui::GetCursorPosX())
-    {
-        ImGui::SameLine(x);
-    }
-    else
-    {
-        ImGui::SameLine();
-    }
 }
 
 static bool is_keyboard(const InputSystem* input, uint32_t controller)
@@ -301,6 +290,52 @@ static void start_capture(InputWindow* window, const InputWindowContext* context
     input_capture_begin(context->input, context->input->controllers[controller].device_id);
 }
 
+void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputSource* sources, float width,
+                               const Localization* strings)
+{
+    char names[INPUT_SOURCES_PER_ACTION][48] = {};
+    uint32_t count = 0;
+    for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
+    {
+        if (sources[s].type != InputSourceType::none)
+        {
+            input_window_source_label(sdl, device, sources[s], names[count], sizeof(names[count]));
+            count++;
+        }
+    }
+    if (count == 0)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_none));
+        return;
+    }
+    std::string all;
+    for (uint32_t s = 0; s < count; s++)
+    {
+        all += s == 0 ? "" : ", ";
+        all += names[s];
+    }
+    if (count == 1 || ImGui::CalcTextSize(all.c_str()).x <= width)
+    {
+        ImGui::TextUnformatted(all.c_str());
+        return;
+    }
+    // Doesn't fit: the first one and how many more; all of them in the tooltip.
+    char shortened[80] = {};
+    std::snprintf(shortened, sizeof(shortened), "%s +%u", names[0], static_cast<unsigned>(count - 1));
+    ImGui::TextUnformatted(shortened);
+    retro_ui_item_tooltip(all.c_str());
+}
+
+void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Localization* strings)
+{
+    char text[100] = {};
+    std::snprintf(text, sizeof(text), piccolo_text(strings, keyboard ? Str::input_press_key : Str::input_press_button),
+                  static_cast<int>(seconds_left));
+    retro_ui_push_section_text();
+    ImGui::TextUnformatted(text);
+    retro_ui_pop_section_text();
+}
+
 static void binding_row(InputWindow* window, const InputWindowContext* context, uint32_t controller_index,
                         const InputBindingSet* defaults, InputAction action, float label_width)
 {
@@ -310,10 +345,17 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
     const Localization* strings = context->strings;
     uint32_t index = static_cast<uint32_t>(action);
     bool changed = !same_sources(controller->bindings.sources[index], defaults->sources[index]);
+    bool waiting = window->capturing && window->capture_action == action && window->capture_controller == controller_index;
 
     ImGui::PushID(static_cast<int>(index));
     ImGui::AlignTextToFramePadding();
-    if (changed)
+    if (waiting)
+    {
+        retro_ui_push_section_text();   // the one being bound stands out
+        ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
+        retro_ui_pop_section_text();
+    }
+    else if (changed)
     {
         // Changed from the defaults: highlighted, like an override.
         ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive), "%s", piccolo_text(strings, ACTION_LABELS[index]));
@@ -322,56 +364,29 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
     {
         ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
     }
-    ImGui::SameLine(label_width);
-    if (window->capturing && window->capture_action == action && window->capture_controller == controller_index)
-    {
-        retro_ui_push_field_text();
-        ImGui::TextUnformatted(piccolo_text(strings, Str::input_press));
-        retro_ui_pop_field_text();
-    }
-    else
-    {
-        std::string text;
-        for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
-        {
-            InputSource source = controller->bindings.sources[index][s];
-            if (source.type == InputSourceType::none)
-            {
-                continue;
-            }
-            char name[48] = {};
-            input_window_source_label(context->sdl, device, source, name, sizeof(name));
-            text += text.empty() ? "" : ", ";
-            text += name;
-        }
-        if (text.empty())
-        {
-            ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_none));
-        }
-        else
-        {
-            ImGui::TextUnformatted(text.c_str());
-        }
-    }
+
+    // [RESET] [SET] [CLEAR] at the right end; the binding gets the room before them.
     const char* set = piccolo_text(strings, Str::input_set);
     const char* clear = piccolo_text(strings, Str::input_clear);
     const char* reset = piccolo_text(strings, Str::input_reset);
     float spacing = ImGui::GetStyle().ItemSpacing.x;
-    align_right(button_width(set) + button_width(clear) + button_width(reset) + spacing * 2.0f);
-    ImGui::BeginDisabled(window->capturing || device == nullptr || !device->connected);
-    if (retro_ui_button(set))
+    float buttons = button_width(set) + button_width(clear) + spacing + (changed ? button_width(reset) + spacing : 0.0f);
+    float buttons_x = ImGui::GetWindowContentRegionMax().x - buttons;
+    ImGui::SameLine(label_width);
+    if (waiting)
     {
-        window->bind_all = false;
-        start_capture(window, context, controller_index, action);
+        uint64_t elapsed = context->now_ms - window->capture_started_ms;
+        uint64_t total = CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
+        uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
+        input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left, strings);
+        ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
     }
-    ImGui::SameLine();
-    if (retro_ui_button(clear))
+    else
     {
-        input_unbind_all(&controller->bindings, action);
-        window->dirty = true;
+        input_window_draw_sources(context->sdl, device, controller->bindings.sources[index],
+                                  buttons_x - ImGui::GetCursorPosX() - spacing, strings);
     }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
+    ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
     if (changed)
     {
         ImGui::BeginDisabled(window->capturing);
@@ -385,11 +400,21 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
             window->dirty = true;
         }
         ImGui::EndDisabled();
+        ImGui::SameLine();
     }
-    else
+    ImGui::BeginDisabled(window->capturing || device == nullptr || !device->connected);
+    if (retro_ui_button(set))
     {
-        ImGui::Dummy(ImVec2(button_width(reset), ImGui::GetFrameHeight()));   // keeps the columns still
+        window->bind_all = false;
+        start_capture(window, context, controller_index, action);
     }
+    ImGui::SameLine();
+    if (retro_ui_button(clear))
+    {
+        input_unbind_all(&controller->bindings, action);
+        window->dirty = true;
+    }
+    ImGui::EndDisabled();
     ImGui::PopID();
 }
 
@@ -642,8 +667,9 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
         window->capturing = false;
         return;
     }
+    uint64_t since = context->now_ms - window->capture_started_ms;
     InputSource source = {};
-    if (input_capture_poll(input, &source))
+    if ((!window->bind_all || since >= BIND_ALL_COOL_OFF_MS) && input_capture_poll(input, &source))
     {
         if (source.type == InputSourceType::key && source.code == HID_ESCAPE)
         {
@@ -658,7 +684,7 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
         next_or_stop(window, context);
         return;
     }
-    if (!input->capture.active || context->now_ms - window->capture_started_ms > CAPTURE_TIMEOUT_MS)
+    if (!input->capture.active || since > CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0))
     {
         next_or_stop(window, context);
     }

@@ -1037,3 +1037,16 @@ int retro_ui_tab_switch(int current, int count)
     g_page_request = 0;
     return target;
 }
+
+void retro_ui_push_section_text()
+{
+    // The section color, unless the theme's is the plain text color (as in
+    // PICCOLO): then the highlight, so it still stands out.
+    uint32_t color = (g_palette.section & 0xFFFFFFu) != (g_palette.text & 0xFFFFFFu) ? g_palette.section : g_palette.highlight;
+    ImGui::PushStyleColor(ImGuiCol_Text, to_imgui(color));
+}
+
+void retro_ui_pop_section_text()
+{
+    ImGui::PopStyleColor();
+}

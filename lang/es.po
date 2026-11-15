@@ -1349,9 +1349,6 @@ msgctxt "input_none"
 msgid "NONE"
 msgstr "NINGUNO"
 
-msgctxt "input_press"
-msgid "PRESS A KEY OR BUTTON (ESC CANCELS)"
-msgstr "PRESIONA UNA TECLA O BOTÓN (ESC CANCELA)"
 
 
 msgctxt "input_device_ignored_auto"
@@ -1670,3 +1667,35 @@ msgstr "Lo que el core emula en este puerto (su propia lista: joypad, mouse, mul
 msgctxt "quick_menu_device"
 msgid "DEVICE"
 msgstr "DISPOSITIVO"
+
+msgctxt "quick_menu_remap"
+msgid "REMAP"
+msgstr "REMAPEAR"
+
+msgctxt "remap_title"
+msgid "%s: %s ON PORT %d"
+msgstr "%s: %s EN EL PUERTO %d"
+
+msgctxt "remap_use_retropad"
+msgid "USE RETROPAD"
+msgstr "USAR RETROPAD"
+
+msgctxt "remap_use_retropad_help"
+msgid "This controller plays this core with its RetroPad bindings, unchanged."
+msgstr "Este control juega este core con sus asignaciones de RetroPad, sin cambios."
+
+msgctxt "remap_done"
+msgid "DONE"
+msgstr "LISTO"
+
+msgctxt "remap_prompt"
+msgid "%s ON PORT %d (%s): HOLD START TO REMAP (%d)"
+msgstr "%s EN EL PUERTO %d (%s): MANTÉN START PARA REMAPEAR (%d)"
+
+msgctxt "input_press_button"
+msgid "PRESS A BUTTON (%d)"
+msgstr "PRESIONA UN BOTÓN (%d)"
+
+msgctxt "input_press_key"
+msgid "PRESS A KEY (%d)"
+msgstr "PRESIONA UNA TECLA (%d)"
