@@ -24,6 +24,7 @@
 #include "core_options_ui.h"
 #include "core_session.h"
 #include "input_bindings.h"
+#include "input_layouts.h"
 #include "input_sdl.h"
 #include "settings.h"
 #include "localization.h"
@@ -85,6 +86,7 @@ struct QuickMenuContext
     LibretroHost*        host = nullptr;    // CONTROLS: the core's devices per port, and the one plugged in
     Settings*            settings = nullptr;   // CONTROLS: the device picked is kept per core
     const InputSdl*      sdl = nullptr;        // CONTROLS: button names
+    const InputLayouts*  layouts = nullptr;    // CONTROLS: the controllers' button names
     uint64_t             now_ms = 0;
 };
 

@@ -57,6 +57,19 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
+# Controller layouts (layouts/<id>.cfg) next to the program and in piccolo's
+# folder, like the translations: anyone can add one (see input_layouts.h).
+add_custom_command(TARGET piccolo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/layouts" "$<TARGET_FILE_DIR:piccolo>/layouts"
+    VERBATIM)
+if(MULTITAP_PICCOLO_DIR)
+    add_custom_target(copy_piccolo_layouts ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/layouts" "${MULTITAP_PICCOLO_DIR}/layouts"
+        DEPENDS piccolo
+        COMMENT "Copying piccolo's controller layouts to ${MULTITAP_PICCOLO_DIR}/layouts"
+        VERBATIM)
+endif()
+
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by

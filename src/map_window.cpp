@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include <cstdio>
+#include <vector>
 
 #include "imgui.h"
 #include "input_sdl.h"
@@ -11,38 +12,29 @@
 
 constexpr uint64_t OFFER_MS = 30000;   // NOT NOW by itself after this long
 
-static const Str APPEARANCE_NAMES[] = {Str::map_generic, Str::map_xbox, Str::map_sony, Str::map_nintendo};
-
-// The face, shoulder, trigger, stick click and menu button names of each
-// appearance, in InputMapControl order up to the sticks (nullptr = from the
-// strings: GENERIC's positions, and the d-pad / sticks of all of them).
-static const char* const LABELS[4][INPUT_MAP_CONTROL_COUNT] = {
-    // GENERIC
-    {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, "L", "R", "SELECT", "START", "L2", "R2", "L3",
-     "R3", "HOME", nullptr, nullptr, nullptr, nullptr},
-    // XBOX
-    {"A", "B", "X", "Y", nullptr, nullptr, nullptr, nullptr, "LB", "RB", "VIEW", "MENU", "LT", "RT", "LS", "RS", "XBOX",
-     nullptr, nullptr, nullptr, nullptr},
-    // PLAYSTATION
-    {"CROSS", "CIRCLE", "SQUARE", "TRIANGLE", nullptr, nullptr, nullptr, nullptr, "L1", "R1", "SHARE", "OPTIONS", "L2",
-     "R2", "L3", "R3", "PS", nullptr, nullptr, nullptr, nullptr},
-    // NINTENDO: A on the right, B at the bottom
-    {"B", "A", "Y", "X", nullptr, nullptr, nullptr, nullptr, "L", "R", "-", "+", "ZL", "ZR", "LS", "RS", "HOME", nullptr,
-     nullptr, nullptr, nullptr},
-};
-
-static const Str GENERIC_LABELS[INPUT_MAP_CONTROL_COUNT] = {
+// The names of the controls a layout doesn't name: the d-pad and the
+// sticks (and any button a layout leaves without a label).
+static const Str DEFAULT_LABELS[INPUT_MAP_CONTROL_COUNT] = {
     Str::map_bottom, Str::map_right, Str::map_left, Str::map_top, Str::map_dpad_up, Str::map_dpad_down,
     Str::map_dpad_left, Str::map_dpad_right, Str::map_title, Str::map_title, Str::map_title, Str::map_title,
     Str::map_title, Str::map_title, Str::map_title, Str::map_title, Str::map_title, Str::map_left_x, Str::map_left_y,
     Str::map_right_x, Str::map_right_y,
 };
 
-static const char* control_label(const MapWindow* window, const Localization* strings, InputMapControl control)
+static const InputLayout* picked_layout(const MapWindow* window, const MapWindowContext* context)
+{
+    const InputLayout* layout = input_layouts_find(context->layouts, window->layout.c_str());
+    return layout != nullptr ? layout : input_layouts_find(context->layouts, "Generic/generic");
+}
+
+static const char* control_label(const InputLayout* layout, const Localization* strings, InputMapControl control)
 {
     uint32_t index = static_cast<uint32_t>(control);
-    const char* label = LABELS[static_cast<int>(window->appearance)][index];
-    return label != nullptr ? label : piccolo_text(strings, GENERIC_LABELS[index]);
+    if (layout != nullptr && !layout->labels[index].empty())
+    {
+        return layout->labels[index].c_str();
+    }
+    return piccolo_text(strings, DEFAULT_LABELS[index]);
 }
 
 static bool is_stick(InputMapControl control)
@@ -50,43 +42,26 @@ static bool is_stick(InputMapControl control)
     return static_cast<uint32_t>(control) >= static_cast<uint32_t>(InputMapControl::left_x);
 }
 
-void map_window_offer(MapWindow* window, uint32_t joystick_id, bool needed, uint64_t now_ms)
+void map_window_offer(MapWindow* window, uint32_t joystick_id, bool needed, const InputLayouts* layouts, uint64_t now_ms)
 {
-    map_window_open(window, joystick_id);
+    map_window_open(window, joystick_id, layouts);
     window->stage = MapStage::offer;
     window->needed = needed;
     window->offer_started_ms = now_ms;
 }
 
-void map_window_open(MapWindow* window, uint32_t joystick_id)
+void map_window_open(MapWindow* window, uint32_t joystick_id, const InputLayouts* layouts)
 {
     window->stage = MapStage::appearance;
+    window->take_focus = true;
     window->joystick_id = joystick_id;
     window->name = input_sdl_joystick_name(joystick_id);
     window->guid = input_sdl_joystick_guid(joystick_id);
     window->needed = !SDL_IsGamepad(static_cast<SDL_JoystickID>(joystick_id));
-    // Preselected from what SDL knows of it.
-    switch (SDL_GetGamepadTypeForID(static_cast<SDL_JoystickID>(joystick_id)))
-    {
-    case SDL_GAMEPAD_TYPE_XBOX360:
-    case SDL_GAMEPAD_TYPE_XBOXONE:
-        window->appearance = MapAppearance::xbox;
-        break;
-    case SDL_GAMEPAD_TYPE_PS3:
-    case SDL_GAMEPAD_TYPE_PS4:
-    case SDL_GAMEPAD_TYPE_PS5:
-        window->appearance = MapAppearance::sony;
-        break;
-    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO:
-    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
-    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
-    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR:
-        window->appearance = MapAppearance::nintendo;
-        break;
-    default:
-        window->appearance = MapAppearance::generic;
-        break;
-    }
+    // Preselected from what SDL knows of it ("ps5", "xboxone"...).
+    const char* type = SDL_GetGamepadStringForType(SDL_GetGamepadTypeForID(static_cast<SDL_JoystickID>(joystick_id)));
+    const InputLayout* layout = layouts != nullptr ? input_layouts_for_type(layouts, type) : nullptr;
+    window->layout = layout != nullptr ? layout->id : std::string("Generic/generic");
 }
 
 void map_window_close(MapWindow* window, InputSystem* input)
@@ -132,7 +107,7 @@ static const PadPart PARTS[] = {
 };
 constexpr size_t PART_COUNT = sizeof(PARTS) / sizeof(PARTS[0]);
 
-static void draw_pad(InputMapControl lit, float unit)
+static void draw_pad(const InputLayout* layout, InputMapControl lit, float unit)
 {
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -148,6 +123,15 @@ static void draw_pad(InputMapControl lit, float unit)
                              ImVec2(origin.x + 25.0f * unit, origin.y + 25.0f * unit), part);
     for (size_t p = 0; p < PART_COUNT; p++)
     {
+        // Only what this kind of pad has (a stick: its click or its axes).
+        InputMapControl control = PARTS[p].control;
+        bool present = layout == nullptr || input_layout_has(layout, control) ||
+                       (control == InputMapControl::left_stick && input_layout_has(layout, InputMapControl::left_x)) ||
+                       (control == InputMapControl::right_stick && input_layout_has(layout, InputMapControl::right_x));
+        if (!present)
+        {
+            continue;
+        }
         // A stick lights for its click and for pushing it.
         bool on = PARTS[p].control == lit ||
                   (PARTS[p].control == InputMapControl::left_stick && (lit == InputMapControl::left_x || lit == InputMapControl::left_y)) ||
@@ -179,8 +163,7 @@ static void finish(MapWindow* window, const MapWindowContext* context)
     char text[300] = {};
     if (input_sdl_mapper_finish(&window->mapper, context->mappings_path, &line))
     {
-        static const char* const IDS[] = {"generic", "xbox", "sony", "nintendo"};
-        input_profile_for(context->input, window->guid)->appearance = IDS[static_cast<int>(window->appearance)];
+        input_profile_for(context->input, window->guid)->appearance = window->layout;
         window->profiles_dirty = true;
         std::snprintf(text, sizeof(text), piccolo_text(context->strings, Str::map_done), window->name.c_str());
     }
@@ -233,20 +216,71 @@ static void draw_appearance(MapWindow* window, const MapWindowContext* context, 
     const Localization* strings = context->strings;
     retro_ui_separator_text(window->name.c_str());
     ImGui::TextUnformatted(piccolo_text(strings, Str::map_appearance));
-    for (int a = 0; a < static_cast<int>(MapAppearance::count); a++)
+    // MAKER, then MODEL among that maker's layouts.
+    const InputLayout* layout = picked_layout(window, context);
+    std::string maker = layout != nullptr ? layout->maker : std::string();
+    std::vector<std::string> makers;
+    input_layouts_makers(context->layouts, &makers);
+    float label_width = 60.0f * block;
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::map_maker));
+    ImGui::SameLine(label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (retro_ui_begin_combo("##maker", maker.c_str()))
     {
-        ImGui::PushID(a);
-        if (ImGui::Selectable(piccolo_text(strings, APPEARANCE_NAMES[a]), static_cast<int>(window->appearance) == a))
+        for (size_t m = 0; m < makers.size(); m++)
         {
-            window->appearance = static_cast<MapAppearance>(a);
+            ImGui::PushID(static_cast<int>(m));
+            if (ImGui::Selectable(makers[m].c_str(), makers[m] == maker))
+            {
+                // The maker's first model.
+                for (size_t l = 0; l < context->layouts->layouts.size(); l++)
+                {
+                    if (context->layouts->layouts[l].maker == makers[m])
+                    {
+                        window->layout = context->layouts->layouts[l].id;
+                        break;
+                    }
+                }
+            }
+            ImGui::PopID();
         }
-        ImGui::PopID();
+        ImGui::EndCombo();
     }
+    layout = picked_layout(window, context);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::map_model));
+    ImGui::SameLine(label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (retro_ui_begin_combo("##model", layout != nullptr ? layout->name.c_str() : ""))
+    {
+        for (size_t l = 0; layout != nullptr && l < context->layouts->layouts.size(); l++)
+        {
+            const InputLayout* candidate = &context->layouts->layouts[l];
+            if (candidate->maker != layout->maker)
+            {
+                continue;
+            }
+            ImGui::PushID(static_cast<int>(l));
+            if (ImGui::Selectable(candidate->name.c_str(), candidate->id == window->layout))
+            {
+                window->layout = candidate->id;
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    layout = picked_layout(window, context);
     ImGui::Spacing();
-    draw_pad(InputMapControl::count, block * 1.5f);
+    draw_pad(layout, InputMapControl::count, block * 1.5f);
+    bool wanted[INPUT_MAP_CONTROL_COUNT] = {};
+    for (uint32_t c = 0; c < INPUT_MAP_CONTROL_COUNT; c++)
+    {
+        wanted[c] = layout == nullptr || input_layout_has(layout, static_cast<InputMapControl>(c));
+    }
     if (retro_ui_button(piccolo_text(strings, Str::map_begin)))
     {
-        if (input_sdl_mapper_begin(&window->mapper, window->joystick_id, context->now_ms))
+        if (input_sdl_mapper_begin(&window->mapper, window->joystick_id, wanted, context->now_ms))
         {
             window->stage = MapStage::mapping;
             context->input->suspended = true;   // its presses are the mapping's alone
@@ -274,9 +308,10 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     }
     InputMapControl control = static_cast<InputMapControl>(window->mapper.step);
     retro_ui_separator_text(window->name.c_str());
-    draw_pad(control, block * 1.5f);
+    const InputLayout* layout = picked_layout(window, context);
+    draw_pad(layout, control, block * 1.5f);
     char text[300] = {};
-    const char* label = control_label(window, strings, control);
+    const char* label = control_label(layout, strings, control);
     if (is_stick(control))
     {
         std::snprintf(text, sizeof(text), "%s", label);
@@ -330,7 +365,11 @@ void map_window_draw(MapWindow* window, const MapWindowContext* context, ImFont*
     size.y = size.y < io.DisplaySize.y - 24.0f * block ? size.y : io.DisplaySize.y - 24.0f * block;
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowFocus();   // a modal: on top of the others
+    if (window->take_focus)
+    {
+        ImGui::SetNextWindowFocus();   // on top of the others when it opens
+        window->take_focus = false;
+    }
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
     char title[200] = {};

@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "input_bindings.h"
+#include "input_layouts.h"
 #include "input_sdl.h"
 #include "localization.h"
 #include "settings.h"
@@ -55,6 +56,7 @@ struct InputWindowContext
     Settings*           settings = nullptr;
     const char*         core_name = "";      // "" = no core running (SCOPE)
     const char*         game_name = "";
+    const InputLayouts* layouts = nullptr;   // the controllers' button names
     uint64_t            now_ms = 0;
 };
 
@@ -63,15 +65,21 @@ void input_window_open(InputWindow* window);
 // Draws the window while open (and runs a SET / BIND ALL in progress).
 void input_window_draw(InputWindow* window, const InputWindowContext* context, ImFont* pixel_font, int32_t scale);
 
+// A gamepad's layout (its appearance, as kept in its profile), or nullptr
+// when it has none (never mapped, declined, or a layout that's gone).
+const InputLayout* input_window_layout(const InputSystem* input, const InputLayouts* layouts, const InputDevice* device);
+
 // A source as the user sees it on that device: "RETURN", "A", "CROSS",
-// "D-PAD UP", "LEFT STICK RIGHT", "L2"... (button names from SDL's labels).
-void input_window_source_label(const InputSdl* sdl, const InputDevice* device, InputSource source, char* out, size_t out_size);
+// "D-PAD UP", "LEFT STICK RIGHT", "ZL"... Buttons are named by the
+// controller's layout; without one, by SDL's labels.
+void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout, InputSource source,
+                               char* out, size_t out_size);
 
 // A binding's sources in `width`: all of them ("D-PAD UP, LEFT STICK UP"),
 // or when they don't fit the first and how many more ("D-PAD UP +1") with
 // all of them in the tooltip; NONE when there's none.
-void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputSource* sources, float width,
-                               const Localization* strings);
+void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
+                               const InputSource* sources, float width, const Localization* strings);
 
 // Waiting for a binding: PRESS A BUTTON (4) / PRESS A KEY (4).
 void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Localization* strings);

@@ -70,9 +70,58 @@ static const char* face_button_label(SDL_Gamepad* gamepad, InputButton button, c
     }
 }
 
-void input_window_source_label(const InputSdl* sdl, const InputDevice* device, InputSource source, char* out, size_t out_size)
+// The layout control behind a source, for its label (count = none).
+static InputMapControl layout_control(InputSource source)
+{
+    if (source.type == InputSourceType::button)
+    {
+        switch (static_cast<InputButton>(source.code))
+        {
+        case InputButton::south:          return InputMapControl::south;
+        case InputButton::east:           return InputMapControl::east;
+        case InputButton::west:           return InputMapControl::west;
+        case InputButton::north:          return InputMapControl::north;
+        case InputButton::back:           return InputMapControl::back;
+        case InputButton::guide:          return InputMapControl::guide;
+        case InputButton::start:          return InputMapControl::start;
+        case InputButton::left_stick:     return InputMapControl::left_stick;
+        case InputButton::right_stick:    return InputMapControl::right_stick;
+        case InputButton::left_shoulder:  return InputMapControl::left_shoulder;
+        case InputButton::right_shoulder: return InputMapControl::right_shoulder;
+        default:                          return InputMapControl::count;
+        }
+    }
+    if (source.type == InputSourceType::axis_plus && source.code == static_cast<uint16_t>(InputAxis::left_trigger))
+    {
+        return InputMapControl::left_trigger;
+    }
+    if (source.type == InputSourceType::axis_plus && source.code == static_cast<uint16_t>(InputAxis::right_trigger))
+    {
+        return InputMapControl::right_trigger;
+    }
+    return InputMapControl::count;
+}
+
+const InputLayout* input_window_layout(const InputSystem* input, const InputLayouts* layouts, const InputDevice* device)
+{
+    if (layouts == nullptr || device == nullptr || device->kind != InputDeviceKind::gamepad)
+    {
+        return nullptr;
+    }
+    const InputProfile* profile = input_profile(input, device->guid);
+    return profile != nullptr ? input_layouts_find(layouts, profile->appearance.c_str()) : nullptr;
+}
+
+void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout, InputSource source,
+                               char* out, size_t out_size)
 {
     SDL_Gamepad* gamepad = device != nullptr ? input_sdl_gamepad(sdl, device->id) : nullptr;
+    InputMapControl control = layout_control(source);
+    if (layout != nullptr && control != InputMapControl::count && !layout->labels[static_cast<uint32_t>(control)].empty())
+    {
+        std::snprintf(out, out_size, "%s", layout->labels[static_cast<uint32_t>(control)].c_str());
+        return;
+    }
     const char* text = "?";
     char key[32] = {};
     switch (source.type)
@@ -273,8 +322,8 @@ static void draw_scoped_settings(InputWindow* window, const InputWindowContext* 
 
 static void draw_settings(InputWindow* window, const InputWindowContext* context)
 {
-    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1};
-    draw_scoped_settings(window, context, KEYS, 1);
+    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_SWAP_ACCEPT_BACK};
+    draw_scoped_settings(window, context, KEYS, 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,8 +339,8 @@ static void start_capture(InputWindow* window, const InputWindowContext* context
     input_capture_begin(context->input, context->input->controllers[controller].device_id);
 }
 
-void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputSource* sources, float width,
-                               const Localization* strings)
+void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
+                               const InputSource* sources, float width, const Localization* strings)
 {
     char names[INPUT_SOURCES_PER_ACTION][48] = {};
     uint32_t count = 0;
@@ -299,7 +348,7 @@ void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, c
     {
         if (sources[s].type != InputSourceType::none)
         {
-            input_window_source_label(sdl, device, sources[s], names[count], sizeof(names[count]));
+            input_window_source_label(sdl, device, layout, sources[s], names[count], sizeof(names[count]));
             count++;
         }
     }
@@ -383,7 +432,7 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
     }
     else
     {
-        input_window_draw_sources(context->sdl, device, controller->bindings.sources[index],
+        input_window_draw_sources(context->sdl, device, input_window_layout(input, context->layouts, device), controller->bindings.sources[index],
                                   buttons_x - ImGui::GetCursorPosX() - spacing, strings);
     }
     ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
@@ -434,7 +483,7 @@ static uint32_t mapped_controller(InputWindow* window, const InputWindowContext*
     window->mapping = 0;
     for (uint32_t c = 0; c < input->controllers.size(); c++)
     {
-        if (is_keyboard(input, c))
+        if (is_keyboard(input, c))   // the keyboard is never ignored
         {
             window->mapping = c;
             break;
@@ -466,6 +515,11 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
     {
         for (uint32_t c = 0; c < input->controllers.size(); c++)
         {
+            const InputDevice* candidate = input_devices_find_const(&input->devices, input->controllers[c].device_id);
+            if (candidate != nullptr && input_devices_ignored(candidate))
+            {
+                continue;   // ignored devices aren't mapped
+            }
             ImGui::PushID(static_cast<int>(c));
             controller_label(context, c, label, sizeof(label));
             if (ImGui::Selectable(label, c == controller))
@@ -479,6 +533,31 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
     controller = mapped_controller(window, context);
     InputBindingSet defaults = {};
     input_window_controller_defaults(input, controller, &defaults);
+
+    // HOTKEYS: how this controller's modifier works.
+    if (first == InputAction::hotkey_enable)
+    {
+        static const Str MODE_NAMES[] = {Str::hotkey_mode_hold, Str::hotkey_mode_one, Str::hotkey_mode_stays};
+        static const InputHotkeyMode MODES[] = {InputHotkeyMode::hold, InputHotkeyMode::one_hotkey, InputHotkeyMode::stays_on};
+        InputController* mapped = &input->controllers[controller];
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(piccolo_text(strings, Str::input_hotkey_mode));
+        retro_ui_item_tooltip(piccolo_text(strings, Str::input_hotkey_mode_help));
+        ImGui::SameLine(label_width);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (retro_ui_begin_combo("##hotkey_mode", piccolo_text(strings, MODE_NAMES[static_cast<int>(mapped->hotkey_mode)])))
+        {
+            for (int m = 0; m < 3; m++)
+            {
+                if (ImGui::Selectable(piccolo_text(strings, MODE_NAMES[m]), mapped->hotkey_mode == MODES[m]))
+                {
+                    mapped->hotkey_mode = MODES[m];
+                    window->dirty = true;
+                }
+            }
+            ImGui::EndCombo();
+        }
+    }
 
     // BIND ALL, DEFAULTS
     const InputDevice* device = input_devices_find_const(&input->devices, input->controllers[controller].device_id);
@@ -524,6 +603,9 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
 // DEVICES
 // ---------------------------------------------------------------------------
 
+static void draw_device(InputWindow* window, const InputWindowContext* context, InputDevice* device, float label_width,
+                        bool open_by_default);
+
 static void draw_devices(InputWindow* window, const InputWindowContext* context, float label_width)
 {
     InputSystem* input = context->input;
@@ -548,12 +630,39 @@ static void draw_devices(InputWindow* window, const InputWindowContext* context,
             ImGui::PopID();
         }
     }
-    for (size_t d = 0; d < input->devices.devices.size(); d++)
+    // ENABLED (connected and used) open; DETECTED (ignored, or not
+    // connected now) folded.
+    for (int section = 0; section < 2; section++)
     {
-        InputDevice* device = &input->devices.devices[d];
+        retro_ui_separator_text(piccolo_text(strings, section == 0 ? Str::input_section_enabled : Str::input_section_detected));
+        for (size_t d = 0; d < input->devices.devices.size(); d++)
+        {
+            InputDevice* candidate = &input->devices.devices[d];
+            bool enabled = candidate->connected && !input_devices_ignored(candidate);
+            if (enabled != (section == 0))
+            {
+                continue;
+            }
+            draw_device(window, context, candidate, label_width, enabled);
+        }
+    }
+}
+
+static void draw_device(InputWindow* window, const InputWindowContext* context, InputDevice* device, float label_width,
+                        bool open_by_default)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    {
         int32_t first = input_first_controller(input, device->id);
         ImGui::PushID(static_cast<int>(device->id));
-        retro_ui_separator_text(device->name.c_str());
+        char header[200] = {};
+        std::snprintf(header, sizeof(header), "%s###device", device->name.c_str());
+        if (!retro_ui_collapsing_header(header, open_by_default ? ImGuiTreeNodeFlags_DefaultOpen : 0))
+        {
+            ImGui::PopID();
+            return;
+        }
         if (!device->connected || input_devices_ignored(device))
         {
             Str state = !device->connected ? Str::input_device_disconnected
@@ -794,10 +903,6 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
             if (begin_tab(window, piccolo_text(strings, Str::input_section_hotkeys), "hotkeys", 3, target))
             {
                 window->tab = 3;
-                // How HOTKEY ENABLE works (a setting, scoped), then the bindings.
-                static const char* const HOTKEY_KEYS[] = {PICCOLO_INPUT_HOTKEY_MODE};
-                draw_scoped_settings(window, context, HOTKEY_KEYS, 1);
-                ImGui::Separator();
                 draw_bindings(window, context, InputAction::hotkey_enable, InputAction::hotkey_fast_forward,
                               Str::input_column_action, label_width);
                 ImGui::EndTabItem();

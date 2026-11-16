@@ -65,6 +65,7 @@ struct App
     std::string input_config_path;   // settings/input.cfg
     InputWindow input_window = {};   // CONFIG > INPUT
     MapWindow   map_window = {};     // MAP CONTROLLER
+    InputLayouts layouts = {};       // controller layouts (layouts/*.cfg)
     std::vector<uint32_t> map_offered;   // joysticks offered MAP CONTROLLER this session
     std::string mappings_path;           // settings/gamepad_mappings.txt
 
@@ -1004,9 +1005,19 @@ constexpr size_t UI_KEY_COUNT = sizeof(UI_KEYS) / sizeof(UI_KEYS[0]);
 
 constexpr uint64_t UI_BACK_HOLD_MS = 600;   // hold BACK (or SELECT alone) this long to close a window
 
-static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up)
+static void drive_ui_with_gamepads(App* app, const InputFrame* source_frame, bool ui_up)
 {
     ImGuiIO& io = ImGui::GetIO();
+    // REVERSE ACCEPT / BACK: the two swap roles in the UI (their bindings stay).
+    InputFrame swapped = *source_frame;
+    if (settings_get_bool(&app->settings, PICCOLO_INPUT_SWAP_ACCEPT_BACK))
+    {
+        uint32_t accept = static_cast<uint32_t>(InputAction::ui_accept);
+        uint32_t back_action = static_cast<uint32_t>(InputAction::ui_back);
+        swapped.gamepad_held[accept] = source_frame->gamepad_held[back_action];
+        swapped.gamepad_held[back_action] = source_frame->gamepad_held[accept];
+    }
+    const InputFrame* frame = &swapped;
     for (size_t i = 0; i < UI_KEY_COUNT; i++)
     {
         uint32_t action = static_cast<uint32_t>(UI_KEYS[i].action);
@@ -1017,17 +1028,24 @@ static void drive_ui_with_gamepads(App* app, const InputFrame* frame, bool ui_up
             app->ui_keys_down[i] = down;
         }
     }
-    // BACK: a tap closes an open list or popup; a window closes only when
-    // BACK, or SELECT by itself, is held (a tap of the button the game
-    // calls A must not close a window by accident).
+    // BACK (RetroPad B): a tap closes an open list or popup, or backs out of
+    // a view inside a window; a window closes only when BACK, or SELECT by
+    // itself, is held (a tap must not close a window by accident).
     uint32_t back = static_cast<uint32_t>(InputAction::ui_back);
     bool back_down = ui_up && frame->gamepad_held[back];
     bool hold_down = ui_up && (back_down || frame->gamepad_enable_alone);
     uint64_t now = SDL_GetTicks();
-    if (back_down && !app->ui_back_down && ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+    if (back_down && !app->ui_back_down)
     {
-        io.AddKeyEvent(ImGuiKey_Escape, true);
-        io.AddKeyEvent(ImGuiKey_Escape, false);
+        if (ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+        {
+            io.AddKeyEvent(ImGuiKey_Escape, true);   // a list or popup closes first
+            io.AddKeyEvent(ImGuiKey_Escape, false);
+        }
+        else if (app->quick_menu.open && app->quick_menu.remap && !app->quick_menu.capturing)
+        {
+            app->quick_menu.remap = false;   // a view inside a window: back out of it
+        }
     }
     if (!hold_down)
     {
@@ -1191,7 +1209,7 @@ static void offer_mapping(App* app, const InputFrame* frame)
             if (!offered)
             {
                 app->map_offered.push_back(joystick);
-                map_window_offer(map, joystick, true, now);
+                map_window_offer(map, joystick, true, &app->layouts, now);
                 break;
             }
         }
@@ -1206,13 +1224,13 @@ static void offer_mapping(App* app, const InputFrame* frame)
             uint32_t joystick = input_sdl_joystick_of(&app->input_sdl, device_id);
             if ((profile == nullptr || profile->appearance.empty()) && joystick != 0)
             {
-                map_window_offer(map, joystick, false, now);
+                map_window_offer(map, joystick, false, &app->layouts, now);
             }
         }
     }
     if (app->input_window.map_request != 0 && !map_window_open_now(map))
     {
-        map_window_open(map, app->input_window.map_request);
+        map_window_open(map, app->input_window.map_request, &app->layouts);
     }
     app->input_window.map_request = 0;
     if (!map->result.empty())
@@ -1232,7 +1250,7 @@ static void offer_mapping(App* app, const InputFrame* frame)
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
-    app->input.settings.game_has_input = !ui_up;
+    app->input.settings.ui_active = ui_up;   // the INTERFACE layer
     piccolo_settings_input(&app->settings, &app->input.settings);   // SETTINGS > INPUT, per core / game too
     // The core and the device on each port: a controller's bindings for them.
     app->input.core_name = game_running(app) ? app->core_name : "";
@@ -1240,7 +1258,6 @@ static void app_update_input(App* app)
     {
         app->input.port_devices[port] = app->session.host->port_devices[port];
     }
-    app->input.settings.core_takes_keyboard = app->session.keyboard.game_focus;
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());
@@ -1266,6 +1283,10 @@ static void app_update_input(App* app)
     }
     app_handle_hotkeys(app, &frame);
     drive_ui_with_gamepads(app, &frame, ui_up);
+    if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])
+    {
+        close_topmost_or_toggle_menu(app);   // Escape in the UI: back, at once
+    }
     // PAGE LEFT / RIGHT change tabs (not while typing in a field).
     int page = 0;
     if (ui_up && !ImGui::GetIO().WantTextInput)
@@ -1640,6 +1661,17 @@ int main(int argc, char** argv)
     // doesn't know, or maps differently from us (written by MAP CONTROLLER).
     app->mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
     const std::string& mappings_path = app->mappings_path;
+    // Controller layouts: the ones next to the program, then piccolo's folder's
+    // (the same id there wins), and GENERIC built in if neither has it.
+    const char* program_folder = SDL_GetBasePath();
+    std::string bundled_layouts = std::string(program_folder != nullptr ? program_folder : "") + "layouts";
+    host_fs_forward_slashes(bundled_layouts.data());
+    input_layouts_load_directory(&app->layouts, bundled_layouts.c_str());
+    if (!app->paths.root.empty())
+    {
+        input_layouts_load_directory(&app->layouts, (app->paths.root + "/layouts").c_str());
+    }
+    input_layouts_ensure_generic(&app->layouts);
     // settings/input.cfg first: controllers are made from its profiles as their devices appear.
     app->input_config_path = app->paths.settings.empty() ? "" : app->paths.settings + "/input.cfg";
     if (!app->input_config_path.empty())
@@ -1773,6 +1805,7 @@ int main(int argc, char** argv)
             quick.settings = &app->settings;
             uint32_t slot_before = app->quick_menu.slot;
             quick.sdl = &app->input_sdl;
+            quick.layouts = &app->layouts;
             quick.now_ms = SDL_GetTicks();
             QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
             draw_remap_prompt(app);
@@ -1820,6 +1853,7 @@ int main(int argc, char** argv)
             input_context.settings = &app->settings;
             input_context.core_name = app->core_name;
             input_context.game_name = app->game_name;
+            input_context.layouts = &app->layouts;
             input_context.now_ms = SDL_GetTicks();
             bool input_was_open = app->input_window.open;
             input_window_draw(&app->input_window, &input_context, app->pixel_font, app->ui_scale);
@@ -1827,6 +1861,7 @@ int main(int argc, char** argv)
             map_context.input = &app->input;
             map_context.strings = &app->strings;
             map_context.mappings_path = app->mappings_path.c_str();
+            map_context.layouts = &app->layouts;
             map_context.now_ms = SDL_GetTicks();
             map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
             if (input_was_open && !app->input_window.open)

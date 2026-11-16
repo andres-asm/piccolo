@@ -470,6 +470,14 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     std::snprintf(title, sizeof(title), piccolo_text(strings, Str::remap_title),
                   input->controllers[menu->remap_controller].name.c_str(), device != nullptr ? device : "RETROPAD",
                   static_cast<int>(menu->remap_port + 1));
+    ImGui::BeginDisabled(menu->capturing);
+    bool back = retro_ui_button(piccolo_text(strings, Str::map_back));
+    ImGui::EndDisabled();
+    if (back)
+    {
+        menu->remap = false;   // back to the ports (B on a gamepad does the same)
+        return;
+    }
     retro_ui_separator_text(title);
     ImGui::BeginDisabled(menu->capturing);
     draw_device_combo(context, menu->remap_port, 80.0f * block);
@@ -536,7 +544,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         }
         else
         {
-            input_window_draw_sources(context->sdl, pad, effective.sources[index],
+            input_window_draw_sources(context->sdl, pad, input_window_layout(input, context->layouts, pad), effective.sources[index],
                                       set_x - ImGui::GetCursorPosX() - ImGui::GetStyle().ItemSpacing.x, strings);
         }
         ImGui::SameLine(set_x > ImGui::GetCursorPosX() ? set_x : 0.0f);

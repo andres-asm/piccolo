@@ -1579,21 +1579,9 @@ msgctxt "setting_input_share_port1_help"
 msgid "The keyboard plays on port 1 together with the gamepad that joined port 1. Off: the keyboard joins its own port with START."
 msgstr "El teclado juega en el puerto 1 junto con el gamepad que se unió al puerto 1. Apagado: el teclado se une a su propio puerto con START."
 
-msgctxt "setting_input_hotkey_mode"
-msgid "HOTKEY ENABLE"
-msgstr "HABILITAR HOTKEYS"
 
-msgctxt "setting_input_hotkey_mode_help"
-msgid "How HOTKEY ENABLE works on gamepads. HOLD: hotkeys work while it is held. DOUBLE TAP: tap it twice, then one hotkey works."
-msgstr "Cómo funciona HABILITAR HOTKEYS en los gamepads. MANTENER: los hotkeys funcionan mientras está apretado. DOBLE TOQUE: tócalo dos veces y funciona un hotkey."
 
-msgctxt "value_hotkey_hold"
-msgid "HOLD"
-msgstr "MANTENER"
 
-msgctxt "value_hotkey_double_tap"
-msgid "DOUBLE TAP"
-msgstr "DOBLE TOQUE"
 
 msgctxt "input_tab_settings"
 msgid "SETTINGS"
@@ -1728,21 +1716,9 @@ msgctxt "map_appearance"
 msgid "WHAT DOES IT LOOK LIKE?"
 msgstr "¿CÓMO ES?"
 
-msgctxt "map_generic"
-msgid "GENERIC"
-msgstr "GENÉRICO"
 
-msgctxt "map_xbox"
-msgid "XBOX"
-msgstr "XBOX"
 
-msgctxt "map_sony"
-msgid "PLAYSTATION"
-msgstr "PLAYSTATION"
 
-msgctxt "map_nintendo"
-msgid "NINTENDO"
-msgstr "NINTENDO"
 
 msgctxt "map_begin"
 msgid "BEGIN"
@@ -1827,3 +1803,47 @@ msgstr "STICK DERECHO: EMPÚJALO HACIA ABAJO"
 msgctxt "input_map_unmapped"
 msgid "CONTROLLERS TO MAP"
 msgstr "CONTROLES PARA MAPEAR"
+
+msgctxt "input_section_enabled"
+msgid "ENABLED"
+msgstr "ACTIVOS"
+
+msgctxt "input_section_detected"
+msgid "DETECTED"
+msgstr "DETECTADOS"
+
+msgctxt "map_maker"
+msgid "MAKER"
+msgstr "MARCA"
+
+msgctxt "map_model"
+msgid "MODEL"
+msgstr "MODELO"
+
+msgctxt "setting_input_swap_accept_back"
+msgid "REVERSE ACCEPT / BACK"
+msgstr "INVERTIR ACEPTAR / VOLVER"
+
+msgctxt "setting_input_swap_accept_back_help"
+msgid "On gamepads, menus and windows: the right button accepts and the bottom one goes back."
+msgstr "En los gamepads, en menús y ventanas: el botón de la derecha acepta y el de abajo vuelve."
+
+msgctxt "input_hotkey_mode"
+msgid "HOTKEY MODE"
+msgstr "MODO DE HOTKEYS"
+
+msgctxt "input_hotkey_mode_help"
+msgid "How this controller's HOTKEY ENABLE turns hotkeys on. HOLD: while it is held. ONE HOTKEY: double tap it, then one hotkey works. STAYS ON: double tap it to turn hotkeys on, double tap again to turn them off."
+msgstr "Cómo activa los hotkeys el HABILITAR HOTKEYS de este control. MANTENER: mientras está apretado. UN HOTKEY: tócalo dos veces y funciona un hotkey. QUEDA ACTIVO: tócalo dos veces para activar los hotkeys y otras dos para desactivarlos."
+
+msgctxt "hotkey_mode_hold"
+msgid "HOLD"
+msgstr "MANTENER"
+
+msgctxt "hotkey_mode_one"
+msgid "ONE HOTKEY"
+msgstr "UN HOTKEY"
+
+msgctxt "hotkey_mode_stays"
+msgid "STAYS ON"
+msgstr "QUEDA ACTIVO"
