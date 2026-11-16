@@ -43,6 +43,7 @@ struct InputWindow
     InputAction bind_all_last = InputAction::pad_b;   // ...up to this one
 
     std::vector<std::string> names;          // NAME fields being edited, per controller
+    uint32_t     map_request = 0;            // DEVICES > MAP...: this joystick (piccolo opens MAP CONTROLLER)
     bool dirty = false;                      // bindings or devices changed: save settings/input.cfg
 };
 

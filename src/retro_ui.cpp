@@ -1038,12 +1038,21 @@ int retro_ui_tab_switch(int current, int count)
     return target;
 }
 
-void retro_ui_push_section_text()
+static uint32_t attention()
 {
     // The section color, unless the theme's is the plain text color (as in
     // PICCOLO): then the highlight, so it still stands out.
-    uint32_t color = (g_palette.section & 0xFFFFFFu) != (g_palette.text & 0xFFFFFFu) ? g_palette.section : g_palette.highlight;
-    ImGui::PushStyleColor(ImGuiCol_Text, to_imgui(color));
+    return (g_palette.section & 0xFFFFFFu) != (g_palette.text & 0xFFFFFFu) ? g_palette.section : g_palette.highlight;
+}
+
+void retro_ui_push_section_text()
+{
+    ImGui::PushStyleColor(ImGuiCol_Text, to_imgui(attention()));
+}
+
+uint32_t retro_ui_attention_color()
+{
+    return to_imgui_u32(attention());
 }
 
 void retro_ui_pop_section_text()

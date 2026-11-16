@@ -159,6 +159,7 @@ bool retro_ui_begin_combo(const char* label, const char* preview);
 // (yellow in CLASSIC), or the highlight color where that is the text color.
 void retro_ui_push_section_text();
 void retro_ui_pop_section_text();
+uint32_t retro_ui_attention_color();   // that color as ImGui's packed color (ImU32)
 
 // Tabs by PAGE LEFT / PAGE RIGHT (L / R on a gamepad, Page Up / Page Down on
 // the keyboard): piccolo hands this frame's request (-1, +1 or 0), and each

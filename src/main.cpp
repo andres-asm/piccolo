@@ -44,6 +44,7 @@
 #include "input_config.h"
 #include "input_sdl.h"
 #include "input_window.h"
+#include "map_window.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -63,6 +64,9 @@ struct App
     bool        open_first_menu = false;
     std::string input_config_path;   // settings/input.cfg
     InputWindow input_window = {};   // CONFIG > INPUT
+    MapWindow   map_window = {};     // MAP CONTROLLER
+    std::vector<uint32_t> map_offered;   // joysticks offered MAP CONTROLLER this session
+    std::string mappings_path;           // settings/gamepad_mappings.txt
 
     // HOLD START TO REMAP: a controller plays a core's device it hasn't
     // played before (no decided InputCoreProfile).
@@ -370,7 +374,7 @@ static void update_pause(App* app)
 {
     bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
-                     app->input_window.open;
+                     app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
     bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
@@ -896,7 +900,8 @@ static void refresh_audio_devices(App* app)
 static bool any_window_open(const App* app)
 {
     return app->picker.open || app->settings_window.open || app->settings_window.image_open || app->quick_menu.open ||
-           app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open;
+           app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open ||
+           map_window_open_now(&app->map_window);
 }
 
 // A menu or a dialog is up: the controllers drive it, not the game.
@@ -910,7 +915,11 @@ static bool ui_is_up(const App* app)
 static void close_topmost_or_toggle_menu(App* app)
 {
     {
-        if (app->quick_menu.open)
+        if (map_window_open_now(&app->map_window))
+        {
+            map_window_close(&app->map_window, &app->input);
+        }
+        else if (app->quick_menu.open)
         {
             app->quick_menu.open = false;
         }
@@ -1160,6 +1169,63 @@ static void draw_remap_prompt(App* app)
     retro_ui_pop_theme();
 }
 
+// MAP CONTROLLER offered: once per session for a controller SDL doesn't
+// know (it can't be used otherwise), and the first time a known one joins
+// (unless mapped or declined before). Its results go to the status line
+// and input.cfg.
+static void offer_mapping(App* app, const InputFrame* frame)
+{
+    MapWindow* map = &app->map_window;
+    uint64_t now = SDL_GetTicks();
+    if (!map_window_open_now(map))
+    {
+        for (size_t u = 0; u < app->input_sdl.unmapped.size(); u++)
+        {
+            uint32_t joystick = app->input_sdl.unmapped[u];
+            bool offered = false;
+            for (size_t o = 0; o < app->map_offered.size(); o++)
+            {
+                offered = offered || app->map_offered[o] == joystick;
+            }
+            if (!offered)
+            {
+                app->map_offered.push_back(joystick);
+                map_window_offer(map, joystick, true, now);
+                break;
+            }
+        }
+    }
+    if (!map_window_open_now(map) && frame->joined_controller >= 0)
+    {
+        uint32_t device_id = app->input.controllers[static_cast<size_t>(frame->joined_controller)].device_id;
+        const InputDevice* device = input_devices_find_const(&app->input.devices, device_id);
+        if (device != nullptr && device->kind == InputDeviceKind::gamepad)
+        {
+            const InputProfile* profile = input_profile(&app->input, device->guid);
+            uint32_t joystick = input_sdl_joystick_of(&app->input_sdl, device_id);
+            if ((profile == nullptr || profile->appearance.empty()) && joystick != 0)
+            {
+                map_window_offer(map, joystick, false, now);
+            }
+        }
+    }
+    if (app->input_window.map_request != 0 && !map_window_open_now(map))
+    {
+        map_window_open(map, app->input_window.map_request);
+    }
+    app->input_window.map_request = 0;
+    if (!map->result.empty())
+    {
+        set_status(app, map->result.c_str());
+        map->result.clear();
+    }
+    if (map->profiles_dirty && !app->input_config_path.empty())
+    {
+        input_config_save(&app->input, app->input_config_path.c_str());
+        map->profiles_dirty = false;
+    }
+}
+
 // Once per loop, after the events: what the controllers say (ports,
 // hotkeys), handed to the core session before it runs frames.
 static void app_update_input(App* app)
@@ -1177,6 +1243,7 @@ static void app_update_input(App* app)
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());
+    offer_mapping(app, &frame);
     char message[300] = {};
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {
@@ -1231,6 +1298,10 @@ static void app_handle_events(App* app)
             app_shell_process_event(&app->shell, &event);
         }
         input_sdl_handle_event(&app->input_sdl, &app->input, &event);
+        if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE && app->input.suspended)
+        {
+            map_window_close(&app->map_window, &app->input);   // the router is off while mapping: Escape still gives up
+        }
 
         if ((event.type == SDL_EVENT_AUDIO_DEVICE_ADDED || event.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) &&
             !event.adevice.recording)
@@ -1565,8 +1636,9 @@ int main(int argc, char** argv)
         io.IniFilename = nullptr;
     }
     // Controllers: settings/gamepad_mappings.txt holds mappings for ones SDL
-    // doesn't know (written by piccolo_map_gamepad).
-    std::string mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
+    // doesn't know, or maps differently from us (written by MAP CONTROLLER).
+    app->mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
+    const std::string& mappings_path = app->mappings_path;
     // settings/input.cfg first: controllers are made from its profiles as their devices appear.
     app->input_config_path = app->paths.settings.empty() ? "" : app->paths.settings + "/input.cfg";
     if (!app->input_config_path.empty())
@@ -1750,6 +1822,12 @@ int main(int argc, char** argv)
             input_context.now_ms = SDL_GetTicks();
             bool input_was_open = app->input_window.open;
             input_window_draw(&app->input_window, &input_context, app->pixel_font, app->ui_scale);
+            MapWindowContext map_context = {};
+            map_context.input = &app->input;
+            map_context.strings = &app->strings;
+            map_context.mappings_path = app->mappings_path.c_str();
+            map_context.now_ms = SDL_GetTicks();
+            map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
             if (input_was_open && !app->input_window.open)
             {
                 save_settings(app);   // SETTINGS tab

@@ -1699,3 +1699,131 @@ msgstr "PRESIONA UN BOTÓN (%d)"
 msgctxt "input_press_key"
 msgid "PRESS A KEY (%d)"
 msgstr "PRESIONA UNA TECLA (%d)"
+
+msgctxt "map_title"
+msgid "MAP CONTROLLER"
+msgstr "MAPEAR CONTROL"
+
+msgctxt "map_new"
+msgid "NEW CONTROLLER: %s"
+msgstr "CONTROL NUEVO: %s"
+
+msgctxt "map_offer_text"
+msgid "Map it so its buttons are right: you press each button as it lights up."
+msgstr "Mapéalo para que sus botones queden bien: presionas cada botón cuando se ilumina."
+
+msgctxt "map_offer_needed"
+msgid "It isn't known as a gamepad: it can't be used until it is mapped."
+msgstr "No se reconoce como gamepad: no se puede usar hasta mapearlo."
+
+msgctxt "map_map"
+msgid "MAP"
+msgstr "MAPEAR"
+
+msgctxt "map_not_now"
+msgid "NOT NOW (%d)"
+msgstr "AHORA NO (%d)"
+
+msgctxt "map_appearance"
+msgid "WHAT DOES IT LOOK LIKE?"
+msgstr "¿CÓMO ES?"
+
+msgctxt "map_generic"
+msgid "GENERIC"
+msgstr "GENÉRICO"
+
+msgctxt "map_xbox"
+msgid "XBOX"
+msgstr "XBOX"
+
+msgctxt "map_sony"
+msgid "PLAYSTATION"
+msgstr "PLAYSTATION"
+
+msgctxt "map_nintendo"
+msgid "NINTENDO"
+msgstr "NINTENDO"
+
+msgctxt "map_begin"
+msgid "BEGIN"
+msgstr "EMPEZAR"
+
+msgctxt "map_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "map_press"
+msgid "PRESS %s"
+msgstr "PRESIONA %s"
+
+msgctxt "map_skip"
+msgid "SKIP"
+msgstr "SALTAR"
+
+msgctxt "map_back"
+msgid "BACK"
+msgstr "ATRÁS"
+
+msgctxt "map_skip_in"
+msgid "SKIPPED IN %d S IF IT DOESN'T HAVE IT"
+msgstr "SE SALTA EN %d S SI NO LO TIENE"
+
+msgctxt "map_done"
+msgid "%s: MAPPED"
+msgstr "%s: MAPEADO"
+
+msgctxt "map_failed"
+msgid "%s: THE MAPPING WAS REFUSED"
+msgstr "%s: EL MAPEO FUE RECHAZADO"
+
+msgctxt "map_bottom"
+msgid "THE BOTTOM BUTTON"
+msgstr "EL BOTÓN DE ABAJO"
+
+msgctxt "map_right"
+msgid "THE RIGHT BUTTON"
+msgstr "EL BOTÓN DE LA DERECHA"
+
+msgctxt "map_left"
+msgid "THE LEFT BUTTON"
+msgstr "EL BOTÓN DE LA IZQUIERDA"
+
+msgctxt "map_top"
+msgid "THE TOP BUTTON"
+msgstr "EL BOTÓN DE ARRIBA"
+
+msgctxt "map_dpad_up"
+msgid "D-PAD UP"
+msgstr "CRUCETA ARRIBA"
+
+msgctxt "map_dpad_down"
+msgid "D-PAD DOWN"
+msgstr "CRUCETA ABAJO"
+
+msgctxt "map_dpad_left"
+msgid "D-PAD LEFT"
+msgstr "CRUCETA IZQUIERDA"
+
+msgctxt "map_dpad_right"
+msgid "D-PAD RIGHT"
+msgstr "CRUCETA DERECHA"
+
+msgctxt "map_left_x"
+msgid "LEFT STICK: PUSH IT RIGHT"
+msgstr "STICK IZQUIERDO: EMPÚJALO A LA DERECHA"
+
+msgctxt "map_left_y"
+msgid "LEFT STICK: PUSH IT DOWN"
+msgstr "STICK IZQUIERDO: EMPÚJALO HACIA ABAJO"
+
+msgctxt "map_right_x"
+msgid "RIGHT STICK: PUSH IT RIGHT"
+msgstr "STICK DERECHO: EMPÚJALO A LA DERECHA"
+
+msgctxt "map_right_y"
+msgid "RIGHT STICK: PUSH IT DOWN"
+msgstr "STICK DERECHO: EMPÚJALO HACIA ABAJO"
+
+msgctxt "input_map_unmapped"
+msgid "CONTROLLERS TO MAP"
+msgstr "CONTROLES PARA MAPEAR"

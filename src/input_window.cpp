@@ -528,6 +528,26 @@ static void draw_devices(InputWindow* window, const InputWindowContext* context,
 {
     InputSystem* input = context->input;
     const Localization* strings = context->strings;
+    // Controllers SDL doesn't know as gamepads: unusable until mapped.
+    if (!context->sdl->unmapped.empty())
+    {
+        retro_ui_separator_text(piccolo_text(strings, Str::input_map_unmapped));
+        for (size_t u = 0; u < context->sdl->unmapped.size(); u++)
+        {
+            uint32_t joystick = context->sdl->unmapped[u];
+            ImGui::PushID(static_cast<int>(10000 + joystick));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(input_sdl_joystick_name(joystick).c_str());
+            const char* map = piccolo_text(strings, Str::input_map);
+            float x = ImGui::GetWindowContentRegionMax().x - button_width(map);
+            ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
+            if (retro_ui_button(map))
+            {
+                window->map_request = joystick;
+            }
+            ImGui::PopID();
+        }
+    }
     for (size_t d = 0; d < input->devices.devices.size(); d++)
     {
         InputDevice* device = &input->devices.devices[d];
@@ -544,6 +564,15 @@ static void draw_devices(InputWindow* window, const InputWindowContext* context,
         if (device->kind == InputDeviceKind::gamepad && first >= 0)
         {
             InputController* controller = &input->controllers[static_cast<size_t>(first)];
+            uint32_t joystick = input_sdl_joystick_of(context->sdl, device->id);
+            if (joystick != 0)
+            {
+                // Map it again as it is (its buttons by position, its appearance).
+                if (retro_ui_button(piccolo_text(strings, Str::input_map)))
+                {
+                    window->map_request = joystick;
+                }
+            }
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(piccolo_text(strings, Str::input_name));
             ImGui::SameLine(label_width);
