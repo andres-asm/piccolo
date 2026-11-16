@@ -59,6 +59,16 @@ endif()
 
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
+# Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
+# tools/make_app_icon.py from the same PNGs as the window icon).
+if(WIN32)
+    enable_language(RC)
+    set(PICCOLO_ICO "${CMAKE_CURRENT_SOURCE_DIR}/assets/windows/piccolo.ico")
+    configure_file(src/piccolo.rc.in "${PICCOLO_GENERATED}/piccolo.rc" @ONLY)
+    target_sources(piccolo PRIVATE "${PICCOLO_GENERATED}/piccolo.rc")
+    set_source_files_properties("${PICCOLO_GENERATED}/piccolo.rc" PROPERTIES OBJECT_DEPENDS "${PICCOLO_ICO}")
+endif()
+
 # piccolo's version (docs/roadmap-piccolo.md in multitap): piccolo_version.h,
 # PICCOLO_VERSION. The branch suffix is piccolo's own branch.
 set(PICCOLO_VERSION_BASE 0.3)

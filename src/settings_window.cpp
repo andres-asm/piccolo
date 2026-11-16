@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "game_mode.h"
 #include "imgui.h"
 
 #include "piccolo_settings.h"
@@ -45,8 +46,11 @@ static void draw_general(const SettingsUiContext* ui, const SettingsWindowContex
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_ON_FOCUS_LOSS, nullptr);
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
-    settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
-    ImGui::TextDisabled("%s", context->game_mode);
+    if (game_mode_supported())   // Linux only: nothing to turn on elsewhere
+    {
+        settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
+        ImGui::TextDisabled("%s", context->game_mode);
+    }
     retro_ui_separator_text(piccolo_text(ui->strings, Str::section_folders));
     settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
     settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());

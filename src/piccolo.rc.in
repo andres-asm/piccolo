@@ -1,0 +1,6 @@
+// piccolo.exe's resources (Windows). CMake fills in the path (configure_file)
+// so the resource compiler finds the icon from any build folder.
+
+// The .exe's icon: Explorer, the taskbar, shortcuts. The lowest id is the
+// one Windows shows. The window's own icon is set at run time (app_icon.h).
+1 ICON "@PICCOLO_ICO@"

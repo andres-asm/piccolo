@@ -867,6 +867,7 @@ static void update_language(App* app)
     std::string user_copy = app->paths.root.empty() ? std::string() : app->paths.root + "/" + file;
     const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
     std::string bundled = base != nullptr ? std::string(base) + file : file;
+    host_fs_forward_slashes(bundled.data());
     const std::string* path = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? &user_copy : &bundled;
     localization_load_po(&app->strings, path->c_str(), piccolo_language_code(language));
     refresh_recent_labels(app);

@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "host_fs.h"
 #include "imgui.h"
 
 #include "piccolo_text.h"
@@ -29,9 +30,30 @@ static bool is_separator(char c)
 }
 
 // "/a/b/c" -> "/a/b", "/a" -> "/". Stays "/" at the root.
+// Windows drives: "C:/a" -> "C:/" (not "C:", which means the drive's current
+// folder), and it stays at "C:/".
 static void go_to_parent(char* directory)
 {
     size_t length = std::strlen(directory);
+    bool drive = length >= 2 && directory[1] == ':' &&
+                 ((directory[0] >= 'A' && directory[0] <= 'Z') || (directory[0] >= 'a' && directory[0] <= 'z'));
+    if (drive)
+    {
+        size_t last_separator = 0;
+        for (size_t i = 2; i + 1 < length; i++)   // a trailing separator doesn't count
+        {
+            if (is_separator(directory[i]))
+            {
+                last_separator = i;
+            }
+        }
+        if (last_separator <= 2)
+        {
+            directory[2] = '/';   // the drive's root
+            directory[3] = '\0';
+            return;
+        }
+    }
     // Ignore trailing separators ("/a/b/" is "/a/b").
     while (length > 1 && is_separator(directory[length - 1]))
     {
@@ -136,6 +158,7 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
         const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
         std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
     }
+    host_fs_forward_slashes(picker->directory);   // so the files picked from it don't mix separators
 
     // The given core if it's in the catalog, else the first usable one that
     // needs content (the catalog lists usable cores first).
