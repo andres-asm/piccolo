@@ -322,12 +322,12 @@ static void draw_scoped_settings(InputWindow* window, const InputWindowContext* 
 
 static void draw_settings(InputWindow* window, const InputWindowContext* context)
 {
-    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_SWAP_ACCEPT_BACK};
-    draw_scoped_settings(window, context, KEYS, 2);
+    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1};
+    draw_scoped_settings(window, context, KEYS, 1);
 }
 
 // ---------------------------------------------------------------------------
-// RETROPAD / INTERFACE / HOTKEYS
+// INTERFACE / HOTKEYS
 // ---------------------------------------------------------------------------
 
 static void start_capture(InputWindow* window, const InputWindowContext* context, uint32_t controller, InputAction action)
@@ -877,7 +877,7 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
         float label_width = 110.0f * block;
         if (ImGui::BeginTabBar("input_tabs"))
         {
-            int target = window->capturing ? -1 : retro_ui_tab_switch(window->tab, 5);
+            int target = window->capturing ? -1 : retro_ui_tab_switch(window->tab, 4);
             if (begin_tab(window, piccolo_text(strings, Str::input_tab_settings), "settings", 0, target))
             {
                 window->tab = 0;
@@ -886,30 +886,23 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
                 end_content();
                 ImGui::EndTabItem();
             }
-            if (begin_tab(window, piccolo_text(strings, Str::input_tab_retropad), "retropad", 1, target))
+            if (begin_tab(window, piccolo_text(strings, Str::input_section_interface), "interface", 1, target))
             {
                 window->tab = 1;
-                draw_bindings(window, context, InputAction::pad_b, InputAction::pad_right_y_minus, Str::input_column_game,
-                              label_width);
-                ImGui::EndTabItem();
-            }
-            if (begin_tab(window, piccolo_text(strings, Str::input_section_interface), "interface", 2, target))
-            {
-                window->tab = 2;
                 draw_bindings(window, context, InputAction::ui_up, InputAction::ui_open_menu, Str::input_column_action,
                               label_width);
                 ImGui::EndTabItem();
             }
-            if (begin_tab(window, piccolo_text(strings, Str::input_section_hotkeys), "hotkeys", 3, target))
+            if (begin_tab(window, piccolo_text(strings, Str::input_section_hotkeys), "hotkeys", 2, target))
             {
-                window->tab = 3;
+                window->tab = 2;
                 draw_bindings(window, context, InputAction::hotkey_enable, InputAction::hotkey_fast_forward,
                               Str::input_column_action, label_width);
                 ImGui::EndTabItem();
             }
-            if (begin_tab(window, piccolo_text(strings, Str::input_tab_devices), "devices", 4, target))
+            if (begin_tab(window, piccolo_text(strings, Str::input_tab_devices), "devices", 3, target))
             {
-                window->tab = 4;
+                window->tab = 3;
                 begin_content();
                 draw_devices(window, context, label_width);
                 end_content();

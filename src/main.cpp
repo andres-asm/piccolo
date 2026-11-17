@@ -67,7 +67,6 @@ struct App
     MapWindow   map_window = {};     // MAP CONTROLLER
     InputLayouts layouts = {};       // controller layouts (layouts/*.cfg)
     std::vector<uint32_t> map_offered;   // joysticks offered MAP CONTROLLER this session
-    std::string mappings_path;           // settings/gamepad_mappings.txt
 
     // HOLD START TO REMAP: a controller plays a core's device it hasn't
     // played before (no decided InputCoreProfile).
@@ -882,11 +881,6 @@ static void update_window(App* app)
 }
 
 // Keyboard as the game's joypad only while the game has the screen.
-static bool game_has_keyboard(const App* app)
-{
-    return game_running(app) && !app->menu_visible && !app->picker.open && !app->settings_window.open &&
-           !app->settings_window.image_open;
-}
 
 static void refresh_audio_devices(App* app)
 {
@@ -910,6 +904,12 @@ static bool any_window_open(const App* app)
 static bool ui_is_up(const App* app)
 {
     return app->menu_visible || !game_running(app) || any_window_open(app) || app->remap_prompt;
+}
+
+// The game has the keyboard: its keys go to the core (and are the RetroPad).
+static bool game_has_keyboard(const App* app)
+{
+    return !ui_is_up(app);
 }
 
 // Escape / BACK: close the topmost window first (IMAGE SETTINGS, SETTINGS,
@@ -1008,16 +1008,7 @@ constexpr uint64_t UI_BACK_HOLD_MS = 600;   // hold BACK (or SELECT alone) this 
 static void drive_ui_with_gamepads(App* app, const InputFrame* source_frame, bool ui_up)
 {
     ImGuiIO& io = ImGui::GetIO();
-    // REVERSE ACCEPT / BACK: the two swap roles in the UI (their bindings stay).
-    InputFrame swapped = *source_frame;
-    if (settings_get_bool(&app->settings, PICCOLO_INPUT_SWAP_ACCEPT_BACK))
-    {
-        uint32_t accept = static_cast<uint32_t>(InputAction::ui_accept);
-        uint32_t back_action = static_cast<uint32_t>(InputAction::ui_back);
-        swapped.gamepad_held[accept] = source_frame->gamepad_held[back_action];
-        swapped.gamepad_held[back_action] = source_frame->gamepad_held[accept];
-    }
-    const InputFrame* frame = &swapped;
+    const InputFrame* frame = source_frame;
     for (size_t i = 0; i < UI_KEY_COUNT; i++)
     {
         uint32_t action = static_cast<uint32_t>(UI_KEYS[i].action);
@@ -1311,7 +1302,7 @@ static void app_handle_events(App* app)
     {
         if (core_session_handle_event(&app->session, &app->shell, &event, game_has_keyboard(app)))
         {
-            continue;   // the core's keyboard (game focus)
+            continue;
         }
         // While INPUT waits for a key (SET), keys are the binding's, not ImGui's.
         bool key_event = event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP || event.type == SDL_EVENT_TEXT_INPUT;
@@ -1657,10 +1648,10 @@ int main(int argc, char** argv)
     {
         io.IniFilename = nullptr;
     }
-    // Controllers: settings/gamepad_mappings.txt holds mappings for ones SDL
-    // doesn't know, or maps differently from us (written by MAP CONTROLLER).
-    app->mappings_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamepad_mappings.txt";
-    const std::string& mappings_path = app->mappings_path;
+    // Controllers: MAP CONTROLLER's mappings are in their profiles (input.cfg);
+    // settings/gamecontrollerdb.txt, if the user drops one in (SDL's format),
+    // adds to the ones SDL knows.
+    std::string database_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamecontrollerdb.txt";
     // Controller layouts: the ones next to the program, then piccolo's folder's
     // (the same id there wins), and GENERIC built in if neither has it.
     const char* program_folder = SDL_GetBasePath();
@@ -1678,7 +1669,7 @@ int main(int argc, char** argv)
     {
         input_config_load(&app->input, app->input_config_path.c_str());
     }
-    input_sdl_init(&app->input_sdl, &app->input, mappings_path.empty() ? nullptr : mappings_path.c_str());
+    input_sdl_init(&app->input_sdl, &app->input, database_path.empty() ? nullptr : database_path.c_str());
     update_language(app);
     set_status(app, piccolo_text(&app->strings, Str::status_start));
 
@@ -1731,7 +1722,7 @@ int main(int argc, char** argv)
         // Held for the whole game, paused or not: a request is a D-Bus call
         // that may block, so not on every pause and resume.
         game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
-        core_session_update(&app->session, &app->shell);
+        core_session_update(&app->session, &app->shell, game_has_keyboard(app));
         if (app->option_cache.dirty)
         {
             save_core_options(app);   // a core declared new options: on disk before it can crash
@@ -1860,7 +1851,6 @@ int main(int argc, char** argv)
             MapWindowContext map_context = {};
             map_context.input = &app->input;
             map_context.strings = &app->strings;
-            map_context.mappings_path = app->mappings_path.c_str();
             map_context.layouts = &app->layouts;
             map_context.now_ms = SDL_GetTicks();
             map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);

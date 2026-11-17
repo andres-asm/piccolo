@@ -140,8 +140,6 @@ static const SettingDescriptor SETTINGS[] = {
     // Input (overridable per core / game; the bindings are per controller, in input.cfg)
     {.key = PICCOLO_INPUT_SHARE_PORT1, .type = SettingType::boolean, .default_value = "true", .overridable = true,
      .label = text_id(Str::setting_input_share_port1), .help = text_id(Str::setting_input_share_port1_help)},
-    {.key = PICCOLO_INPUT_SWAP_ACCEPT_BACK, .type = SettingType::boolean, .default_value = "false",
-     .label = text_id(Str::setting_input_swap_accept_back), .help = text_id(Str::setting_input_swap_accept_back_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[1], .type = SettingType::integer, .default_value = "1", .overridable = true,

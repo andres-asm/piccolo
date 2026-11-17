@@ -1555,9 +1555,6 @@ msgstr "JUGADOR"
 
 
 
-msgctxt "input_column_game"
-msgid "GAME"
-msgstr "JUEGO"
 
 msgctxt "input_column_action"
 msgid "ACTION"
@@ -1587,9 +1584,6 @@ msgctxt "input_tab_settings"
 msgid "SETTINGS"
 msgstr "AJUSTES"
 
-msgctxt "input_tab_retropad"
-msgid "RETROPAD"
-msgstr "RETROPAD"
 
 msgctxt "input_bind_all"
 msgid "BIND ALL"
@@ -1692,13 +1686,10 @@ msgctxt "map_title"
 msgid "MAP CONTROLLER"
 msgstr "MAPEAR CONTROL"
 
-msgctxt "map_new"
-msgid "NEW CONTROLLER: %s"
-msgstr "CONTROL NUEVO: %s"
 
 msgctxt "map_offer_text"
-msgid "Map it so its buttons are right: you press each button as it lights up."
-msgstr "Mapéalo para que sus botones queden bien: presionas cada botón cuando se ilumina."
+msgid "Follow this wizard to map it for the user interface and for the default RetroPad. If you don't map it now, you can map its user interface controls in the INPUT settings and its RetroPad buttons in the quick menu."
+msgstr "Sigue este asistente para mapearlo para la interfaz y para el RetroPad por defecto. Si no lo mapeas ahora, puedes mapear sus controles de la interfaz en los ajustes de INPUT y sus botones del RetroPad en el menú rápido."
 
 msgctxt "map_offer_needed"
 msgid "It isn't known as a gamepad: it can't be used until it is mapped."
@@ -1713,8 +1704,8 @@ msgid "NOT NOW (%d)"
 msgstr "AHORA NO (%d)"
 
 msgctxt "map_appearance"
-msgid "WHAT DOES IT LOOK LIKE?"
-msgstr "¿CÓMO ES?"
+msgid "SELECT CONTROLLER TYPE"
+msgstr "ELIGE EL TIPO DE CONTROL"
 
 
 
@@ -1813,20 +1804,14 @@ msgid "DETECTED"
 msgstr "DETECTADOS"
 
 msgctxt "map_maker"
-msgid "MAKER"
-msgstr "MARCA"
+msgid "LABELS"
+msgstr "ETIQUETAS"
 
 msgctxt "map_model"
-msgid "MODEL"
-msgstr "MODELO"
+msgid "LAYOUT"
+msgstr "DISTRIBUCIÓN"
 
-msgctxt "setting_input_swap_accept_back"
-msgid "REVERSE ACCEPT / BACK"
-msgstr "INVERTIR ACEPTAR / VOLVER"
 
-msgctxt "setting_input_swap_accept_back_help"
-msgid "On gamepads, menus and windows: the right button accepts and the bottom one goes back."
-msgstr "En los gamepads, en menús y ventanas: el botón de la derecha acepta y el de abajo vuelve."
 
 msgctxt "input_hotkey_mode"
 msgid "HOTKEY MODE"
@@ -1847,3 +1832,77 @@ msgstr "UN HOTKEY"
 msgctxt "hotkey_mode_stays"
 msgid "STAYS ON"
 msgstr "QUEDA ACTIVO"
+
+
+
+msgctxt "map_press_for"
+msgid "PRESS THE BUTTON FOR %s"
+msgstr "PRESIONA EL BOTÓN PARA %s"
+
+msgctxt "map_role_up"
+msgid "UP"
+msgstr "ARRIBA"
+
+msgctxt "map_role_down"
+msgid "DOWN"
+msgstr "ABAJO"
+
+msgctxt "map_role_left"
+msgid "LEFT"
+msgstr "IZQUIERDA"
+
+msgctxt "map_role_right"
+msgid "RIGHT"
+msgstr "DERECHA"
+
+msgctxt "map_role_page_left"
+msgid "PREVIOUS PAGE"
+msgstr "PÁGINA ANTERIOR"
+
+msgctxt "map_role_page_right"
+msgid "NEXT PAGE"
+msgstr "PÁGINA SIGUIENTE"
+
+msgctxt "map_role_accept"
+msgid "ACCEPT"
+msgstr "ACEPTAR"
+
+msgctxt "map_role_back"
+msgid "GO BACK"
+msgstr "VOLVER"
+
+msgctxt "map_role_modifier"
+msgid "HOTKEY ENABLE"
+msgstr "HABILITAR HOTKEYS"
+
+msgctxt "map_role_menu"
+msgid "MAIN MENU (A HOTKEY)"
+msgstr "MENÚ PRINCIPAL (UN HOTKEY)"
+
+msgctxt "map_role_quick_menu"
+msgid "QUICK MENU (A HOTKEY)"
+msgstr "MENÚ RÁPIDO (UN HOTKEY)"
+
+msgctxt "map_detected"
+msgid "NEW CONTROLLER DETECTED"
+msgstr "NUEVO CONTROL DETECTADO"
+
+msgctxt "map_step_interface"
+msgid "STEP 1: USER INTERFACE"
+msgstr "PASO 1: INTERFAZ"
+
+msgctxt "map_step_interface_text"
+msgid "Press the button you want for each control of the menus and windows, wherever it is on the controller."
+msgstr "Presiona el botón que quieras para cada control de los menús y ventanas, esté donde esté en el control."
+
+msgctxt "map_step_game"
+msgid "STEP 2: GAME"
+msgstr "PASO 2: JUEGO"
+
+msgctxt "map_step_game_text"
+msgid "Press each button as it lights up: they are the RetroPad games get by default."
+msgstr "Presiona cada botón cuando se ilumine: son el RetroPad que reciben los juegos por defecto."
+
+msgctxt "map_start"
+msgid "START (%d)"
+msgstr "EMPEZAR (%d)"

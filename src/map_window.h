@@ -3,17 +3,25 @@
 // MAP CONTROLLER (milestone 3, step 5c): a modal that maps a controller as
 // it is, Steam style:
 //
-//   OFFER        "NEW CONTROLLER: <name>" the first time one is used (or
-//                when SDL doesn't know it): MAP / NOT NOW (30 s, then NOT NOW).
-//   APPEARANCE   MAKER and MODEL, two linked lists of the layouts
-//                (layouts/<Maker>/<model>.cfg), preselected from SDL's type:
-//                they give the names of the buttons and which ones it has.
-//   MAPPING      a drawn pad with the button to press lit; PRESS <its name>;
-//                the optional ones skip after 5 s; BACK / SKIP / CANCEL.
+// a small wizard (its buttons always at the bottom):
 //
-// The result is an SDL mapping for the controller's GUID (kept in
-// settings/gamepad_mappings.txt) and its appearance in its profile
-// (input.cfg). While mapping, the input router is suspended, so presses do
+//   OFFER        NEW CONTROLLER DETECTED the first time one is used (or
+//                when SDL doesn't know it): MAP / NOT NOW (30 s, then NOT NOW).
+//   APPEARANCE   SELECT CONTROLLER TYPE: LABELS and LAYOUT, two linked lists
+//                of the layouts (layouts/<Labels>/<layout>.cfg), preselected
+//                from SDL's type: they give the names of the buttons and which
+//                ones it has. Also its HOTKEY MODE (HOLD by default).
+//   STEP 1       USER INTERFACE: what comes, then START (by itself after
+//                10 s); the button for each of its controls (navigate, pages,
+//                accept, back, HOTKEY ENABLE, main menu, quick menu),
+//                wherever it is. No pad drawn: it can't light up the button.
+//   STEP 2       GAME: the same, with the pad; then the drawn pad with the
+//                button to press lit; PRESS <its name>; the optional ones
+//                skip after 5 s; BACK / SKIP / CANCEL.
+//
+// The result is an SDL mapping for the controller's GUID and its appearance,
+// both in its profile (input.cfg), with the interface's buttons as changes to its bindings
+// (applied to it now, if it is in use). While mapping, the input router is suspended, so presses do
 // nothing else.
 
 #include <cstdint>
@@ -31,7 +39,9 @@ enum class MapStage
     closed,
     offer,
     appearance,
-    mapping,
+    intro_interface,   // STEP 1's page, before its presses
+    mapping,           // STEP 1's presses, then STEP 2's
+    intro_game,        // STEP 2's page (the mapper waits meanwhile)
 };
 
 struct MapWindow
@@ -42,9 +52,13 @@ struct MapWindow
     std::string    guid;
     bool           needed = false;           // SDL doesn't know it: unusable until mapped
     std::string    layout = "Generic/generic";   // the appearance picked (an InputLayout id)
+    InputHotkeyMode hotkey_mode = InputHotkeyMode::hold;
     uint64_t       offer_started_ms = 0;
+    uint64_t       intro_started_ms = 0;
+    bool           offered = false;          // came as NEW CONTROLLER DETECTED (else MAP CONTROLLER, from DEVICES)
+    bool           game_intro_done = false;  // STEP 2's page was shown
     InputSdlMapper mapper;
-    bool           profiles_dirty = false;   // an appearance (or NOT NOW) was kept: save input.cfg
+    bool           profiles_dirty = false;   // a mapping, an appearance (or NOT NOW) was kept: save input.cfg
     std::string    result;                   // "<name>: MAPPED" (or refused) for the status line, once
     bool           take_focus = false;       // just opened: come to the front once (every frame would close its lists)
 };
@@ -53,7 +67,6 @@ struct MapWindowContext
 {
     InputSystem*        input = nullptr;
     const Localization* strings = nullptr;
-    const char*         mappings_path = "";
     const InputLayouts* layouts = nullptr;
     uint64_t            now_ms = 0;
 };

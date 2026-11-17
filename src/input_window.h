@@ -31,7 +31,7 @@ struct ImFont;
 struct InputWindow
 {
     bool         open = false;
-    int          tab = 0;                    // 0 SETTINGS .. 4 DEVICES (for PAGE LEFT / RIGHT)
+    int          tab = 0;                    // 0 SETTINGS .. 3 DEVICES (for PAGE LEFT / RIGHT)
     SettingLayer scope = SettingLayer::global;
     bool         choose_scope = false;       // pick the scope on the next draw (just opened)
     uint32_t     mapping = UINT32_MAX;       // the controller mapped in RETROPAD / INTERFACE / HOTKEYS (UINT32_MAX: port 1's)
