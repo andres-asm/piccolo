@@ -58,6 +58,8 @@ struct QuickMenu
     InputAction   capture_action = InputAction::pad_b;
     uint64_t      capture_started_ms = 0;
     bool          bind_all = false;
+    bool          capture_seen = false; // the remap view looked at the capture this frame (else it's dropped)
+    InputAction   pad_action = InputAction::count;   // the row the drawn pad shows when not capturing (focused or hovered)
     bool          input_dirty = false;
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]

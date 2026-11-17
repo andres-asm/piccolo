@@ -21,6 +21,7 @@ add_executable(piccolo
     src/settings_window.cpp
     src/input_window.cpp
     src/map_window.cpp
+    src/pad_picture.cpp
     src/image_window.cpp
     src/piccolo_window.cpp
     src/piccolo_text.cpp

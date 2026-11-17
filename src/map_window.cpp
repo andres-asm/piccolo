@@ -7,6 +7,7 @@
 
 #include "imgui.h"
 #include "input_sdl.h"
+#include "pad_picture.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -65,11 +66,6 @@ static const char* control_label(const InputLayout* layout, const Localization* 
     return piccolo_text(strings, DEFAULT_LABELS[index]);
 }
 
-static bool is_stick(InputMapControl control)
-{
-    return static_cast<uint32_t>(control) >= static_cast<uint32_t>(InputMapControl::left_x) && control != InputMapControl::count;
-}
-
 void map_window_offer(MapWindow* window, uint32_t joystick_id, bool needed, const InputLayouts* layouts, uint64_t now_ms)
 {
     map_window_open(window, joystick_id, layouts);
@@ -98,6 +94,8 @@ void map_window_open(MapWindow* window, uint32_t joystick_id, const InputLayouts
 void map_window_close(MapWindow* window, InputSystem* input)
 {
     input_sdl_mapper_cancel(&window->mapper);
+    input_sdl_press_close(&window->press);
+    window->press_stage = MapStage::closed;
     window->stage = MapStage::closed;
     input->suspended = false;
 }
@@ -105,83 +103,6 @@ void map_window_close(MapWindow* window, InputSystem* input)
 bool map_window_open_now(const MapWindow* window)
 {
     return window->stage != MapStage::closed;
-}
-
-// ---------------------------------------------------------------------------
-// The drawn pad
-// ---------------------------------------------------------------------------
-
-struct PadPart
-{
-    InputMapControl control;
-    float           x0, y0, x1, y1;   // in a 100 x 46 box
-};
-
-static const PadPart PARTS[] = {
-    {InputMapControl::left_trigger, 14, 0, 28, 4},
-    {InputMapControl::right_trigger, 72, 0, 86, 4},
-    {InputMapControl::left_shoulder, 12, 5, 30, 9},
-    {InputMapControl::right_shoulder, 70, 5, 88, 9},
-    {InputMapControl::dpad_up, 19, 14, 25, 19},
-    {InputMapControl::dpad_down, 19, 25, 25, 30},
-    {InputMapControl::dpad_left, 13, 19, 19, 25},
-    {InputMapControl::dpad_right, 25, 19, 31, 25},
-    {InputMapControl::north, 75, 13, 81, 19},
-    {InputMapControl::south, 75, 25, 81, 31},
-    {InputMapControl::west, 68, 19, 74, 25},
-    {InputMapControl::east, 82, 19, 88, 25},
-    {InputMapControl::back, 40, 16, 46, 19},
-    {InputMapControl::start, 54, 16, 60, 19},
-    {InputMapControl::guide, 47, 22, 53, 26},
-    {InputMapControl::left_stick, 32, 30, 40, 38},
-    {InputMapControl::right_stick, 60, 30, 68, 38},
-};
-constexpr size_t PART_COUNT = sizeof(PARTS) / sizeof(PARTS[0]);
-
-static void draw_pad(const InputLayout* layout, InputMapControl lit, float unit)
-{
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImVec2 origin = ImGui::GetCursorScreenPos();
-    float width = ImGui::GetContentRegionAvail().x;
-    origin.x += static_cast<float>(static_cast<int>((width - 100.0f * unit) * 0.5f));
-    ImU32 body = ImGui::GetColorU32(ImGuiCol_Button);
-    ImU32 part = ImGui::GetColorU32(ImGuiCol_FrameBg);
-    ImU32 light = retro_ui_attention_color();
-    // The body, and the d-pad's middle.
-    draw_list->AddRectFilled(ImVec2(origin.x + 8.0f * unit, origin.y + 10.0f * unit),
-                             ImVec2(origin.x + 92.0f * unit, origin.y + 44.0f * unit), body);
-    draw_list->AddRectFilled(ImVec2(origin.x + 19.0f * unit, origin.y + 19.0f * unit),
-                             ImVec2(origin.x + 25.0f * unit, origin.y + 25.0f * unit), part);
-    for (size_t p = 0; p < PART_COUNT; p++)
-    {
-        // Only what this kind of pad has (a stick: its click or its axes).
-        InputMapControl control = PARTS[p].control;
-        bool present = layout == nullptr || input_layout_has(layout, control) ||
-                       (control == InputMapControl::left_stick && input_layout_has(layout, InputMapControl::left_x)) ||
-                       (control == InputMapControl::right_stick && input_layout_has(layout, InputMapControl::right_x));
-        if (!present)
-        {
-            continue;
-        }
-        // A stick lights for its click and for pushing it.
-        bool on = PARTS[p].control == lit ||
-                  (PARTS[p].control == InputMapControl::left_stick && (lit == InputMapControl::left_x || lit == InputMapControl::left_y)) ||
-                  (PARTS[p].control == InputMapControl::right_stick && (lit == InputMapControl::right_x || lit == InputMapControl::right_y));
-        draw_list->AddRectFilled(ImVec2(origin.x + PARTS[p].x0 * unit, origin.y + PARTS[p].y0 * unit),
-                                 ImVec2(origin.x + PARTS[p].x1 * unit, origin.y + PARTS[p].y1 * unit), on ? light : part);
-    }
-    // Which way to push a stick: a mark on that side.
-    if (is_stick(lit))
-    {
-        bool left = lit == InputMapControl::left_x || lit == InputMapControl::left_y;
-        bool x = lit == InputMapControl::left_x || lit == InputMapControl::right_x;
-        float cx = left ? 36.0f : 64.0f;
-        float mx = x ? cx + 5.0f : cx - 1.0f;
-        float my = x ? 33.0f : 39.0f;
-        draw_list->AddRectFilled(ImVec2(origin.x + mx * unit, origin.y + my * unit),
-                                 ImVec2(origin.x + (mx + 2.0f) * unit, origin.y + (my + 2.0f) * unit), light);
-    }
-    ImGui::Dummy(ImVec2(width, 46.0f * unit));
 }
 
 // ---------------------------------------------------------------------------
@@ -319,6 +240,19 @@ static int seconds_left(uint64_t now_ms, uint64_t started_ms, uint64_t total_ms)
     return static_cast<int>((total_ms - (elapsed < total_ms ? elapsed : total_ms) + 999) / 1000);
 }
 
+// A press of any button on the controller being mapped, for pages it can
+// answer that way: one SDL doesn't know can't drive the interface. Each page
+// starts from everything let go (the press that opened it doesn't count).
+static bool raw_press(MapWindow* window)
+{
+    if (window->press_stage != window->stage)
+    {
+        window->press_stage = window->stage;
+        input_sdl_press_wait_release(&window->press);
+    }
+    return input_sdl_press_poll(&window->press, window->joystick_id);
+}
+
 static void draw_offer(MapWindow* window, const MapWindowContext* context)
 {
     const Localization* strings = context->strings;
@@ -329,9 +263,11 @@ static void draw_offer(MapWindow* window, const MapWindowContext* context)
     {
         ImGui::Spacing();
         wrapped(piccolo_text(strings, Str::map_offer_needed));
+        wrapped(piccolo_text(strings, Str::map_any_button));
     }
     footer();
-    if (retro_ui_button(piccolo_text(strings, Str::map_map)))
+    bool pressed = window->needed && raw_press(window);
+    if (retro_ui_button(piccolo_text(strings, Str::map_map)) || pressed)
     {
         window->stage = MapStage::appearance;
         return;
@@ -423,9 +359,14 @@ static void draw_appearance(MapWindow* window, const MapWindowContext* context, 
         ImGui::EndCombo();
     }
     ImGui::Spacing();
-    draw_pad(layout, InputMapControl::count, block * 1.5f);
+    pad_picture_draw(layout, InputMapControl::count, false, block * 1.5f);
+    if (window->needed)
+    {
+        wrapped(piccolo_text(strings, Str::map_any_button));
+    }
     footer();
-    if (retro_ui_button(piccolo_text(strings, Str::map_begin)))
+    bool pressed = window->needed && raw_press(window);
+    if (retro_ui_button(piccolo_text(strings, Str::map_begin)) || pressed)
     {
         window->stage = MapStage::intro_interface;
         window->intro_started_ms = context->now_ms;
@@ -445,10 +386,16 @@ static void draw_intro_interface(MapWindow* window, const MapWindowContext* cont
     retro_ui_separator_text(window->name.c_str());
     section(piccolo_text(strings, Str::map_step_interface));
     wrapped(piccolo_text(strings, Str::map_step_interface_text));
+    if (window->needed)
+    {
+        ImGui::Spacing();
+        wrapped(piccolo_text(strings, Str::map_any_button));
+    }
     footer();
     std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_start),
                   seconds_left(context->now_ms, window->intro_started_ms, INTRO_MS));
-    if (retro_ui_button(text) || context->now_ms - window->intro_started_ms >= INTRO_MS)
+    bool pressed = window->needed && raw_press(window);
+    if (retro_ui_button(text) || pressed || context->now_ms - window->intro_started_ms >= INTRO_MS)
     {
         const InputLayout* layout = picked_layout(window, context);
         bool wanted[INPUT_MAP_CONTROL_COUNT] = {};
@@ -495,11 +442,12 @@ static void draw_intro_game(MapWindow* window, const MapWindowContext* context, 
     section(piccolo_text(strings, Str::map_step_game));
     wrapped(piccolo_text(strings, Str::map_step_game_text));
     ImGui::Spacing();
-    draw_pad(picked_layout(window, context), InputMapControl::count, block * 1.5f);
+    pad_picture_draw(picked_layout(window, context), InputMapControl::count, false, block * 1.5f);
+    wrapped(piccolo_text(strings, Str::map_any_button));   // the router is suspended: no controller drives the page
     footer();
     std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_start),
                   seconds_left(context->now_ms, window->intro_started_ms, INTRO_MS));
-    if (retro_ui_button(text) || context->now_ms - window->intro_started_ms >= INTRO_MS)
+    if (retro_ui_button(text) || raw_press(window) || context->now_ms - window->intro_started_ms >= INTRO_MS)
     {
         window->stage = MapStage::mapping;
         window->game_intro_done = true;
@@ -555,9 +503,9 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     }
     else
     {
-        draw_pad(layout, control, block * 1.5f);   // STEP 1 has no pad: it can't light up what's asked
+        pad_picture_draw(layout, control, false, block * 1.5f);   // STEP 1 has no pad: it can't light up what's asked
         const char* label = control_label(layout, strings, control);
-        if (is_stick(control))
+        if (input_map_control_is_stick(control))
         {
             std::snprintf(text, sizeof(text), "%s", label);
         }

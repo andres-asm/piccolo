@@ -19,6 +19,11 @@
 //                button to press lit; PRESS <its name>; the optional ones
 //                skip after 5 s; BACK / SKIP / CANCEL.
 //
+// A controller SDL doesn't know can't drive the interface: on its pages
+// (OFFER, the type, STEP 1's) any button on it is the main button. On
+// STEP 2's page any button on it is START for every controller (the router
+// is suspended by then).
+//
 // The result is an SDL mapping for the controller's GUID and its appearance,
 // both in its profile (input.cfg), with the interface's buttons as changes to its bindings
 // (applied to it now, if it is in use). While mapping, the input router is suspended, so presses do
@@ -29,6 +34,7 @@
 
 #include "input_bindings.h"
 #include "input_layouts.h"
+#include "input_sdl.h"
 #include "input_sdl_mapping.h"
 #include "localization.h"
 
@@ -58,6 +64,8 @@ struct MapWindow
     bool           offered = false;          // came as NEW CONTROLLER DETECTED (else MAP CONTROLLER, from DEVICES)
     bool           game_intro_done = false;  // STEP 2's page was shown
     InputSdlMapper mapper;
+    InputSdlPress  press;                    // any button on it: the page's main button (it can't drive the interface)
+    MapStage       press_stage = MapStage::closed;   // the page `press` last looked from (a new page waits for a release)
     bool           profiles_dirty = false;   // a mapping, an appearance (or NOT NOW) was kept: save input.cfg
     std::string    result;                   // "<name>: MAPPED" (or refused) for the status line, once
     bool           take_focus = false;       // just opened: come to the front once (every frame would close its lists)

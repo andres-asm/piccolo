@@ -10,6 +10,7 @@
 #include "app_shell.h"
 #include "debug_ui.h"
 #include "input_window.h"
+#include "pad_picture.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
@@ -46,6 +47,7 @@ void quick_menu_open(QuickMenu* menu, uint32_t slot)
     menu->remap = false;
     menu->capturing = false;
     menu->bind_all = false;
+    menu->pad_action = InputAction::count;
     menu->open = true;
     menu->slot = slot >= LIBRETRO_STATE_SLOT_FIRST && slot <= LIBRETRO_STATE_SLOT_LAST ? slot : LIBRETRO_STATE_SLOT_FIRST;
     menu->refresh = true;
@@ -358,6 +360,7 @@ static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context
     menu->capturing = true;
     menu->capture_action = action;
     menu->capture_started_ms = context->now_ms;
+    menu->capture_seen = true;
     input_capture_begin(input, input->controllers[menu->remap_controller].device_id);
 }
 
@@ -386,6 +389,7 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
     {
         return;
     }
+    menu->capture_seen = true;
     uint64_t since = context->now_ms - menu->capture_started_ms;
     InputSource source = {};
     if ((!menu->bind_all || since >= REMAP_COOL_OFF_MS) && input_capture_poll(context->input, &source))
@@ -513,6 +517,22 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     InputBindingSet effective = {};
     input_effective_bindings(input, menu->remap_controller, menu->remap_port, &effective);
     const InputDevice* pad = input_devices_find_const(&input->devices, input->controllers[menu->remap_controller].device_id);
+    if (pad != nullptr && pad->kind == InputDeviceKind::gamepad)
+    {
+        // The pad, with where the control being bound (or the row in focus) is now.
+        InputAction shown = menu->capturing ? menu->capture_action : menu->pad_action;
+        InputMapControl lit = InputMapControl::count;
+        bool minus = false;
+        uint32_t shown_index = static_cast<uint32_t>(shown);
+        for (uint32_t s = 0; shown_index < INPUT_ACTION_COUNT && s < INPUT_SOURCES_PER_ACTION && lit == InputMapControl::count; s++)
+        {
+            InputSource source = effective.sources[shown_index][s];
+            lit = input_map_control_for_source(source);
+            minus = source.type == InputSourceType::axis_minus;
+        }
+        pad_picture_draw(input_window_layout(input, context->layouts, pad), lit, minus, block);
+    }
+    menu->pad_action = InputAction::count;
     float label_width = 110.0f * block;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::BeginChild("remap_rows", ImVec2(0.0f, 0.0f));
@@ -553,6 +573,10 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         {
             menu->bind_all = false;
             remap_start_capture(menu, context, controls[i].action);
+        }
+        if (ImGui::IsItemFocused() || ImGui::IsItemHovered())
+        {
+            menu->pad_action = controls[i].action;   // the pad shows it on the next frame
         }
         ImGui::EndDisabled();
         ImGui::PopID();
@@ -670,10 +694,25 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     }
 }
 
+// A SET / BIND ALL nobody looks at any more (the menu closed by any of its
+// ways, another tab, out of the remap view) is dropped: a capture left on
+// would keep every action and the game from the controller.
+static void drop_unseen_capture(QuickMenu* menu, const QuickMenuContext* context)
+{
+    if (menu->capturing && !menu->capture_seen)
+    {
+        menu->capturing = false;
+        menu->bind_all = false;
+        input_capture_cancel(context->input);
+    }
+    menu->capture_seen = false;
+}
+
 QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context, ImFont* pixel_font, int32_t scale)
 {
     if (!menu->open)
     {
+        drop_unseen_capture(menu, context);
         return QuickMenuAction::none;
     }
     const Localization* strings = context->strings;
@@ -751,6 +790,7 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
         retro_ui_end_window();
     }
     ImGui::End();
+    drop_unseen_capture(menu, context);
     retro_ui_pop_theme();
     return action;
 }

@@ -1906,3 +1906,7 @@ msgstr "Presiona cada botón cuando se ilumine: son el RetroPad que reciben los 
 msgctxt "map_start"
 msgid "START (%d)"
 msgstr "EMPEZAR (%d)"
+
+msgctxt "map_any_button"
+msgid "Or press any button on the controller."
+msgstr "O presiona cualquier botón del control."
