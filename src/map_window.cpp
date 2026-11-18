@@ -19,8 +19,8 @@ constexpr uint64_t QUESTION_MS = 15000;   // a STEP 4 question: NO by itself aft
 // The window's size and where the controller drawing sits, in UI blocks:
 // always the same place, whatever the text above it.
 constexpr float WINDOW_WIDTH = 320.0f;
-constexpr float WINDOW_HEIGHT = 240.0f;
-constexpr float PAD_TOP = 100.0f;
+constexpr float WINDOW_HEIGHT = 252.0f;
+constexpr float PAD_TOP = 112.0f;
 constexpr float PAD_UNIT = 1.25f;
 
 // The names of the controls a layout doesn't name: the d-pad and the
@@ -395,7 +395,7 @@ static void prompt(MapWindow* window, const MapWindowContext* context, const cha
 
 // A step's own buttons while it takes its inputs: BACK (the previous input),
 // RESET (the step's first input), SKIP (this one; counting down when it
-// skips by itself).
+// skips by itself), CANCEL (the whole wizard, nothing kept).
 static void step_buttons(MapWindow* window, const MapWindowContext* context)
 {
     const Localization* strings = context->strings;
@@ -419,6 +419,11 @@ static void step_buttons(MapWindow* window, const MapWindowContext* context)
     {
         input_sdl_mapper_skip(&window->mapper, context->now_ms);
     }
+    ImGui::SameLine();
+    if (retro_ui_button(piccolo_text(strings, Str::map_cancel)))
+    {
+        map_window_close(window, context->input);   // nothing kept: SDL's mapping as it was
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +441,7 @@ static void start_mapper(MapWindow* window, const MapWindowContext* context, boo
     {
         wanted[c] = layout == nullptr || input_layout_has(layout, static_cast<InputMapControl>(c));
     }
+    wanted[static_cast<uint32_t>(InputMapControl::guide)] = false;   // GUIDE / HOME: STEP 4's
     bool optional[ROLE_COUNT] = {};
     for (uint32_t r = 0; r < ROLE_COUNT; r++)
     {
@@ -560,7 +566,7 @@ static void draw_offer(MapWindow* window, const MapWindowContext* context)
         wrapped(piccolo_text(strings, Str::map_offer_needed));
     }
     ImGui::Spacing();
-    wrapped(piccolo_text(strings, Str::map_any_button));
+    wrapped(piccolo_text(strings, Str::map_offer_any_button));
     footer();
     // Any button on the new controller is MAP, whether SDL knows it or not.
     bool pressed = raw_press(window);
@@ -655,11 +661,9 @@ static void draw_type(MapWindow* window, const MapWindowContext* context, float 
         }
         ImGui::EndCombo();
     }
+    ImGui::Spacing();
+    wrapped(piccolo_text(strings, window->needed ? Str::map_type_goes_on_any : Str::map_type_goes_on));
     pad_area(layout, PadView::front, InputMapControl::count, false, block);
-    if (window->needed)
-    {
-        wrapped(piccolo_text(strings, Str::map_any_button));
-    }
     footer();
     // Choosing in a list (or opening one) starts the countdown again; the
     // buttons below don't (their press is a choice, not a touch).
@@ -702,8 +706,8 @@ static void draw_intro_buttons(MapWindow* window, const MapWindowContext* contex
 {
     const Localization* strings = context->strings;
     header(window, strings, Str::map_step_buttons, piccolo_text(strings, Str::map_step_buttons_text));
+    wrapped(piccolo_text(strings, Str::map_starts_any));
     pad_area(picked_layout(window, context), PadView::front, InputMapControl::count, false, block);
-    wrapped(piccolo_text(strings, Str::map_any_button));
     footer();
     if (retro_ui_button(piccolo_text(strings, Str::map_back)))
     {
@@ -742,8 +746,8 @@ static void draw_intro_interface(MapWindow* window, const MapWindowContext* cont
 {
     const Localization* strings = context->strings;
     header(window, strings, Str::map_step_interface, piccolo_text(strings, Str::map_step_interface_text));
+    wrapped(piccolo_text(strings, Str::map_starts_any));   // the router is suspended: no controller drives the page
     pad_area(picked_layout(window, context), PadView::front, InputMapControl::count, false, block);
-    wrapped(piccolo_text(strings, Str::map_any_button));   // the router is suspended: no controller drives the page
     footer();
     if (retro_ui_button(piccolo_text(strings, Str::map_back)))
     {

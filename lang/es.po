@@ -1884,8 +1884,8 @@ msgid "HOLD THE BUTTON FOR %s"
 msgstr "MANTÉN EL BOTÓN PARA %s"
 
 msgctxt "map_hold_hint"
-msgid "Hold it until the ring closes. Let go sooner to choose another."
-msgstr "Mantenlo hasta que se cierre el círculo. Suéltalo antes para elegir otro."
+msgid "Let go before the ring closes if you want to choose another button."
+msgstr "Suéltalo antes de que se cierre el círculo si quieres elegir otro botón."
 
 msgctxt "map_step_extras"
 msgid "STEP 4: EXTRA BUTTONS"
@@ -2000,8 +2000,8 @@ msgid "%d ADDED"
 msgstr "%d AGREGADOS"
 
 msgctxt "map_summary_text"
-msgid "Nothing is kept until FINISH. RESTART begins again; CANCEL leaves the controller as it was."
-msgstr "Nada se guarda hasta TERMINAR. EMPEZAR DE NUEVO vuelve al inicio; CANCELAR deja el control como estaba."
+msgid "Press FINISH to save your mapping, RESTART to start over. CANCEL leaves the mapping as it was."
+msgstr "Presiona TERMINAR para guardar el mapeo, EMPEZAR DE NUEVO para volver a empezar. CANCELAR deja el mapeo como estaba."
 
 msgctxt "map_role_up"
 msgid "UP"
@@ -2074,6 +2074,22 @@ msgstr "Presiona el botón que quieras para cada control de los menús y ventana
 msgctxt "map_start"
 msgid "START (%d)"
 msgstr "EMPEZAR (%d)"
+
+msgctxt "map_offer_any_button"
+msgid "Press any button on the controller to map it."
+msgstr "Presiona cualquier botón del control para mapearlo."
+
+msgctxt "map_type_goes_on"
+msgid "It goes on by itself when you leave it alone."
+msgstr "Sigue solo si no tocas nada."
+
+msgctxt "map_type_goes_on_any"
+msgid "It goes on by itself when you leave it alone, or when you press any button on the controller."
+msgstr "Sigue solo si no tocas nada, o cuando presionas cualquier botón del control."
+
+msgctxt "map_starts_any"
+msgid "Mapping starts by itself, or when you press any button on the controller."
+msgstr "El mapeo empieza solo, o cuando presionas cualquier botón del control."
 
 msgctxt "map_any_button"
 msgid "Or press any button on the controller."
