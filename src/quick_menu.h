@@ -50,7 +50,9 @@ struct QuickMenu
 
     // CONTROLS can show the remap of one port's controller for the running
     // core and that port's device: its controls by the game's names, SET,
-    // BIND ALL, USE RETROPAD. Changes mark input_dirty (piccolo saves input.cfg).
+    // BIND ALL, DEFAULT ALL, and the core's combos bound to inputs. It is the
+    // core's remap, or THIS GAME's when the game has its own (SCOPE). Changes
+    // mark input_dirty (piccolo saves input.cfg).
     bool          remap = false;
     uint32_t      remap_port = 0;
     uint32_t      remap_controller = 0;
@@ -61,8 +63,15 @@ struct QuickMenu
     uint64_t      capture_started_ms = 0;
     bool          bind_all = false;
     bool          capture_seen = false; // the remap view looked at the capture this frame (else it's dropped)
+    std::string   capture_combo;        // SET on a combo's row: its id ("" = on capture_action)
     InputAction   pad_action = InputAction::count;   // the row the drawn pad shows when not capturing (focused or hovered)
+    std::string   pad_combo;            // ...or this combo's row (its id)
     uint32_t      pad_row = 0;          // which of its sources
+    // COMBOS: making or changing one (the core's, any game of it can bind it).
+    bool          combo_editing = false;
+    std::string   combo_edit_id;        // "" = a new one
+    char          combo_edit_name[64] = {};
+    uint16_t      combo_edit_buttons = 0;
     bool          input_dirty = false;
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]

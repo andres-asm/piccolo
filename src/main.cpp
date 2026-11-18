@@ -1099,9 +1099,12 @@ static void update_remap_prompt(App* app, uint64_t now_ms)
         else if (now_ms - app->remap_prompt_started_ms >= REMAP_PROMPT_MS)
         {
             app->remap_prompt = false;
+            // (The game's remap if it has one, else the core's.)
+            std::string id = input_controller_profile_id(input, controller);
+            uint32_t device = input->port_devices[app->remap_prompt_port];
+            bool game_has = input_core_profile(input, input->core_name.c_str(), input->game_name.c_str(), device, id) != nullptr;
             InputCoreProfile* profile = input_core_profile_for(input, input->core_name.c_str(),
-                                                               input->port_devices[app->remap_prompt_port],
-                                                               input_controller_profile_id(input, controller));
+                                                               game_has ? input->game_name.c_str() : "", device, id);
             profile->decided = true;   // the RetroPad, remembered
             if (!app->input_config_path.empty())
             {
@@ -1119,8 +1122,7 @@ static void update_remap_prompt(App* app, uint64_t now_ms)
         for (size_t m = 0; m < input->ports[port].size(); m++)
         {
             uint32_t controller = input->ports[port][m];
-            const InputCoreProfile* profile = input_core_profile(input, input->core_name.c_str(), input->port_devices[port],
-                                                                 input_controller_profile_id(input, controller));
+            const InputCoreProfile* profile = input_active_core_profile(input, controller, port);
             if (profile == nullptr || !profile->decided)
             {
                 app->remap_prompt = true;
@@ -1233,6 +1235,7 @@ static void app_update_input(App* app)
     piccolo_settings_input(&app->settings, &app->input.settings);   // SETTINGS > INPUT, per core / game too
     // The core and the device on each port: a controller's bindings for them.
     app->input.core_name = game_running(app) ? app->core_name : "";
+    app->input.game_name = game_running(app) ? app->game_name : "";   // a game's own remaps
     for (unsigned port = 0; port < LIBRETRO_MAX_PORTS; port++)
     {
         app->input.port_devices[port] = app->session.host->port_devices[port];

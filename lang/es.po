@@ -1722,6 +1722,46 @@ msgctxt "remap_done"
 msgid "DONE"
 msgstr "LISTO"
 
+msgctxt "remap_scope_help"
+msgid "WHOSE REMAP THIS IS: THE CORE'S (EVERY GAME OF IT) OR THIS GAME'S OWN. THIS GAME STARTS AS A COPY OF THE CORE'S; BACK TO THIS CORE DROPS IT."
+msgstr "DE QUIÉN ES ESTE REMAPEO: DEL CORE (TODOS SUS JUEGOS) O PROPIO DE ESTE JUEGO. ESTE JUEGO EMPIEZA COMO COPIA DEL DEL CORE; VOLVER A ESTE CORE LO DESCARTA."
+
+msgctxt "remap_combos"
+msgid "COMBOS"
+msgstr "COMBOS"
+
+msgctxt "remap_combos_help"
+msgid "Several buttons pressed by one input (THREE PUNCHES). Kept per core: every game of this core can bind them."
+msgstr "Varios botones presionados con una sola entrada (TRES GOLPES). Se guardan por core: todos los juegos de este core pueden asignarlos."
+
+msgctxt "remap_combo_new"
+msgid "+ NEW COMBO"
+msgstr "+ NUEVO COMBO"
+
+msgctxt "remap_combo_edit"
+msgid "EDIT"
+msgstr "EDITAR"
+
+msgctxt "remap_combo_name"
+msgid "NAME"
+msgstr "NOMBRE"
+
+msgctxt "remap_combo_name_hint"
+msgid "OPTIONAL"
+msgstr "OPCIONAL"
+
+msgctxt "remap_combo_save"
+msgid "SAVE"
+msgstr "GUARDAR"
+
+msgctxt "remap_combo_delete"
+msgid "DELETE"
+msgstr "BORRAR"
+
+msgctxt "remap_combo_delete_help"
+msgid "Deletes the combo from this core, and from every remap that binds it."
+msgstr "Borra el combo de este core y de todos los remapeos que lo usan."
+
 msgctxt "remap_prompt"
 msgid "%s ON PORT %d (%s): HOLD START TO REMAP (%d)"
 msgstr "%s EN EL PUERTO %d (%s): MANTÉN START PARA REMAPEAR (%d)"

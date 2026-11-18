@@ -389,11 +389,47 @@ static void remap_controls(const QuickMenuContext* context, uint32_t port, std::
     }
 }
 
+// The remap being edited: the game's when it has its own, else the core's.
 static InputCoreProfile* remap_profile(QuickMenu* menu, const QuickMenuContext* context)
 {
     InputSystem* input = context->input;
-    return input_core_profile_for(input, input->core_name.c_str(), input->port_devices[menu->remap_port],
-                                  input_controller_profile_id(input, menu->remap_controller));
+    std::string id = input_controller_profile_id(input, menu->remap_controller);
+    uint32_t device = input->port_devices[menu->remap_port];
+    bool game_has = !input->game_name.empty() &&
+                    input_core_profile(input, input->core_name.c_str(), input->game_name.c_str(), device, id) != nullptr;
+    return input_core_profile_for(input, input->core_name.c_str(), game_has ? input->game_name.c_str() : "", device, id);
+}
+
+// A combo's binding in the remap being edited (made if it has none).
+static InputComboBinding* remap_combo_binding(QuickMenu* menu, const QuickMenuContext* context, const std::string& combo)
+{
+    InputCoreProfile* profile = remap_profile(menu, context);
+    profile->decided = true;
+    menu->input_dirty = true;
+    for (size_t k = 0; k < profile->combos.size(); k++)
+    {
+        if (profile->combos[k].combo == combo)
+        {
+            return &profile->combos[k];
+        }
+    }
+    InputComboBinding binding = {};
+    binding.combo = combo;
+    profile->combos.push_back(binding);
+    return &profile->combos.back();
+}
+
+// A combo's binding in what plays now, or nullptr.
+static const InputComboBinding* combo_binding_of(const InputCoreProfile* profile, const std::string& combo)
+{
+    for (size_t k = 0; profile != nullptr && k < profile->combos.size(); k++)
+    {
+        if (profile->combos[k].combo == combo)
+        {
+            return &profile->combos[k];
+        }
+    }
+    return nullptr;
 }
 
 // The captured source becomes this action's binding for the core and device.
@@ -427,6 +463,11 @@ static InputBindingOverride* remap_override(QuickMenu* menu, const QuickMenuCont
 // The captured source on `row` (BIND ALL: alone).
 static void remap_set(QuickMenu* menu, const QuickMenuContext* context, InputAction action, uint32_t row, InputSource source)
 {
+    if (!menu->capture_combo.empty())
+    {
+        input_sources_set(remap_combo_binding(menu, context, menu->capture_combo)->sources, row, source);
+        return;
+    }
     InputBindingOverride* change = remap_override(menu, context, action);
     if (menu->bind_all)
     {
@@ -448,16 +489,25 @@ static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context
     }
     menu->capturing = true;
     menu->capture_action = action;
+    menu->capture_combo.clear();
     menu->capture_row = row;
     menu->capture_started_ms = context->now_ms;
     menu->capture_seen = true;
     input_capture_begin(input, input->controllers[menu->remap_controller].device_id);
 }
 
+// SET / + on a combo's row.
+static void remap_start_combo_capture(QuickMenu* menu, const QuickMenuContext* context, const std::string& combo, uint32_t row)
+{
+    menu->bind_all = false;
+    remap_start_capture(menu, context, InputAction::count, row);
+    menu->capture_combo = combo;
+}
+
 // The next control of a BIND ALL (in the list's order), or the end.
 static void remap_next(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls)
 {
-    if (menu->bind_all)
+    if (menu->bind_all && menu->capture_combo.empty())
     {
         for (size_t i = 0; i + 1 < controls.size(); i++)
         {
@@ -550,6 +600,319 @@ static void draw_device_combo(const QuickMenuContext* context, uint32_t p, float
     ImGui::PopID();
 }
 
+// SCOPE [ THIS CORE (fbneo) v ]: the remap is the core's, or the game's own
+// (THIS GAME starts as a copy of the core's; back to THIS CORE drops it).
+static void draw_remap_scope(QuickMenu* menu, const QuickMenuContext* context, float label_width)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    if (input->game_name.empty())
+    {
+        return;
+    }
+    std::string id = input_controller_profile_id(input, menu->remap_controller);
+    uint32_t device = input->port_devices[menu->remap_port];
+    const InputCoreProfile* game = input_core_profile(input, input->core_name.c_str(), input->game_name.c_str(), device, id);
+    char core_label[300] = {};
+    char game_label[600] = {};
+    std::snprintf(core_label, sizeof(core_label), "%s (%s)", piccolo_text(strings, Str::scope_core), input->core_name.c_str());
+    std::snprintf(game_label, sizeof(game_label), "%s (%s)", piccolo_text(strings, Str::scope_game), input->game_name.c_str());
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::scope));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::remap_scope_help));
+    ImGui::SameLine(label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    if (retro_ui_begin_combo("##remap_scope", game != nullptr ? game_label : core_label))
+    {
+        if (ImGui::Selectable(core_label, game == nullptr) && game != nullptr)
+        {
+            input_core_profile_remove(input, game);
+            menu->input_dirty = true;
+        }
+        if (ImGui::Selectable(game_label, game != nullptr) && game == nullptr)
+        {
+            const InputCoreProfile* core = input_core_profile(input, input->core_name.c_str(), "", device, id);
+            InputCoreProfile copy = core != nullptr ? *core : InputCoreProfile{};
+            copy.core = input->core_name;
+            copy.game = input->game_name;
+            copy.device = device;
+            copy.profile_id = id;
+            copy.decided = true;
+            input->core_profiles.push_back(copy);
+            menu->input_dirty = true;
+        }
+        ImGui::EndCombo();
+    }
+}
+
+// The name of a RetroPad button in this game (its descriptor), else the RetroPad's.
+static std::string button_label(uint32_t button, const std::vector<RemapControl>& controls, const Localization* strings)
+{
+    for (size_t i = 0; i < controls.size(); i++)
+    {
+        if (static_cast<uint32_t>(controls[i].action) == button)
+        {
+            return controls[i].label;
+        }
+    }
+    return piccolo_text(strings, PAD_LABELS[button]);
+}
+
+// A combo as shown: its name, else its buttons ("A + B").
+static std::string combo_label(const InputCombo* combo, const std::vector<RemapControl>& controls, const Localization* strings)
+{
+    if (!combo->name.empty())
+    {
+        return combo->name;
+    }
+    std::string text;
+    for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
+    {
+        if ((combo->buttons & (1u << b)) != 0)
+        {
+            text += text.empty() ? "" : " + ";
+            text += button_label(b, controls, strings);
+        }
+    }
+    return text;
+}
+
+// Making or changing a combo: its NAME (optional) and its buttons.
+static void draw_combo_editor(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+                              float label_width)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::remap_combo_name));
+    ImGui::SameLine(label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##combo_name", piccolo_text(strings, Str::remap_combo_name_hint), menu->combo_edit_name,
+                             sizeof(menu->combo_edit_name));
+    retro_ui_pop_field_text();
+    // The buttons this game has (each once), else the whole RetroPad.
+    bool any = false;
+    for (size_t i = 0; i < controls.size(); i++)
+    {
+        any = any || static_cast<uint32_t>(controls[i].action) < INPUT_PAD_BUTTON_COUNT;
+    }
+    for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
+    {
+        bool listed = !any;
+        for (size_t i = 0; !listed && i < controls.size(); i++)
+        {
+            listed = static_cast<uint32_t>(controls[i].action) == b;
+        }
+        if (!listed)
+        {
+            continue;
+        }
+        ImGui::PushID(static_cast<int>(b));
+        bool on = (menu->combo_edit_buttons & (1u << b)) != 0;
+        if (retro_ui_checkbox(button_label(b, controls, strings).c_str(), &on))
+        {
+            menu->combo_edit_buttons = static_cast<uint16_t>(on ? (menu->combo_edit_buttons | (1u << b))
+                                                                : (menu->combo_edit_buttons & ~(1u << b)));
+        }
+        ImGui::PopID();
+    }
+    ImGui::BeginDisabled(menu->combo_edit_buttons == 0);
+    if (retro_ui_button(piccolo_text(strings, Str::remap_combo_save)))
+    {
+        std::string name = menu->combo_edit_name;
+        size_t first = name.find_first_not_of(' ');
+        size_t last = name.find_last_not_of(' ');
+        name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
+        InputCombo* combo = nullptr;
+        for (size_t c = 0; c < input->combos.size() && !menu->combo_edit_id.empty(); c++)
+        {
+            if (input->combos[c].core == input->core_name && input->combos[c].id == menu->combo_edit_id)
+            {
+                combo = &input->combos[c];
+            }
+        }
+        if (combo == nullptr)
+        {
+            combo = input_combo_add(input, input->core_name.c_str(), name, menu->combo_edit_buttons);
+        }
+        combo->name = name;
+        combo->buttons = menu->combo_edit_buttons;
+        menu->combo_editing = false;
+        menu->input_dirty = true;
+    }
+    ImGui::EndDisabled();
+    if (!menu->combo_edit_id.empty())
+    {
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::remap_combo_delete)))
+        {
+            input_combo_remove(input, input->core_name.c_str(), menu->combo_edit_id);
+            menu->combo_editing = false;
+            menu->input_dirty = true;
+        }
+        retro_ui_item_tooltip(piccolo_text(strings, Str::remap_combo_delete_help));
+    }
+    ImGui::SameLine();
+    if (retro_ui_button(piccolo_text(strings, Str::map_cancel)))
+    {
+        menu->combo_editing = false;
+    }
+}
+
+static void open_combo_editor(QuickMenu* menu, const InputCombo* combo)
+{
+    menu->combo_editing = true;
+    menu->combo_edit_id = combo != nullptr ? combo->id : std::string();
+    std::snprintf(menu->combo_edit_name, sizeof(menu->combo_edit_name), "%s", combo != nullptr ? combo->name.c_str() : "");
+    menu->combo_edit_buttons = combo != nullptr ? combo->buttons : 0;
+}
+
+// COMBOS: the core's combos, each bound to inputs in this remap like a
+// control (+ / SET / CLEAR), EDIT to change it; + NEW COMBO.
+static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+                            const InputDevice* pad, const InputLayout* pad_layout, const InputProfile* pad_profile,
+                            float label_width)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    ImGui::Spacing();
+    retro_ui_separator_text(piccolo_text(strings, Str::remap_combos));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::remap_combos_help));
+    if (menu->combo_editing)
+    {
+        draw_combo_editor(menu, context, controls, label_width);
+        return;
+    }
+    const InputCoreProfile* active = input_active_core_profile(input, menu->remap_controller, menu->remap_port);
+    const char* set = piccolo_text(strings, Str::input_set);
+    const char* clear = piccolo_text(strings, Str::input_clear);
+    const char* edit = piccolo_text(strings, Str::remap_combo_edit);
+    const char* add = "+";
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float row_buttons = ImGui::CalcTextSize(set).x + ImGui::CalcTextSize(clear).x + padding * 2.0f + spacing;
+    float first_buttons = row_buttons + ImGui::CalcTextSize(add).x + ImGui::CalcTextSize(edit).x + padding * 2.0f + spacing * 2.0f;
+    // (A copy of the ids: EDIT > DELETE changes the list.)
+    std::vector<std::string> ids;
+    for (size_t c = 0; c < input->combos.size(); c++)
+    {
+        if (input->combos[c].core == input->core_name)
+        {
+            ids.push_back(input->combos[c].id);
+        }
+    }
+    for (size_t c = 0; c < ids.size(); c++)
+    {
+        const InputCombo* combo = input_combo(input, input->core_name.c_str(), ids[c]);
+        if (combo == nullptr)
+        {
+            continue;
+        }
+        const InputComboBinding* binding = combo_binding_of(active, combo->id);
+        InputSource none[INPUT_SOURCES_PER_ACTION] = {};
+        const InputSource* sources = binding != nullptr ? binding->sources : none;
+        bool waiting = menu->capturing && menu->capture_combo == combo->id;
+        uint32_t count = input_sources_count(sources);
+        uint32_t rows = count > 0 ? count : 1;
+        if (waiting && menu->capture_row >= rows)
+        {
+            rows = menu->capture_row + 1;
+        }
+        std::string label = combo_label(combo, controls, strings);
+        ImGui::PushID(("combo/" + combo->id).c_str());
+        for (uint32_t r = 0; r < rows; r++)
+        {
+            ImGui::PushID(static_cast<int>(r));
+            ImGui::AlignTextToFramePadding();
+            if (waiting && r == 0)
+            {
+                retro_ui_push_section_text();
+            }
+            ImGui::TextUnformatted(r == 0 ? label.c_str() : "");
+            if (waiting && r == 0)
+            {
+                retro_ui_pop_section_text();
+            }
+            float buttons_x = ImGui::GetWindowContentRegionMax().x - (r == 0 ? first_buttons : row_buttons);
+            ImGui::SameLine(label_width);
+            if (waiting && menu->capture_row == r)
+            {
+                uint64_t elapsed = context->now_ms - menu->capture_started_ms;
+                uint64_t total = input->settings.press_ms;
+                uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
+                input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left,
+                                          input_capture_hold_progress(input, context->now_ms), strings);
+                ImGui::SetScrollHereY(0.5f);
+            }
+            else
+            {
+                InputSource one[INPUT_SOURCES_PER_ACTION] = {};
+                one[0] = r < count ? sources[r] : InputSource{};
+                input_window_draw_sources(context->sdl, pad, pad_layout, pad_profile, one,
+                                          buttons_x - spacing - ImGui::GetCursorPosX(), strings);
+            }
+            ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
+            ImGui::BeginDisabled(menu->capturing);
+            if (r == 0)
+            {
+                if (retro_ui_button(edit))
+                {
+                    open_combo_editor(menu, combo);
+                }
+                ImGui::SameLine();
+                ImGui::BeginDisabled(count == 0 || count >= INPUT_SOURCES_PER_ACTION);
+                if (retro_ui_button(add))
+                {
+                    remap_start_combo_capture(menu, context, combo->id, count);
+                }
+                retro_ui_item_tooltip(piccolo_text(strings, Str::input_add_help));
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+            }
+            if (retro_ui_button(set))
+            {
+                remap_start_combo_capture(menu, context, combo->id, r < count ? r : count);
+            }
+            if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
+            {
+                menu->pad_combo = combo->id;
+                menu->pad_row = r;
+            }
+            ImGui::SameLine();
+            ImGui::BeginDisabled(r >= count);
+            if (retro_ui_button(clear))
+            {
+                InputComboBinding* changed = remap_combo_binding(menu, context, combo->id);
+                input_sources_remove(changed->sources, r);
+                if (input_sources_count(changed->sources) == 0)
+                {
+                    // Nothing on it any more: unbound.
+                    InputCoreProfile* profile = remap_profile(menu, context);
+                    for (size_t k = 0; k < profile->combos.size(); k++)
+                    {
+                        if (profile->combos[k].combo == combo->id)
+                        {
+                            profile->combos.erase(profile->combos.begin() + static_cast<long>(k));
+                            break;
+                        }
+                    }
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+        ImGui::PopID();
+    }
+    ImGui::BeginDisabled(menu->capturing);
+    if (retro_ui_button(piccolo_text(strings, Str::remap_combo_new)))
+    {
+        open_combo_editor(menu, nullptr);
+    }
+    ImGui::EndDisabled();
+}
+
 static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float block)
 {
     InputSystem* input = context->input;
@@ -576,10 +939,12 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     if (back)
     {
         menu->remap = false;   // back to the ports (B on a gamepad does the same)
+        menu->combo_editing = false;
         return;
     }
     retro_ui_separator_text(title);
-    ImGui::BeginDisabled(menu->capturing);
+    ImGui::BeginDisabled(menu->capturing || menu->combo_editing);
+    draw_remap_scope(menu, context, 100.0f * block);
     draw_device_combo(context, menu->remap_port, 100.0f * block);
     ImGui::EndDisabled();
 
@@ -597,6 +962,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         profile->decided = true;
         profile->custom = false;
         profile->overrides.clear();
+        profile->combos.clear();
         menu->input_dirty = true;
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::remap_use_retropad_help));
@@ -630,6 +996,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     // focus) is now.
     bool show_pad = pad != nullptr && pad->kind == InputDeviceKind::gamepad;
     InputAction shown = menu->capturing ? menu->capture_action : menu->pad_action;
+    std::string shown_combo = menu->capturing ? menu->capture_combo : menu->pad_combo;
     InputMapControl lit = InputMapControl::count;
     bool minus = false;
     uint32_t shown_index = static_cast<uint32_t>(shown);
@@ -641,13 +1008,24 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         minus = held.type == InputSourceType::axis_minus;
     }
     uint32_t shown_row = menu->capturing ? menu->capture_row : menu->pad_row;
-    if (lit == InputMapControl::count && shown_index < INPUT_ACTION_COUNT && shown_row < INPUT_SOURCES_PER_ACTION)
+    if (lit == InputMapControl::count && !shown_combo.empty() && shown_row < INPUT_SOURCES_PER_ACTION)
+    {
+        const InputComboBinding* binding =
+            combo_binding_of(input_active_core_profile(input, menu->remap_controller, menu->remap_port), shown_combo);
+        if (binding != nullptr)
+        {
+            lit = input_map_control_for_source(binding->sources[shown_row]);
+            minus = binding->sources[shown_row].type == InputSourceType::axis_minus;
+        }
+    }
+    else if (lit == InputMapControl::count && shown_index < INPUT_ACTION_COUNT && shown_row < INPUT_SOURCES_PER_ACTION)
     {
         InputSource source = effective.sources[shown_index][shown_row];
         lit = input_map_control_for_source(source);
         minus = source.type == InputSourceType::axis_minus;
     }
     menu->pad_action = InputAction::count;
+    menu->pad_combo.clear();
     float label_width = 110.0f * block;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::BeginChild("remap_rows", ImVec2(0.0f, 0.0f));
@@ -666,7 +1044,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         InputAction action = controls[i].action;
         uint32_t index = static_cast<uint32_t>(action);
         const InputSource* sources = effective.sources[index];
-        bool waiting = menu->capturing && menu->capture_action == action;
+        bool waiting = menu->capturing && menu->capture_combo.empty() && menu->capture_action == action;
         // A stick direction: a key or button on it pushes it a set amount (the percent).
         bool analog = index >= static_cast<uint32_t>(InputAction::pad_left_x_plus) &&
                       index <= static_cast<uint32_t>(InputAction::pad_right_y_minus);
@@ -782,6 +1160,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         }
         ImGui::PopID();
     }
+    draw_combo_rows(menu, context, controls, pad, pad_layout, pad_profile, label_width);
     ImGui::EndChild();
     ImGui::PopStyleColor();
     if (show_pad)
