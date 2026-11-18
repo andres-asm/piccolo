@@ -1719,10 +1719,6 @@ msgstr "ELIGE EL TIPO DE CONTROL"
 
 
 
-msgctxt "map_begin"
-msgid "BEGIN"
-msgstr "EMPEZAR"
-
 msgctxt "map_cancel"
 msgid "CANCEL"
 msgstr "CANCELAR"

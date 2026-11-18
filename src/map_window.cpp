@@ -12,7 +12,8 @@
 #include "retro_ui.h"
 
 constexpr uint64_t OFFER_MS = 15000;   // NOT NOW by itself after this long
-constexpr uint64_t INTRO_MS = 10000;   // a step's page STARTs by itself after this long
+constexpr uint64_t INTRO_MS = 10000;
+constexpr uint64_t APPEARANCE_MS = 15000;   // SELECT CONTROLLER TYPE: START by itself after this long untouched   // a step's page STARTs by itself after this long
 
 // The names of the controls a layout doesn't name: the d-pad and the
 // sticks (and any button a layout leaves without a label).
@@ -98,6 +99,7 @@ void map_window_close(MapWindow* window, InputSystem* input)
     input_sdl_mapper_cancel(&window->mapper);
     input_sdl_press_close(&window->press);
     window->press_stage = MapStage::closed;
+    window->drawn_stage = MapStage::closed;
     window->stage = MapStage::closed;
     input->suspended = false;
 }
@@ -374,8 +376,17 @@ static void draw_appearance(MapWindow* window, const MapWindowContext* context, 
         wrapped(piccolo_text(strings, Str::map_any_button));
     }
     footer();
+    // Touching any list (or choosing in it) starts the countdown again.
+    if (ImGui::IsAnyItemActive() || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId))
+    {
+        window->appearance_started_ms = context->now_ms;
+    }
+    char begin[100] = {};
+    std::snprintf(begin, sizeof(begin), piccolo_text(strings, Str::map_start),
+                  seconds_left(context->now_ms, window->appearance_started_ms, APPEARANCE_MS));
     bool pressed = window->needed && raw_press(window);
-    if (retro_ui_button(piccolo_text(strings, Str::map_begin)) || pressed)
+    bool timed_out = context->now_ms - window->appearance_started_ms >= APPEARANCE_MS;
+    if (retro_ui_button(begin) || pressed || timed_out)
     {
         window->stage = MapStage::intro_buttons;
         window->intro_started_ms = context->now_ms;
@@ -578,6 +589,14 @@ void map_window_draw(MapWindow* window, const MapWindowContext* context, ImFont*
     if (ImGui::Begin(title, nullptr, flags))
     {
         retro_ui_begin_window(scale);
+        if (window->stage != window->drawn_stage)
+        {
+            if (window->stage == MapStage::appearance)
+            {
+                window->appearance_started_ms = context->now_ms;   // its countdown starts on entering it
+            }
+            window->drawn_stage = window->stage;
+        }
         switch (window->stage)
         {
         case MapStage::offer:

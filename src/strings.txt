@@ -462,7 +462,6 @@ map_offer_needed = It isn't known as a gamepad: it can't be used until it is map
 map_map = MAP
 map_not_now = NOT NOW (%d)
 map_appearance = SELECT CONTROLLER TYPE
-map_begin = BEGIN
 map_cancel = CANCEL
 map_press = PRESS %s
 map_skip = SKIP

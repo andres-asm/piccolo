@@ -11,7 +11,8 @@
 //   APPEARANCE   SELECT CONTROLLER TYPE: LABELS and LAYOUT, two linked lists
 //                of the layouts (layouts/<Labels>/<layout>.cfg), preselected
 //                from SDL's type: they give the names of the buttons and which
-//                ones it has. Also its HOTKEY MODE (HOLD by default).
+//                ones it has. Also its HOTKEY MODE (HOLD by default). START by
+//                itself after 15 s untouched (the guess is usually right).
 //   STEP 1       CONTROLLER BUTTONS: what comes, with the pad, then START
 //                (by itself after 10 s, or any button on it); then the drawn
 //                pad with the button to press lit; PRESS <its name>; the
@@ -65,6 +66,8 @@ struct MapWindow
     InputHotkeyMode hotkey_mode = InputHotkeyMode::hold;
     uint64_t       offer_started_ms = 0;
     uint64_t       intro_started_ms = 0;
+    uint64_t       appearance_started_ms = 0;   // SELECT CONTROLLER TYPE: START by itself after a while untouched
+    MapStage       drawn_stage = MapStage::closed;   // the page drawn last (to notice entering one)
     bool           offered = false;          // came as NEW CONTROLLER DETECTED (else MAP CONTROLLER, from DEVICES)
     bool           interface_intro_done = false;  // STEP 2's page was shown
     InputSdlMapper mapper;
