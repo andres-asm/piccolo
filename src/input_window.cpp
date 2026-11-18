@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -838,6 +839,169 @@ static void extra_button_names(InputWindow* window, const InputWindowContext* co
     }
 }
 
+// SDL's mapping fields as the sources they give ("a" = the bottom button...).
+struct SdlField
+{
+    const char*     name;
+    InputSourceType type;
+    uint16_t        code;
+};
+
+static const SdlField SDL_FIELDS[] = {
+    {"a", InputSourceType::button, static_cast<uint16_t>(InputButton::south)},
+    {"b", InputSourceType::button, static_cast<uint16_t>(InputButton::east)},
+    {"x", InputSourceType::button, static_cast<uint16_t>(InputButton::west)},
+    {"y", InputSourceType::button, static_cast<uint16_t>(InputButton::north)},
+    {"back", InputSourceType::button, static_cast<uint16_t>(InputButton::back)},
+    {"guide", InputSourceType::button, static_cast<uint16_t>(InputButton::guide)},
+    {"start", InputSourceType::button, static_cast<uint16_t>(InputButton::start)},
+    {"leftstick", InputSourceType::button, static_cast<uint16_t>(InputButton::left_stick)},
+    {"rightstick", InputSourceType::button, static_cast<uint16_t>(InputButton::right_stick)},
+    {"leftshoulder", InputSourceType::button, static_cast<uint16_t>(InputButton::left_shoulder)},
+    {"rightshoulder", InputSourceType::button, static_cast<uint16_t>(InputButton::right_shoulder)},
+    {"dpup", InputSourceType::button, static_cast<uint16_t>(InputButton::dpad_up)},
+    {"dpdown", InputSourceType::button, static_cast<uint16_t>(InputButton::dpad_down)},
+    {"dpleft", InputSourceType::button, static_cast<uint16_t>(InputButton::dpad_left)},
+    {"dpright", InputSourceType::button, static_cast<uint16_t>(InputButton::dpad_right)},
+    {"misc1", InputSourceType::button, static_cast<uint16_t>(InputButton::misc1)},
+    {"paddle1", InputSourceType::button, static_cast<uint16_t>(InputButton::right_paddle1)},
+    {"paddle2", InputSourceType::button, static_cast<uint16_t>(InputButton::left_paddle1)},
+    {"paddle3", InputSourceType::button, static_cast<uint16_t>(InputButton::right_paddle2)},
+    {"paddle4", InputSourceType::button, static_cast<uint16_t>(InputButton::left_paddle2)},
+    {"touchpad", InputSourceType::button, static_cast<uint16_t>(InputButton::touchpad)},
+    {"misc2", InputSourceType::button, static_cast<uint16_t>(InputButton::misc2)},
+    {"misc3", InputSourceType::button, static_cast<uint16_t>(InputButton::misc3)},
+    {"misc4", InputSourceType::button, static_cast<uint16_t>(InputButton::misc4)},
+    {"misc5", InputSourceType::button, static_cast<uint16_t>(InputButton::misc5)},
+    {"misc6", InputSourceType::button, static_cast<uint16_t>(InputButton::misc6)},
+    {"lefttrigger", InputSourceType::axis_plus, static_cast<uint16_t>(InputAxis::left_trigger)},
+    {"righttrigger", InputSourceType::axis_plus, static_cast<uint16_t>(InputAxis::right_trigger)},
+};
+
+// A stick axis field's name ("leftx" = LEFT STICK X), or nullptr.
+static const char* stick_axis_name(const std::string& field)
+{
+    if (field == "leftx") return "LEFT STICK X";
+    if (field == "lefty") return "LEFT STICK Y";
+    if (field == "rightx") return "RIGHT STICK X";
+    if (field == "righty") return "RIGHT STICK Y";
+    return nullptr;
+}
+
+// A raw joystick element in words: "b3" BUTTON 3, "h0.1" HAT 0 UP, "+a2"
+// AXIS 2 +, "a5~" AXIS 5 (INVERTED). Anything else as it is.
+static std::string element_words(const std::string& element)
+{
+    char text[64] = {};
+    if (element.size() >= 2 && element[0] == 'b')
+    {
+        std::snprintf(text, sizeof(text), "BUTTON %s", element.c_str() + 1);
+        return text;
+    }
+    if (element.size() >= 4 && element[0] == 'h')
+    {
+        size_t dot = element.find('.');
+        if (dot != std::string::npos)
+        {
+            int mask = std::atoi(element.c_str() + dot + 1);
+            const char* way = mask == 1 ? "UP" : mask == 2 ? "RIGHT" : mask == 4 ? "DOWN" : mask == 8 ? "LEFT" : "?";
+            std::snprintf(text, sizeof(text), "HAT %s %s", element.substr(1, dot - 1).c_str(), way);
+            return text;
+        }
+    }
+    std::string axis = element;
+    const char* half = "";
+    if (!axis.empty() && (axis[0] == '+' || axis[0] == '-'))
+    {
+        half = axis[0] == '+' ? " +" : " -";
+        axis = axis.substr(1);
+    }
+    bool inverted = !axis.empty() && axis[axis.size() - 1] == '~';
+    if (inverted)
+    {
+        axis = axis.substr(0, axis.size() - 1);
+    }
+    if (axis.size() >= 2 && axis[0] == 'a')
+    {
+        std::snprintf(text, sizeof(text), "AXIS %s%s%s", axis.c_str() + 1, half, inverted ? " (INVERTED)" : "");
+        return text;
+    }
+    return element;
+}
+
+// The SDL mapping this gamepad uses now, read only: each control by the
+// name the rest of the window gives it, and the joystick's own input behind
+// it. (To check what MAP CONTROLLER made, or that its CANCEL put it back.)
+static void sdl_mapping_view(const InputWindowContext* context, const InputDevice* device, uint32_t controller, float label_width)
+{
+    SDL_Gamepad* gamepad = input_sdl_gamepad(context->sdl, device->id);
+    if (gamepad == nullptr)
+    {
+        return;
+    }
+    char* mapping = SDL_GetGamepadMapping(gamepad);
+    if (mapping == nullptr)
+    {
+        return;
+    }
+    InputSystem* input = context->input;
+    const InputLayout* layout = input_window_layout(input, context->layouts, device);
+    const InputProfile* profile = input_profile(input, input_controller_profile_id(input, controller));
+    if (retro_ui_collapsing_header(piccolo_text(context->strings, Str::input_sdl_mapping), 0))
+    {
+        // "<guid>,<name>,field:value,...": past the GUID and the name.
+        const char* field = mapping;
+        for (int commas = 0; commas < 2 && field != nullptr; commas++)
+        {
+            field = std::strchr(field, ',');
+            field = field != nullptr ? field + 1 : nullptr;
+        }
+        while (field != nullptr && *field != '\0')
+        {
+            const char* end = std::strchr(field, ',');
+            std::string text = end != nullptr ? std::string(field, static_cast<size_t>(end - field)) : std::string(field);
+            field = end != nullptr ? end + 1 : nullptr;
+            size_t colon = text.find(':');
+            if (colon == std::string::npos)
+            {
+                continue;
+            }
+            std::string name = text.substr(0, colon);
+            std::string value = text.substr(colon + 1);
+            if (name == "platform" || name == "crc" || name == "hint" || name == "type")
+            {
+                continue;   // about the mapping, not a control
+            }
+            char label[64] = {};
+            const char* stick = stick_axis_name(name);
+            bool known = stick != nullptr;
+            if (stick != nullptr)
+            {
+                std::snprintf(label, sizeof(label), "%s", stick);
+            }
+            for (size_t f = 0; !known && f < sizeof(SDL_FIELDS) / sizeof(SDL_FIELDS[0]); f++)
+            {
+                if (name == SDL_FIELDS[f].name)
+                {
+                    InputSource source = {};
+                    source.type = SDL_FIELDS[f].type;
+                    source.code = SDL_FIELDS[f].code;
+                    input_window_source_label(context->sdl, device, layout, profile, source, label, sizeof(label));
+                    known = true;
+                }
+            }
+            if (!known)
+            {
+                std::snprintf(label, sizeof(label), "%s", name.c_str());   // a field piccolo doesn't know: as SDL names it
+            }
+            ImGui::TextUnformatted(label);
+            ImGui::SameLine(label_width);
+            ImGui::TextDisabled("%s", element_words(value).c_str());
+        }
+    }
+    SDL_free(mapping);
+}
+
 static void draw_device(InputWindow* window, const InputWindowContext* context, InputDevice* device, float label_width,
                         bool open_by_default)
 {
@@ -911,6 +1075,7 @@ static void draw_device(InputWindow* window, const InputWindowContext* context, 
                 ImGui::EndCombo();
             }
             extra_button_names(window, context, device, static_cast<uint32_t>(first), label_width);
+            sdl_mapping_view(context, device, static_cast<uint32_t>(first), label_width);
         }
 
         if (device->kind == InputDeviceKind::keyboard)
