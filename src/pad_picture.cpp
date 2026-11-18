@@ -45,17 +45,19 @@ static const PadPart SIX_FACE[] = {
 };
 constexpr size_t SIX_FACE_COUNT = sizeof(SIX_FACE) / sizeof(SIX_FACE[0]);
 
-// Seen from behind (so upside down, left and right swapped): the shoulders
-// and triggers at the bottom edge, the four paddles in a column in the middle.
+// The back, as if the pad were see-through (left stays left): shoulders and
+// triggers at the top as on the front, two paddles under each hand, one
+// above the other (SDL's paddle1 / paddle3 on the right, paddle2 / paddle4
+// on the left).
 static const PadPart BACK[] = {
-    {InputMapControl::right_shoulder, 12, 33, 30, 37},
-    {InputMapControl::left_shoulder, 70, 33, 88, 37},
-    {InputMapControl::right_trigger, 14, 38, 28, 42},
-    {InputMapControl::left_trigger, 72, 38, 86, 42},
-    {InputMapControl::paddle1, 46, 4, 54, 10},
-    {InputMapControl::paddle2, 46, 11, 54, 17},
-    {InputMapControl::paddle3, 46, 18, 54, 24},
-    {InputMapControl::paddle4, 46, 25, 54, 31},
+    {InputMapControl::left_trigger, 14, 0, 28, 4},
+    {InputMapControl::right_trigger, 72, 0, 86, 4},
+    {InputMapControl::left_shoulder, 12, 5, 30, 9},
+    {InputMapControl::right_shoulder, 70, 5, 88, 9},
+    {InputMapControl::paddle2, 22, 16, 30, 26},
+    {InputMapControl::paddle4, 22, 29, 30, 39},
+    {InputMapControl::paddle1, 70, 16, 78, 26},
+    {InputMapControl::paddle3, 70, 29, 78, 39},
 };
 constexpr size_t BACK_COUNT = sizeof(BACK) / sizeof(BACK[0]);
 
@@ -96,8 +98,8 @@ void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapCont
 
     if (view == PadView::back)
     {
-        draw_list->AddRectFilled(ImVec2(origin.x + 8.0f * unit, origin.y + 0.0f * unit),
-                                 ImVec2(origin.x + 92.0f * unit, origin.y + 34.0f * unit), body);
+        draw_list->AddRectFilled(ImVec2(origin.x + 8.0f * unit, origin.y + 10.0f * unit),
+                                 ImVec2(origin.x + 92.0f * unit, origin.y + 44.0f * unit), body);
         for (size_t p = 0; p < BACK_COUNT; p++)
         {
             draw_part(draw_list, origin, unit, &BACK[p], BACK[p].control == lit ? light : part);

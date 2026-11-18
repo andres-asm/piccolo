@@ -27,7 +27,7 @@
 //                held. MAIN MENU also becomes HOTKEY ENABLE + that button.
 //   STEP 3       EXTRA BUTTONS (only from SETTINGS > INPUT > DEVICES > MAP...):
 //                three questions, YES / NO (NO by itself after 15 s): paddles
-//                (the pad drawn from behind), extra shoulders L4 / R4, other
+//                (the back drawn: two paddles under each hand), extra shoulders L4 / R4, other
 //                buttons; then the ones answered YES, held like STEP 1 (the
 //                others one after the other until none comes). They are added
 //                to the controller's SDL mapping (paddle1..4, misc5/6, misc1..4).
