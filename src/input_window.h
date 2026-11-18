@@ -82,7 +82,7 @@ void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, c
                                const InputSource* sources, float width, const Localization* strings);
 
 // Waiting for a binding: PRESS A BUTTON (4) / PRESS A KEY (4).
-void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Localization* strings);
+void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_progress, const Localization* strings);
 
 // The defaults a controller goes back to with RESET / DEFAULTS: the
 // keyboard's or a gamepad's, none for the keyboard's extra players.

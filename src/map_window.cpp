@@ -537,6 +537,13 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     }
     ImGui::Spacing();
     section(text);
+    if (role >= 0)
+    {
+        // Held 2 s to be taken: how far it has come (let go sooner to choose another).
+        wrapped(piccolo_text(strings, Str::map_hold_hint));
+        ImGui::ProgressBar(input_sdl_mapper_hold_progress(&window->mapper, context->now_ms),
+                           ImVec2(-1.0f, ImGui::GetTextLineHeight()), "");
+    }
     uint32_t left = input_sdl_mapper_seconds_left(&window->mapper, context->now_ms);
     if (left > 0)
     {

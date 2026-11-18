@@ -21,7 +21,8 @@
 //   STEP 2       USER INTERFACE: what comes, then START (the same way); the
 //                button for each of its controls (navigate, pages, accept,
 //                back, main menu, HOTKEY ENABLE, quick menu), wherever it is,
-//                but only one STEP 1 mapped; the drawn pad lights the one
+//                but only one STEP 1 mapped, held 2 s (a bar fills; let go
+//                sooner and it isn't taken); the drawn pad lights the one
 //                held. MAIN MENU also becomes HOTKEY ENABLE + that button.
 //
 // A controller SDL doesn't know can't drive the interface: on the type's page

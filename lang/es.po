@@ -1683,8 +1683,8 @@ msgid "%s ON PORT %d (%s): HOLD START TO REMAP (%d)"
 msgstr "%s EN EL PUERTO %d (%s): MANTÉN START PARA REMAPEAR (%d)"
 
 msgctxt "input_press_button"
-msgid "PRESS A BUTTON (%d)"
-msgstr "PRESIONA UN BOTÓN (%d)"
+msgid "HOLD A BUTTON (%d)"
+msgstr "MANTÉN UN BOTÓN (%d)"
 
 msgctxt "input_press_key"
 msgid "PRESS A KEY (%d)"
@@ -1840,8 +1840,12 @@ msgstr "QUEDA ACTIVO"
 
 
 msgctxt "map_press_for"
-msgid "PRESS THE BUTTON FOR %s"
-msgstr "PRESIONA EL BOTÓN PARA %s"
+msgid "HOLD THE BUTTON FOR %s"
+msgstr "MANTÉN EL BOTÓN PARA %s"
+
+msgctxt "map_hold_hint"
+msgid "Hold it 2 seconds. Let go sooner to choose another."
+msgstr "Mantenlo 2 segundos. Suéltalo antes para elegir otro."
 
 msgctxt "map_role_up"
 msgid "UP"

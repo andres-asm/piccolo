@@ -427,7 +427,7 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
     menu->capture_seen = true;
     uint64_t since = context->now_ms - menu->capture_started_ms;
     InputSource source = {};
-    if ((!menu->bind_all || since >= REMAP_COOL_OFF_MS) && input_capture_poll(context->input, &source))
+    if ((!menu->bind_all || since >= REMAP_COOL_OFF_MS) && input_capture_poll(context->input, context->now_ms, &source))
     {
         if (source.type == InputSourceType::key && source.code == HID_ESCAPE_KEY)
         {
@@ -439,7 +439,10 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
         remap_next(menu, context, controls);
         return;
     }
-    if (!context->input->capture.active || since > REMAP_CAPTURE_TIMEOUT_MS + (menu->bind_all ? REMAP_COOL_OFF_MS : 0))
+    InputSource held = {};
+    bool holding = input_capture_candidate(context->input, &held);   // no time-out while a control is being held
+    if (!context->input->capture.active ||
+        (!holding && since > REMAP_CAPTURE_TIMEOUT_MS + (menu->bind_all ? REMAP_COOL_OFF_MS : 0)))
     {
         remap_next(menu, context, controls);
     }
@@ -562,6 +565,13 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     InputMapControl lit = InputMapControl::count;
     bool minus = false;
     uint32_t shown_index = static_cast<uint32_t>(shown);
+    InputSource held = {};
+    if (menu->capturing && input_capture_candidate(input, &held))
+    {
+        // Being held to be bound: that one (let go sooner and it isn't taken).
+        lit = input_map_control_for_source(held);
+        minus = held.type == InputSourceType::axis_minus;
+    }
     for (uint32_t s = 0; shown_index < INPUT_ACTION_COUNT && s < INPUT_SOURCES_PER_ACTION && lit == InputMapControl::count; s++)
     {
         InputSource source = effective.sources[shown_index][s];
@@ -597,7 +607,8 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             uint64_t elapsed = context->now_ms - menu->capture_started_ms;
             uint64_t total = REMAP_CAPTURE_TIMEOUT_MS + (menu->bind_all ? REMAP_COOL_OFF_MS : 0);
             uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
-            input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left, strings);
+            input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left,
+                                      input_capture_hold_progress(input, context->now_ms), strings);
             ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
         }
         else

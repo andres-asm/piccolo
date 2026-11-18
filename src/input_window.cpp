@@ -375,7 +375,7 @@ void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, c
     retro_ui_item_tooltip(all.c_str());
 }
 
-void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Localization* strings)
+void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_progress, const Localization* strings)
 {
     char text[100] = {};
     std::snprintf(text, sizeof(text), piccolo_text(strings, keyboard ? Str::input_press_key : Str::input_press_button),
@@ -383,6 +383,12 @@ void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, const Local
     retro_ui_push_section_text();
     ImGui::TextUnformatted(text);
     retro_ui_pop_section_text();
+    if (hold_progress > 0.0f)
+    {
+        // A gamepad's control is taken once held: how far it has come.
+        ImGui::SameLine();
+        ImGui::ProgressBar(hold_progress, ImVec2(ImGui::GetFontSize() * 6.0f, ImGui::GetTextLineHeight()), "");
+    }
 }
 
 static void binding_row(InputWindow* window, const InputWindowContext* context, uint32_t controller_index,
@@ -427,7 +433,8 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
         uint64_t elapsed = context->now_ms - window->capture_started_ms;
         uint64_t total = CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
         uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
-        input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left, strings);
+        input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left,
+                                  input_capture_hold_progress(input, context->now_ms), strings);
         ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
     }
     else
@@ -807,7 +814,7 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
     }
     uint64_t since = context->now_ms - window->capture_started_ms;
     InputSource source = {};
-    if ((!window->bind_all || since >= BIND_ALL_COOL_OFF_MS) && input_capture_poll(input, &source))
+    if ((!window->bind_all || since >= BIND_ALL_COOL_OFF_MS) && input_capture_poll(input, context->now_ms, &source))
     {
         if (source.type == InputSourceType::key && source.code == HID_ESCAPE)
         {
@@ -822,7 +829,9 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
         next_or_stop(window, context);
         return;
     }
-    if (!input->capture.active || since > CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0))
+    InputSource held = {};
+    bool holding = input_capture_candidate(input, &held);   // no time-out while a control is being held
+    if (!input->capture.active || (!holding && since > CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0)))
     {
         next_or_stop(window, context);
     }
