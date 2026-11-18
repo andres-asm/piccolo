@@ -1200,7 +1200,7 @@ static void offer_mapping(App* app, const InputFrame* frame)
             if (!offered)
             {
                 app->map_offered.push_back(joystick);
-                map_window_offer(map, joystick, true, &app->layouts, now);
+                map_window_offer(map, joystick, true, &app->layouts, &app->input, now);
                 break;
             }
         }
@@ -1215,13 +1215,13 @@ static void offer_mapping(App* app, const InputFrame* frame)
             uint32_t joystick = input_sdl_joystick_of(&app->input_sdl, device_id);
             if ((profile == nullptr || profile->appearance.empty()) && joystick != 0)
             {
-                map_window_offer(map, joystick, false, &app->layouts, now);
+                map_window_offer(map, joystick, false, &app->layouts, &app->input, now);
             }
         }
     }
     if (app->input_window.map_request != 0 && !map_window_open_now(map))
     {
-        map_window_open(map, app->input_window.map_request, &app->layouts);
+        map_window_open(map, app->input_window.map_request, &app->layouts, &app->input);
     }
     app->input_window.map_request = 0;
     if (!map->result.empty())

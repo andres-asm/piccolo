@@ -165,6 +165,11 @@ void input_window_source_label(const InputSdl* sdl, const InputDevice* device, c
         case InputButton::right_paddle2:  text = "RIGHT PADDLE 2"; break;
         case InputButton::left_paddle2:   text = "LEFT PADDLE 2"; break;
         case InputButton::touchpad:       text = "TOUCHPAD"; break;
+        case InputButton::misc2:          text = "MISC 2"; break;
+        case InputButton::misc3:          text = "MISC 3"; break;
+        case InputButton::misc4:          text = "MISC 4"; break;
+        case InputButton::misc5:          text = "L4"; break;   // MAP CONTROLLER puts the extra shoulders here
+        case InputButton::misc6:          text = "R4"; break;
         case InputButton::count:          break;
         }
         break;

@@ -1863,6 +1863,66 @@ msgctxt "map_hold_hint"
 msgid "Hold it until the ring closes. Let go sooner to choose another."
 msgstr "Mantenlo hasta que se cierre el círculo. Suéltalo antes para elegir otro."
 
+msgctxt "map_step_extras"
+msgid "STEP 3: EXTRA BUTTONS"
+msgstr "PASO 3: BOTONES EXTRA"
+
+msgctxt "map_extras_paddles"
+msgid "Does it have paddles on the back?"
+msgstr "¿Tiene paddles atrás?"
+
+msgctxt "map_extras_shoulders"
+msgid "Does it have extra shoulder buttons (L4 and R4)?"
+msgstr "¿Tiene botones de hombro extra (L4 y R4)?"
+
+msgctxt "map_extras_others"
+msgid "Does it have any other buttons?"
+msgstr "¿Tiene otros botones?"
+
+msgctxt "map_extras_others_text"
+msgid "Hold each one, one at a time. When none are left, wait or press FINISH."
+msgstr "Mantén cada uno, de a uno. Cuando no queden más, espera o presiona TERMINAR."
+
+msgctxt "map_yes"
+msgid "YES"
+msgstr "SÍ"
+
+msgctxt "map_no"
+msgid "NO (%d)"
+msgstr "NO (%d)"
+
+msgctxt "map_finish"
+msgid "FINISH"
+msgstr "TERMINAR"
+
+msgctxt "map_paddle_1"
+msgid "PADDLE 1"
+msgstr "PADDLE 1"
+
+msgctxt "map_paddle_2"
+msgid "PADDLE 2"
+msgstr "PADDLE 2"
+
+msgctxt "map_paddle_3"
+msgid "PADDLE 3"
+msgstr "PADDLE 3"
+
+msgctxt "map_paddle_4"
+msgid "PADDLE 4"
+msgstr "PADDLE 4"
+
+msgctxt "map_l4"
+msgid "L4"
+msgstr "L4"
+
+msgctxt "map_r4"
+msgid "R4"
+msgstr "R4"
+
+msgctxt "map_other_button"
+msgid "ANOTHER BUTTON"
+msgstr "OTRO BOTÓN"
+
 msgctxt "map_role_up"
 msgid "UP"
 msgstr "ARRIBA"
