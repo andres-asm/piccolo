@@ -205,26 +205,59 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     draw_slots(menu, block, appearing);
     load_thumbnail(menu);
 
-    // The thumbnail in a 4:3 box (letterboxed to its own aspect), the slot's details beside it.
+    // The thumbnail at the biggest whole-number scale that fits (sharp pixels:
+    // nearest filtering, on whole pixels), the slot's details beside it. Room:
+    // most of the width, the height left under the slots.
     const StateSlotInfo* info = &menu->slots[menu->slot];
-    ImVec2 box(160.0f * block, 120.0f * block);
+    ImVec2 room = ImGui::GetContentRegionAvail();
+    room.x = static_cast<float>(static_cast<int>(room.x * 0.6f));
+    room.y = static_cast<float>(static_cast<int>(room.y - ImGui::GetStyle().ItemSpacing.y));
+    room.x = room.x > 160.0f * block ? room.x : 160.0f * block;
+    room.y = room.y > 120.0f * block ? room.y : 120.0f * block;
+    bool showing = menu->has_picture && menu->shown_slot == menu->slot && menu->texture_id != 0 && menu->width > 0 &&
+                   menu->height > 0;
+    ImVec2 box(room.x, room.x * 3.0f / 4.0f);   // no picture: a 4:3 box
+    if (box.y > room.y)
+    {
+        box = ImVec2(room.y * 4.0f / 3.0f, room.y);
+    }
+    if (showing)
+    {
+        float width = static_cast<float>(menu->width);
+        float height = static_cast<float>(menu->height);
+        int scale_x = static_cast<int>(room.x / width);
+        int scale_y = static_cast<int>(room.y / height);
+        int scale = scale_x < scale_y ? scale_x : scale_y;
+        if (scale >= 1)
+        {
+            box = ImVec2(width * static_cast<float>(scale), height * static_cast<float>(scale));
+        }
+        else
+        {
+            // Not even once: shrunk to fit (it can't be whole pixels then).
+            float aspect = width / height;
+            box = ImVec2(room.x, room.x / aspect);
+            if (box.y > room.y)
+            {
+                box = ImVec2(room.y * aspect, room.y);
+            }
+        }
+    }
+    box = ImVec2(static_cast<float>(static_cast<int>(box.x)), static_cast<float>(static_cast<int>(box.y)));
     ImVec2 corner = ImGui::GetCursorScreenPos();
+    corner = ImVec2(static_cast<float>(static_cast<int>(corner.x)), static_cast<float>(static_cast<int>(corner.y)));
     ImDrawList* draw_list = ImGui::GetWindowDrawList();
     draw_list->AddRectFilled(corner, ImVec2(corner.x + box.x, corner.y + box.y), IM_COL32(0, 0, 0, 255));
-    if (menu->has_picture && menu->shown_slot == menu->slot && menu->texture_id != 0 && menu->height > 0)
+    if (showing)
     {
-        float aspect = static_cast<float>(menu->width) / static_cast<float>(menu->height);
-        ImVec2 picture(box.x, box.x / aspect);
-        if (picture.y > box.y)
-        {
-            picture = ImVec2(box.y * aspect, box.y);
-        }
-        ImVec2 top_left(corner.x + (box.x - picture.x) * 0.5f, corner.y + (box.y - picture.y) * 0.5f);
         float u = 0.0f;
         float v = 0.0f;
         streaming_texture_uv_max(&menu->texture, &u, &v);
-        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(menu->texture_id)), top_left,
-                            ImVec2(top_left.x + picture.x, top_left.y + picture.y), ImVec2(0.0f, 0.0f), ImVec2(u, v));
+        const ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
+        draw_list->AddCallback(platform_io.DrawCallback_SetSamplerNearest, nullptr);
+        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(menu->texture_id)), corner,
+                            ImVec2(corner.x + box.x, corner.y + box.y), ImVec2(0.0f, 0.0f), ImVec2(u, v));
+        draw_list->AddCallback(platform_io.DrawCallback_SetSamplerLinear, nullptr);
     }
     ImGui::Dummy(box);
     ImGui::SameLine();
@@ -914,9 +947,13 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
     float block = static_cast<float>(scale);
     const ImGuiIO& io = ImGui::GetIO();
     retro_ui_push_theme(pixel_font, scale);
-    // A fixed size like SETTINGS (360 x 240 retro pixels, never bigger than
-    // the window): a window that resizes to its contents loses its scroll.
-    ImVec2 size(360.0f * block, 240.0f * block);
+    // About 60 % of the window (never smaller than 360 x 240 retro pixels,
+    // never bigger than the window), the same every frame: a window that
+    // resizes to its contents loses its scroll.
+    ImVec2 size(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.6f);
+    size.x = size.x > 360.0f * block ? size.x : 360.0f * block;
+    size.y = size.y > 240.0f * block ? size.y : 240.0f * block;
+    size = ImVec2(static_cast<float>(static_cast<int>(size.x)), static_cast<float>(static_cast<int>(size.y)));
     size.x = size.x < io.DisplaySize.x - 8.0f * block ? size.x : io.DisplaySize.x - 8.0f * block;
     size.y = size.y < io.DisplaySize.y - 24.0f * block ? size.y : io.DisplaySize.y - 24.0f * block;
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);

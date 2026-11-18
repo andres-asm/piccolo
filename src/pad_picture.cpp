@@ -99,7 +99,16 @@ static void draw_pad(ImDrawList* draw_list, ImVec2 origin, const InputLayout* la
                                  ImVec2(origin.x + 92.0f * unit, origin.y + 44.0f * unit), body);
         for (size_t p = 0; p < BACK_COUNT; p++)
         {
-            draw_part(draw_list, origin, unit, &BACK[p], BACK[p].control == lit ? light : part);
+            // The layout's shoulders and triggers (an SNES pad: L / R only), seen
+            // from behind; the paddles always (this view is for them).
+            InputMapControl control = BACK[p].control;
+            bool paddle = control == InputMapControl::left_paddle1 || control == InputMapControl::right_paddle1 ||
+                          control == InputMapControl::left_paddle2 || control == InputMapControl::right_paddle2;
+            if (!paddle && layout != nullptr && control != lit && !input_layout_has(layout, control))
+            {
+                continue;
+            }
+            draw_part(draw_list, origin, unit, &BACK[p], control == lit ? light : part);
         }
         return;
     }
