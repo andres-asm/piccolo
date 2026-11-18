@@ -1244,6 +1244,10 @@ static void app_update_input(App* app)
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());
     offer_mapping(app, &frame);
+    if (frame.profiles_changed && !app->input_config_path.empty())
+    {
+        input_config_save(&app->input, app->input_config_path.c_str());   // a turbo's speed, by taps (in the game)
+    }
     char message[300] = {};
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {

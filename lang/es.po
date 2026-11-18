@@ -1487,6 +1487,22 @@ msgctxt "input_action_right_y_minus"
 msgid "RIGHT STICK UP"
 msgstr "STICK DER. ARRIBA"
 
+msgctxt "input_action_pad_turbo"
+msgid "TURBO BUTTON"
+msgstr "BOTÓN TURBO"
+
+msgctxt "remap_turbo"
+msgid "TURBO"
+msgstr "TURBO"
+
+msgctxt "remap_turbo_help"
+msgid "While held, this row's key or button presses its RetroPad button and lets go over and over. Double tap it: faster; triple tap: slower."
+msgstr "Mientras se sostiene, la tecla o botón de esta fila presiona y suelta su botón del RetroPad una y otra vez. Doble tap: más rápido; triple tap: más lento."
+
+msgctxt "remap_turbo_button_help"
+msgid "Hold it and press a button: that button's turbo goes on or off until the game closes (not kept). Best on a button the game doesn't use."
+msgstr "Sostenlo y presiona un botón: el turbo de ese botón se prende o se apaga hasta cerrar el juego (no se guarda). Mejor en un botón que el juego no usa."
+
 msgctxt "input_action_ui_up"
 msgid "UP"
 msgstr "ARRIBA"

@@ -479,6 +479,10 @@ static void remap_set(QuickMenu* menu, const QuickMenuContext* context, InputAct
         }
         row = 0;
     }
+    else if (row < INPUT_SOURCES_PER_ACTION)
+    {
+        source.turbo = change->sources[row].turbo;   // SET again keeps the row's turbo
+    }
     input_sources_set(change->sources, row, source);
 }
 
@@ -511,7 +515,7 @@ static void remap_next(QuickMenu* menu, const QuickMenuContext* context, const s
 {
     if (menu->bind_all && menu->capture_combo.empty())
     {
-        for (size_t i = 0; i + 1 < controls.size(); i++)
+        for (size_t i = 0; i + 1 < controls.size() && controls[i + 1].action != InputAction::pad_turbo; i++)
         {
             if (controls[i].action == menu->capture_action)
             {
@@ -1415,6 +1419,8 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     }
     std::vector<RemapControl> controls;
     remap_controls(context, menu->remap_port, &controls);
+    RemapControl turbo_button = {InputAction::pad_turbo, piccolo_text(strings, Str::input_action_pad_turbo)};
+    controls.push_back(turbo_button);   // last, in its own section (BIND ALL stops before it)
     remap_run_capture(menu, context, controls);
 
     // <controller> -> <core device> MAPPING: what the controller is mapped to, not what it is.
@@ -1544,6 +1550,12 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         {
             rows = menu->capture_row + 1;   // + : the new row, waiting
         }
+        if (action == InputAction::pad_turbo)
+        {
+            ImGui::Spacing();
+            retro_ui_separator_text(piccolo_text(strings, Str::remap_turbo));
+            retro_ui_item_tooltip(piccolo_text(strings, Str::remap_turbo_button_help));
+        }
         ImGui::PushID(static_cast<int>(index));
         for (uint32_t r = 0; r < rows; r++)
         {
@@ -1569,7 +1581,12 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             InputSource source = r < count ? sources[r] : InputSource{};
             bool digital = source.type == InputSourceType::key || source.type == InputSourceType::button;
             bool show_percent = analog && digital && !(waiting && menu->capture_row == r);
-            float text_end = buttons_x - spacing - (show_percent ? percent_width + spacing : 0.0f);
+            // A RetroPad button's key or button: TURBO for this row.
+            bool show_turbo = index < INPUT_PAD_BUTTON_COUNT && digital && !(waiting && menu->capture_row == r);
+            const char* turbo_label = piccolo_text(strings, Str::remap_turbo);
+            float turbo_width = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x + ImGui::CalcTextSize(turbo_label).x;
+            float text_end = buttons_x - spacing - (show_percent ? percent_width + spacing : 0.0f) -
+                             (show_turbo ? turbo_width + spacing : 0.0f);
             ImGui::SameLine(label_width);
             if (waiting && menu->capture_row == r)
             {
@@ -1609,6 +1626,19 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
                     ImGui::EndCombo();
                 }
                 retro_ui_item_tooltip(piccolo_text(strings, Str::remap_percent_help));
+                ImGui::EndDisabled();
+            }
+            if (show_turbo)
+            {
+                ImGui::SameLine(text_end + spacing);
+                ImGui::BeginDisabled(menu->capturing);
+                bool turbo = source.turbo > 0;
+                if (retro_ui_checkbox(turbo_label, &turbo))
+                {
+                    InputBindingOverride* change = remap_override(menu, context, action);
+                    change->sources[r].turbo = turbo ? INPUT_TURBO_DEFAULT : 0;
+                }
+                retro_ui_item_tooltip(piccolo_text(strings, Str::remap_turbo_help));
                 ImGui::EndDisabled();
             }
             ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);

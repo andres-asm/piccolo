@@ -30,7 +30,7 @@ static const Str ACTION_LABELS[INPUT_ACTION_COUNT] = {
     Str::input_action_pad_l2, Str::input_action_pad_r2, Str::input_action_pad_l3, Str::input_action_pad_r3,
     Str::input_action_left_x_plus, Str::input_action_left_x_minus, Str::input_action_left_y_plus,
     Str::input_action_left_y_minus, Str::input_action_right_x_plus, Str::input_action_right_x_minus,
-    Str::input_action_right_y_plus, Str::input_action_right_y_minus,
+    Str::input_action_right_y_plus, Str::input_action_right_y_minus, Str::input_action_pad_turbo,
     Str::input_action_ui_up, Str::input_action_ui_down, Str::input_action_ui_left, Str::input_action_ui_right,
     Str::input_action_ui_accept, Str::input_action_ui_back, Str::input_action_ui_page_left,
     Str::input_action_ui_page_right, Str::input_action_ui_open_menu,
