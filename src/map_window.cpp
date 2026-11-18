@@ -8,6 +8,7 @@
 #include "imgui.h"
 #include "input_sdl.h"
 #include "pad_picture.h"
+#include "pixel_font_imgui.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -418,7 +419,7 @@ static void draw_intro_buttons(MapWindow* window, const MapWindowContext* contex
         }
         if (input_sdl_mapper_begin(&window->mapper, window->joystick_id, ROLE_COUNT, optional, wanted, context->now_ms))
         {
-            window->mapper.role_hold_ms = context->input->settings.hold_ms;        // SETTINGS > INPUT
+            window->mapper.hold_ms = context->input->settings.hold_ms;        // SETTINGS > INPUT
             window->mapper.optional_wait_ms = context->input->settings.press_ms;
             window->stage = MapStage::mapping;
             window->interface_intro_done = false;
@@ -529,13 +530,15 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     }
     ImGui::Spacing();
     section(text);
-    if (role >= 0)
+    // Held (SETTINGS > INPUT > HOLD TO BIND) to be taken: a ring closes next to it.
+    char spinner[4] = {};
+    pixel_font_imgui_spinner(input_sdl_mapper_hold_progress(&window->mapper, context->now_ms), spinner);
+    if (spinner[0] != '\0')
     {
-        // Held (SETTINGS > INPUT > HOLD TO BIND) to be taken: how far it has come.
-        wrapped(piccolo_text(strings, Str::map_hold_hint));
-        ImGui::ProgressBar(input_sdl_mapper_hold_progress(&window->mapper, context->now_ms),
-                           ImVec2(-1.0f, ImGui::GetTextLineHeight()), "");
+        ImGui::SameLine();
+        section(spinner);
     }
+    wrapped(piccolo_text(strings, Str::map_hold_hint));
     uint32_t left = input_sdl_mapper_seconds_left(&window->mapper, context->now_ms);
     if (left > 0)
     {
@@ -558,6 +561,41 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     if (retro_ui_button(piccolo_text(strings, Str::map_cancel)))
     {
         map_window_close(window, context->input);
+    }
+}
+
+// Which page of the wizard this is, as a row of small squares above the
+// buttons (the current one lit): the type, STEP 1, STEP 2. None on OFFER.
+static void draw_page_indicator(const MapWindow* window)
+{
+    int32_t page = -1;
+    switch (window->stage)
+    {
+        case MapStage::appearance:      page = 0; break;
+        case MapStage::intro_buttons:   page = 1; break;
+        case MapStage::mapping:         page = input_sdl_mapper_role(&window->mapper) >= 0 ? 2 : 1; break;
+        case MapStage::intro_interface: page = 2; break;
+        default:                        break;
+    }
+    if (page < 0)
+    {
+        return;
+    }
+    const int32_t PAGES = 3;
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float size = static_cast<float>(static_cast<int>(ImGui::GetFontSize() * 0.75f));
+    float gap = size;
+    float width = static_cast<float>(PAGES) * size + static_cast<float>(PAGES - 1) * gap;
+    ImVec2 window_pos = ImGui::GetWindowPos();
+    ImVec2 window_size = ImGui::GetWindowSize();
+    float x = window_pos.x + static_cast<float>(static_cast<int>((window_size.x - width) * 0.5f));
+    float y = window_pos.y + window_size.y - style.WindowPadding.y - ImGui::GetFrameHeight() - style.ItemSpacing.y - size;
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    for (int32_t p = 0; p < PAGES; p++)
+    {
+        float px = x + static_cast<float>(p) * (size + gap);
+        ImU32 color = p == page ? IM_COL32(255, 220, 80, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+        draw->AddRectFilled(ImVec2(px, y), ImVec2(px + size, y + size), color);
     }
 }
 
@@ -596,6 +634,7 @@ void map_window_draw(MapWindow* window, const MapWindowContext* context, ImFont*
             }
             window->drawn_stage = window->stage;
         }
+        draw_page_indicator(window);
         switch (window->stage)
         {
         case MapStage::offer:

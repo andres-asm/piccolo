@@ -1589,8 +1589,8 @@ msgid "HOLD TO BIND"
 msgstr "MANTENER PARA ASIGNAR"
 
 msgctxt "setting_input_hold_time_help"
-msgid "Seconds a gamepad's button must be held to be bound with SET and in MAP CONTROLLER. Let go sooner and it isn't."
-msgstr "Segundos que hay que mantener un botón del gamepad para asignarlo con SET y en MAPEAR CONTROL. Si lo sueltas antes, no se asigna."
+msgid "Seconds a gamepad's button must be held to be bound (SET, BIND ALL, MAP CONTROLLER): a ring closes meanwhile. Let go sooner and it isn't."
+msgstr "Segundos que hay que mantener un botón del gamepad para asignarlo (SET, ASIGNAR TODO, MAPEAR CONTROL): mientras, se cierra un círculo. Si lo sueltas antes, no se asigna."
 
 
 
@@ -1740,8 +1740,8 @@ msgid "CANCEL"
 msgstr "CANCELAR"
 
 msgctxt "map_press"
-msgid "PRESS %s"
-msgstr "PRESIONA %s"
+msgid "HOLD %s"
+msgstr "MANTÉN %s"
 
 msgctxt "map_skip"
 msgid "SKIP"
@@ -1860,8 +1860,8 @@ msgid "HOLD THE BUTTON FOR %s"
 msgstr "MANTÉN EL BOTÓN PARA %s"
 
 msgctxt "map_hold_hint"
-msgid "Hold it until the bar fills. Let go sooner to choose another."
-msgstr "Mantenlo hasta que se llene la barra. Suéltalo antes para elegir otro."
+msgid "Hold it until the ring closes. Let go sooner to choose another."
+msgstr "Mantenlo hasta que se cierre el círculo. Suéltalo antes para elegir otro."
 
 msgctxt "map_role_up"
 msgid "UP"

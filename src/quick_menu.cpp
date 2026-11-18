@@ -395,8 +395,7 @@ static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context
     menu->capture_action = action;
     menu->capture_started_ms = context->now_ms;
     menu->capture_seen = true;
-    // SET: held to be taken (the pad shows it); BIND ALL names each control: a press is enough.
-    input_capture_begin(input, input->controllers[menu->remap_controller].device_id, !menu->bind_all);
+    input_capture_begin(input, input->controllers[menu->remap_controller].device_id);
 }
 
 // The next control of a BIND ALL (in the list's order), or the end.

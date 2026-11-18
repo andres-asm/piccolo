@@ -125,6 +125,19 @@ static const GlyphPicture GLYPHS[] = {
     { PIXEL_FONT_ARROW_RIGHT, { ".#...", ".##..", ".###.", ".##..", ".#..." } },
     { PIXEL_FONT_CHECK,       { "....#", "...##", "#.##.", "###..", ".#..." } },
     { PIXEL_FONT_MENU,        { "#####", ".....", "#####", ".....", "#####" } },
+    // The hold spinner: a ring filling clockwise from the top, one pixel a frame, until it is almost
+    // the O (the full ring would be the O itself: no two glyphs may look the same).
+    { PIXEL_FONT_SPINNER_FIRST + 0, { "..#..", ".....", ".....", ".....", "....." } },
+    { PIXEL_FONT_SPINNER_FIRST + 1, { "..##.", ".....", ".....", ".....", "....." } },
+    { PIXEL_FONT_SPINNER_FIRST + 2, { "..##.", "....#", ".....", ".....", "....." } },
+    { PIXEL_FONT_SPINNER_FIRST + 3, { "..##.", "....#", "....#", ".....", "....." } },
+    { PIXEL_FONT_SPINNER_FIRST + 4, { "..##.", "....#", "....#", "....#", "....." } },
+    { PIXEL_FONT_SPINNER_FIRST + 5, { "..##.", "....#", "....#", "....#", "...#." } },
+    { PIXEL_FONT_SPINNER_FIRST + 6, { "..##.", "....#", "....#", "....#", "..##." } },
+    { PIXEL_FONT_SPINNER_FIRST + 7, { "..##.", "....#", "....#", "....#", ".###." } },
+    { PIXEL_FONT_SPINNER_FIRST + 8, { "..##.", "....#", "....#", "#...#", ".###." } },
+    { PIXEL_FONT_SPINNER_FIRST + 9, { "..##.", "....#", "#...#", "#...#", ".###." } },
+    { PIXEL_FONT_SPINNER_FIRST + 10, { "..##.", "#...#", "#...#", "#...#", ".###." } },
 };
 
 constexpr uint32_t PICTURE_COUNT = sizeof(GLYPHS) / sizeof(GLYPHS[0]);

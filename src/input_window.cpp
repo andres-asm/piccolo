@@ -9,6 +9,7 @@
 
 #include "imgui.h"
 #include "piccolo_text.h"
+#include "pixel_font_imgui.h"
 #include "piccolo_settings.h"
 #include "retro_ui.h"
 #include "settings_ui.h"
@@ -335,8 +336,7 @@ static void start_capture(InputWindow* window, const InputWindowContext* context
     window->capture_action = action;
     window->capture_controller = controller;
     window->capture_started_ms = context->now_ms;
-    // SET: held to be taken (the pad shows it); BIND ALL names each control: a press is enough.
-    input_capture_begin(context->input, context->input->controllers[controller].device_id, !window->bind_all);
+    input_capture_begin(context->input, context->input->controllers[controller].device_id);
 }
 
 void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
@@ -383,11 +383,15 @@ void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_
     retro_ui_push_section_text();
     ImGui::TextUnformatted(text);
     retro_ui_pop_section_text();
-    if (hold_progress > 0.0f)
+    // A gamepad's control is taken once held: a ring closes next to it.
+    char spinner[4] = {};
+    pixel_font_imgui_spinner(hold_progress, spinner);
+    if (spinner[0] != '\0')
     {
-        // A gamepad's control is taken once held: how far it has come.
         ImGui::SameLine();
-        ImGui::ProgressBar(hold_progress, ImVec2(ImGui::GetFontSize() * 6.0f, ImGui::GetTextLineHeight()), "");
+        retro_ui_push_section_text();
+        ImGui::TextUnformatted(spinner);
+        retro_ui_pop_section_text();
     }
 }
 

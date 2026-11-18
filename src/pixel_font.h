@@ -31,6 +31,10 @@ constexpr uint32_t PIXEL_FONT_ARROW_LEFT  = 0x25C0;   // BLACK LEFT-POINTING TRI
 constexpr uint32_t PIXEL_FONT_ARROW_RIGHT = 0x25B6;   // BLACK RIGHT-POINTING TRIANGLE
 constexpr uint32_t PIXEL_FONT_CHECK       = 0x2714;   // HEAVY CHECK MARK
 constexpr uint32_t PIXEL_FONT_MENU        = 0x2630;   // TRIGRAM FOR HEAVEN (the "hamburger" menu)
+// The hold spinner's frames (Private Use Area): frame N lights N + 1 pixels
+// of a ring, clockwise from the top; the last one is the O but for a pixel.
+constexpr uint32_t PIXEL_FONT_SPINNER_FIRST  = 0xE000;
+constexpr uint32_t PIXEL_FONT_SPINNER_FRAMES = 11;
 
 // One cell row as 5 bits: bit 4 = leftmost pixel, bit 0 = rightmost. Row 0 is
 // the top of the cell (accents), rows 2..6 the letter, row 7 below it.

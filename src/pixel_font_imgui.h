@@ -23,3 +23,7 @@ constexpr const char* PIXEL_FONT_UTF8_MENU = "\xE2\x98\xB0";    // U+2630
 
 // Adds the font to ImGui's atlas. Returns nullptr (and logs) on failure.
 ImFont* pixel_font_imgui_add();
+
+// The hold spinner's frame for `progress` (0 .. 1) as UTF-8 text, to draw
+// like any letter: "" at 0, the ring almost closed at 1.
+void pixel_font_imgui_spinner(float progress, char out[4]);

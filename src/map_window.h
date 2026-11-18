@@ -15,13 +15,14 @@
 //                itself after 15 s untouched (the guess is usually right).
 //   STEP 1       CONTROLLER BUTTONS: what comes, with the pad, then START
 //                (by itself after 10 s, or any button on it); then the drawn
-//                pad with the button to press lit; PRESS <its name>; the
+//                pad with the button to press lit; HOLD <its name> (a ring
+//                closes, as in STEP 2); the
 //                optional ones skip after 5 s; BACK / SKIP / CANCEL. This is
 //                the SDL mapping: where each button is.
 //   STEP 2       USER INTERFACE: what comes, then START (the same way); the
 //                button for each of its controls (navigate, pages, accept,
 //                back, main menu, HOTKEY ENABLE, quick menu), wherever it is,
-//                but only one STEP 1 mapped, held HOLD TO BIND (a bar fills; let go
+//                but only one STEP 1 mapped, held HOLD TO BIND (a ring closes; let go
 //                sooner and it isn't taken); the drawn pad lights the one
 //                held. MAIN MENU also becomes HOTKEY ENABLE + that button.
 //

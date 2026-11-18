@@ -138,3 +138,19 @@ ImFont* pixel_font_imgui_add()
     }
     return font;
 }
+
+void pixel_font_imgui_spinner(float progress, char out[4])
+{
+    out[0] = '\0';
+    if (progress <= 0.0f)
+    {
+        return;
+    }
+    uint32_t frame = static_cast<uint32_t>(progress * static_cast<float>(PIXEL_FONT_SPINNER_FRAMES));
+    frame = frame >= PIXEL_FONT_SPINNER_FRAMES ? PIXEL_FONT_SPINNER_FRAMES - 1 : frame;
+    uint32_t codepoint = PIXEL_FONT_SPINNER_FIRST + frame;   // U+E000..: three UTF-8 bytes
+    out[0] = static_cast<char>(0xE0 | (codepoint >> 12));
+    out[1] = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+    out[2] = static_cast<char>(0x80 | (codepoint & 0x3F));
+    out[3] = '\0';
+}
