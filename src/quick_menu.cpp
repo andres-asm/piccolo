@@ -363,36 +363,54 @@ static InputCoreProfile* remap_profile(QuickMenu* menu, const QuickMenuContext* 
 }
 
 // The captured source becomes this action's binding for the core and device.
-static void remap_set(QuickMenu* menu, const QuickMenuContext* context, InputAction action, InputSource source)
+// This action's change for the core and device, made from what plays now
+// when it has none (switching to custom keeps the rest as it was).
+static InputBindingOverride* remap_override(QuickMenu* menu, const QuickMenuContext* context, InputAction action)
 {
+    InputBindingSet effective = {};
+    input_effective_bindings(context->input, menu->remap_controller, menu->remap_port, &effective);
     InputCoreProfile* profile = remap_profile(menu, context);
-    // Starting from what plays now: switching to custom keeps the rest.
     profile->decided = true;
     profile->custom = true;
-    InputBindingOverride change = {};
-    change.action = action;
-    change.sources[0] = source;
-    bool replaced = false;
+    menu->input_dirty = true;
     for (size_t o = 0; o < profile->overrides.size(); o++)
     {
         if (profile->overrides[o].action == action)
         {
-            profile->overrides[o] = change;
-            replaced = true;
+            return &profile->overrides[o];
         }
     }
-    if (!replaced)
+    InputBindingOverride change = {};
+    change.action = action;
+    for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
     {
-        profile->overrides.push_back(change);
+        change.sources[s] = effective.sources[static_cast<uint32_t>(action)][s];
     }
-    menu->input_dirty = true;
+    profile->overrides.push_back(change);
+    return &profile->overrides.back();
 }
 
-static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context, InputAction action)
+// The captured source on `row` (BIND ALL: alone).
+static void remap_set(QuickMenu* menu, const QuickMenuContext* context, InputAction action, uint32_t row, InputSource source)
+{
+    InputBindingOverride* change = remap_override(menu, context, action);
+    if (menu->bind_all)
+    {
+        for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
+        {
+            change->sources[s] = InputSource{};
+        }
+        row = 0;
+    }
+    input_sources_set(change->sources, row, source);
+}
+
+static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context, InputAction action, uint32_t row)
 {
     InputSystem* input = context->input;
     menu->capturing = true;
     menu->capture_action = action;
+    menu->capture_row = row;
     menu->capture_started_ms = context->now_ms;
     menu->capture_seen = true;
     input_capture_begin(input, input->controllers[menu->remap_controller].device_id);
@@ -407,7 +425,7 @@ static void remap_next(QuickMenu* menu, const QuickMenuContext* context, const s
         {
             if (controls[i].action == menu->capture_action)
             {
-                remap_start_capture(menu, context, controls[i + 1].action);
+                remap_start_capture(menu, context, controls[i + 1].action, 0);
                 return;
             }
         }
@@ -434,7 +452,7 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
             menu->capturing = false;
             return;
         }
-        remap_set(menu, context, menu->capture_action, source);
+        remap_set(menu, context, menu->capture_action, menu->capture_row, source);
         remap_next(menu, context, controls);
         return;
     }
@@ -531,7 +549,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     if (retro_ui_button(piccolo_text(strings, Str::input_bind_all)) && !controls.empty())
     {
         menu->bind_all = true;
-        remap_start_capture(menu, context, controls[0].action);
+        remap_start_capture(menu, context, controls[0].action, 0);
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::input_bind_all_help));
     ImGui::SameLine();
@@ -571,9 +589,10 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         lit = input_map_control_for_source(held);
         minus = held.type == InputSourceType::axis_minus;
     }
-    for (uint32_t s = 0; shown_index < INPUT_ACTION_COUNT && s < INPUT_SOURCES_PER_ACTION && lit == InputMapControl::count; s++)
+    uint32_t shown_row = menu->capturing ? menu->capture_row : menu->pad_row;
+    if (lit == InputMapControl::count && shown_index < INPUT_ACTION_COUNT && shown_row < INPUT_SOURCES_PER_ACTION)
     {
-        InputSource source = effective.sources[shown_index][s];
+        InputSource source = effective.sources[shown_index][shown_row];
         lit = input_map_control_for_source(source);
         minus = source.type == InputSourceType::axis_minus;
     }
@@ -583,53 +602,134 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     float label_width = 110.0f * block;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::BeginChild("remap_rows", ImVec2(show_pad ? -pad_width : 0.0f, 0.0f));
+    const InputLayout* pad_layout = input_window_layout(input, context->layouts, pad);
+    const char* set = piccolo_text(strings, Str::input_set);
+    const char* clear = piccolo_text(strings, Str::input_clear);
+    const char* add = "+";
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float row_buttons = ImGui::CalcTextSize(set).x + ImGui::CalcTextSize(clear).x + padding * 2.0f + spacing;
+    float first_buttons = row_buttons + ImGui::CalcTextSize(add).x + padding + spacing;
+    float percent_width = ImGui::CalcTextSize("100%").x + padding + ImGui::GetFrameHeight();
     for (size_t i = 0; i < controls.size(); i++)
     {
-        uint32_t index = static_cast<uint32_t>(controls[i].action);
+        InputAction action = controls[i].action;
+        uint32_t index = static_cast<uint32_t>(action);
+        const InputSource* sources = effective.sources[index];
+        bool waiting = menu->capturing && menu->capture_action == action;
+        // A stick direction: a key or button on it pushes it a set amount (the percent).
+        bool analog = index >= static_cast<uint32_t>(InputAction::pad_left_x_plus) &&
+                      index <= static_cast<uint32_t>(InputAction::pad_right_y_minus);
+        uint32_t count = input_sources_count(sources);
+        uint32_t rows = count > 0 ? count : 1;
+        if (waiting && menu->capture_row >= rows)
+        {
+            rows = menu->capture_row + 1;   // + : the new row, waiting
+        }
         ImGui::PushID(static_cast<int>(index));
-        ImGui::AlignTextToFramePadding();
-        bool waiting = menu->capturing && menu->capture_action == controls[i].action;
-        if (waiting)
+        for (uint32_t r = 0; r < rows; r++)
         {
-            retro_ui_push_section_text();   // the one being bound stands out
+            ImGui::PushID(static_cast<int>(r));
+            ImGui::AlignTextToFramePadding();
+            if (r == 0)
+            {
+                if (waiting)
+                {
+                    retro_ui_push_section_text();   // the one being bound stands out
+                }
+                ImGui::TextUnformatted(controls[i].label.c_str());
+                if (waiting)
+                {
+                    retro_ui_pop_section_text();
+                }
+            }
+            else
+            {
+                ImGui::TextUnformatted("");   // more sources of the same control: no label
+            }
+            float buttons_x = ImGui::GetWindowContentRegionMax().x - (r == 0 ? first_buttons : row_buttons);
+            InputSource source = r < count ? sources[r] : InputSource{};
+            bool digital = source.type == InputSourceType::key || source.type == InputSourceType::button;
+            bool show_percent = analog && digital && !(waiting && menu->capture_row == r);
+            float text_end = buttons_x - spacing - (show_percent ? percent_width + spacing : 0.0f);
+            ImGui::SameLine(label_width);
+            if (waiting && menu->capture_row == r)
+            {
+                uint64_t elapsed = context->now_ms - menu->capture_started_ms;
+                uint64_t total = context->input->settings.press_ms + (menu->bind_all ? REMAP_COOL_OFF_MS : 0);
+                uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
+                input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left,
+                                          input_capture_hold_progress(input, context->now_ms), strings);
+                ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
+            }
+            else
+            {
+                InputSource one[INPUT_SOURCES_PER_ACTION] = {};
+                one[0] = source;
+                input_window_draw_sources(context->sdl, pad, pad_layout, one, text_end - ImGui::GetCursorPosX(), strings);
+            }
+            if (show_percent)
+            {
+                // How far it pushes the stick (D-pad right at 20 %: walking, not running).
+                char current[16] = {};
+                std::snprintf(current, sizeof(current), "%u%%", static_cast<unsigned>(source.percent));
+                ImGui::SameLine(text_end + spacing);
+                ImGui::SetNextItemWidth(percent_width);
+                ImGui::BeginDisabled(menu->capturing);
+                if (retro_ui_begin_combo("##percent", current))
+                {
+                    for (uint32_t p = 10; p <= 100; p += 10)
+                    {
+                        char item[16] = {};
+                        std::snprintf(item, sizeof(item), "%u%%", static_cast<unsigned>(p));
+                        if (ImGui::Selectable(item, source.percent == p))
+                        {
+                            InputBindingOverride* change = remap_override(menu, context, action);
+                            change->sources[r].percent = static_cast<uint8_t>(p);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                retro_ui_item_tooltip(piccolo_text(strings, Str::remap_percent_help));
+                ImGui::EndDisabled();
+            }
+            ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
+            ImGui::BeginDisabled(menu->capturing);
+            if (r == 0)
+            {
+                ImGui::BeginDisabled(count == 0 || count >= INPUT_SOURCES_PER_ACTION);
+                if (retro_ui_button(add))
+                {
+                    menu->bind_all = false;
+                    remap_start_capture(menu, context, action, count);   // a new row
+                }
+                retro_ui_item_tooltip(piccolo_text(strings, Str::input_add_help));
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+            }
+            if (retro_ui_button(set))
+            {
+                menu->bind_all = false;
+                remap_start_capture(menu, context, action, r < count ? r : count);
+            }
+            // The pad shows the row under the mouse, or the one in focus while
+            // navigating with a gamepad or keys (a click also focuses, but that
+            // focus shouldn't keep the row lit once its SET is over).
+            if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
+            {
+                menu->pad_action = action;   // the pad shows it on the next frame
+                menu->pad_row = r;
+            }
+            ImGui::SameLine();
+            ImGui::BeginDisabled(r >= count);
+            if (retro_ui_button(clear))
+            {
+                input_sources_remove(remap_override(menu, context, action)->sources, r);
+            }
+            ImGui::EndDisabled();
+            ImGui::EndDisabled();
+            ImGui::PopID();
         }
-        ImGui::TextUnformatted(controls[i].label.c_str());
-        if (waiting)
-        {
-            retro_ui_pop_section_text();
-        }
-        const char* set = piccolo_text(strings, Str::input_set);
-        float set_x = ImGui::GetWindowContentRegionMax().x - (ImGui::CalcTextSize(set).x + ImGui::GetStyle().FramePadding.x * 2.0f);
-        ImGui::SameLine(label_width);
-        if (waiting)
-        {
-            uint64_t elapsed = context->now_ms - menu->capture_started_ms;
-            uint64_t total = context->input->settings.press_ms + (menu->bind_all ? REMAP_COOL_OFF_MS : 0);
-            uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
-            input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left,
-                                      input_capture_hold_progress(input, context->now_ms), strings);
-            ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
-        }
-        else
-        {
-            input_window_draw_sources(context->sdl, pad, input_window_layout(input, context->layouts, pad), effective.sources[index],
-                                      set_x - ImGui::GetCursorPosX() - ImGui::GetStyle().ItemSpacing.x, strings);
-        }
-        ImGui::SameLine(set_x > ImGui::GetCursorPosX() ? set_x : 0.0f);
-        ImGui::BeginDisabled(menu->capturing);
-        if (retro_ui_button(set))
-        {
-            menu->bind_all = false;
-            remap_start_capture(menu, context, controls[i].action);
-        }
-        // The pad shows the row under the mouse, or the one in focus while
-        // navigating with a gamepad or keys (a click also focuses, but that
-        // focus shouldn't keep the row lit once its SET is over).
-        if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
-        {
-            menu->pad_action = controls[i].action;   // the pad shows it on the next frame
-        }
-        ImGui::EndDisabled();
         ImGui::PopID();
     }
     ImGui::EndChild();

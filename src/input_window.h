@@ -38,6 +38,7 @@ struct InputWindow
 
     bool        capturing = false;           // SET: waiting for a key or button
     InputAction capture_action = InputAction::pad_b;
+    uint32_t    capture_row = 0;             // the row (source) being set; its count = a new row (+)
     uint32_t    capture_controller = 0;
     uint64_t    capture_started_ms = 0;
     bool        bind_all = false;            // BIND ALL: go on to the next action...

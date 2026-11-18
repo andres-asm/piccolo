@@ -1609,6 +1609,14 @@ msgctxt "input_bind_all_help"
 msgid "Asks for every control below in turn; nothing pressed for 5 seconds skips one, Esc stops."
 msgstr "Pide cada control de abajo en orden; si no presionas nada en 5 segundos se salta, Esc termina."
 
+msgctxt "input_add_help"
+msgid "Another button for the same action, on a new row: any of them does it."
+msgstr "Otro botón para la misma acción, en una fila nueva: cualquiera de ellos la hace."
+
+msgctxt "remap_percent_help"
+msgid "How far this key or button pushes the stick: 20 % walks where 100 % runs."
+msgstr "Cuánto empuja el stick esta tecla o botón: con 20 % se camina, con 100 % se corre."
+
 msgctxt "input_reset"
 msgid "RESET"
 msgstr "RESET"

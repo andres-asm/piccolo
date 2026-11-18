@@ -335,10 +335,12 @@ static void draw_settings(InputWindow* window, const InputWindowContext* context
 // INTERFACE / HOTKEYS
 // ---------------------------------------------------------------------------
 
-static void start_capture(InputWindow* window, const InputWindowContext* context, uint32_t controller, InputAction action)
+static void start_capture(InputWindow* window, const InputWindowContext* context, uint32_t controller, InputAction action,
+                          uint32_t row)
 {
     window->capturing = true;
     window->capture_action = action;
+    window->capture_row = row;
     window->capture_controller = controller;
     window->capture_started_ms = context->now_ms;
     input_capture_begin(context->input, context->input->controllers[controller].device_id);
@@ -398,86 +400,128 @@ void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_
     }
 }
 
+// One action: a row per source (its label on the first only), each with
+// SET and CLEAR; the first also has + (one more source for it: a new row)
+// and RESET when it differs from the defaults.
 static void binding_row(InputWindow* window, const InputWindowContext* context, uint32_t controller_index,
                         const InputBindingSet* defaults, InputAction action, float label_width)
 {
     InputSystem* input = context->input;
     InputController* controller = &input->controllers[controller_index];
     const InputDevice* device = input_devices_find_const(&input->devices, controller->device_id);
+    const InputLayout* layout = input_window_layout(input, context->layouts, device);
     const Localization* strings = context->strings;
     uint32_t index = static_cast<uint32_t>(action);
-    bool changed = !same_sources(controller->bindings.sources[index], defaults->sources[index]);
+    InputSource* sources = controller->bindings.sources[index];
+    bool changed = !same_sources(sources, defaults->sources[index]);
     bool waiting = window->capturing && window->capture_action == action && window->capture_controller == controller_index;
-
-    ImGui::PushID(static_cast<int>(index));
-    ImGui::AlignTextToFramePadding();
-    if (waiting)
+    uint32_t count = input_sources_count(sources);
+    uint32_t rows = count > 0 ? count : 1;   // an action with nothing still has its row
+    if (waiting && window->capture_row >= rows)
     {
-        retro_ui_push_section_text();   // the one being bound stands out
-        ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
-        retro_ui_pop_section_text();
-    }
-    else if (changed)
-    {
-        // Changed from the defaults: highlighted, like an override.
-        ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive), "%s", piccolo_text(strings, ACTION_LABELS[index]));
-    }
-    else
-    {
-        ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
+        rows = window->capture_row + 1;      // + : the new row, waiting
     }
 
-    // [RESET] [SET] [CLEAR] at the right end; the binding gets the room before them.
     const char* set = piccolo_text(strings, Str::input_set);
     const char* clear = piccolo_text(strings, Str::input_clear);
     const char* reset = piccolo_text(strings, Str::input_reset);
+    const char* add = "+";
     float spacing = ImGui::GetStyle().ItemSpacing.x;
-    float buttons = button_width(set) + button_width(clear) + spacing + (changed ? button_width(reset) + spacing : 0.0f);
-    float buttons_x = ImGui::GetWindowContentRegionMax().x - buttons;
-    ImGui::SameLine(label_width);
-    if (waiting)
+    float row_buttons = button_width(set) + button_width(clear) + spacing;
+    float first_buttons = row_buttons + button_width(add) + spacing + (changed ? button_width(reset) + spacing : 0.0f);
+
+    ImGui::PushID(static_cast<int>(index));
+    for (uint32_t r = 0; r < rows; r++)
     {
-        uint64_t elapsed = context->now_ms - window->capture_started_ms;
-        uint64_t total = context->input->settings.press_ms + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
-        uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
-        input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left,
-                                  input_capture_hold_progress(input, context->now_ms), strings);
-        ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
-    }
-    else
-    {
-        input_window_draw_sources(context->sdl, device, input_window_layout(input, context->layouts, device), controller->bindings.sources[index],
-                                  buttons_x - ImGui::GetCursorPosX() - spacing, strings);
-    }
-    ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
-    if (changed)
-    {
-        ImGui::BeginDisabled(window->capturing);
-        if (retro_ui_button(reset))
+        ImGui::PushID(static_cast<int>(r));
+        ImGui::AlignTextToFramePadding();
+        if (r == 0)
         {
-            input_unbind_all(&controller->bindings, action);
-            for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
+            if (waiting)
             {
-                input_bind(&controller->bindings, action, defaults->sources[index][s]);
+                retro_ui_push_section_text();   // the one being bound stands out
+                ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
+                retro_ui_pop_section_text();
             }
+            else if (changed)
+            {
+                // Changed from the defaults: highlighted, like an override.
+                ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive), "%s", piccolo_text(strings, ACTION_LABELS[index]));
+            }
+            else
+            {
+                ImGui::TextUnformatted(piccolo_text(strings, ACTION_LABELS[index]));
+            }
+        }
+        else
+        {
+            ImGui::TextUnformatted("");   // more sources of the same action: no label
+        }
+
+        // The buttons at the right end; the binding gets the room before them.
+        float buttons_x = ImGui::GetWindowContentRegionMax().x - (r == 0 ? first_buttons : row_buttons);
+        ImGui::SameLine(label_width);
+        if (waiting && window->capture_row == r)
+        {
+            uint64_t elapsed = context->now_ms - window->capture_started_ms;
+            uint64_t total = context->input->settings.press_ms + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
+            uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
+            input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left,
+                                      input_capture_hold_progress(input, context->now_ms), strings);
+            ImGui::SetScrollHereY(0.5f);   // BIND ALL: keep it in view
+        }
+        else
+        {
+            InputSource one[INPUT_SOURCES_PER_ACTION] = {};
+            one[0] = r < count ? sources[r] : InputSource{};
+            input_window_draw_sources(context->sdl, device, layout, one, buttons_x - ImGui::GetCursorPosX() - spacing, strings);
+        }
+        ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
+        bool usable = !window->capturing && device != nullptr && device->connected;
+        if (r == 0)
+        {
+            if (changed)
+            {
+                ImGui::BeginDisabled(window->capturing);
+                if (retro_ui_button(reset))
+                {
+                    input_unbind_all(&controller->bindings, action);
+                    for (uint32_t s = 0; s < INPUT_SOURCES_PER_ACTION; s++)
+                    {
+                        input_bind(&controller->bindings, action, defaults->sources[index][s]);
+                    }
+                    window->dirty = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+            }
+            ImGui::BeginDisabled(!usable || count == 0 || count >= INPUT_SOURCES_PER_ACTION);
+            if (retro_ui_button(add))
+            {
+                window->bind_all = false;
+                start_capture(window, context, controller_index, action, count);   // a new row
+            }
+            retro_ui_item_tooltip(piccolo_text(strings, Str::input_add_help));
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+        }
+        ImGui::BeginDisabled(!usable);
+        if (retro_ui_button(set))
+        {
+            window->bind_all = false;
+            start_capture(window, context, controller_index, action, r < count ? r : count);
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(r >= count);
+        if (retro_ui_button(clear))
+        {
+            input_sources_remove(sources, r);
             window->dirty = true;
         }
         ImGui::EndDisabled();
-        ImGui::SameLine();
+        ImGui::EndDisabled();
+        ImGui::PopID();
     }
-    ImGui::BeginDisabled(window->capturing || device == nullptr || !device->connected);
-    if (retro_ui_button(set))
-    {
-        window->bind_all = false;
-        start_capture(window, context, controller_index, action);
-    }
-    ImGui::SameLine();
-    if (retro_ui_button(clear))
-    {
-        input_unbind_all(&controller->bindings, action);
-        window->dirty = true;
-    }
-    ImGui::EndDisabled();
     ImGui::PopID();
 }
 
@@ -580,7 +624,7 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
     {
         window->bind_all = true;
         window->bind_all_last = last;
-        start_capture(window, context, controller, first);
+        start_capture(window, context, controller, first, 0);
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::input_bind_all_help));
     ImGui::EndDisabled();
@@ -795,7 +839,7 @@ static void next_or_stop(InputWindow* window, const InputWindowContext* context)
     if (window->bind_all && window->capture_action != window->bind_all_last)
     {
         start_capture(window, context, window->capture_controller,
-                      static_cast<InputAction>(static_cast<uint32_t>(window->capture_action) + 1));
+                      static_cast<InputAction>(static_cast<uint32_t>(window->capture_action) + 1), 0);
         return;
     }
     window->bind_all = false;
@@ -830,8 +874,15 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
             return;
         }
         InputBindingSet* bindings = &input->controllers[window->capture_controller].bindings;
-        input_unbind_all(bindings, window->capture_action);
-        input_bind(bindings, window->capture_action, source);
+        if (window->bind_all)
+        {
+            input_unbind_all(bindings, window->capture_action);   // BIND ALL: this one, alone
+            input_bind(bindings, window->capture_action, source);
+        }
+        else
+        {
+            input_sources_set(bindings->sources[static_cast<uint32_t>(window->capture_action)], window->capture_row, source);
+        }
         window->dirty = true;
         next_or_stop(window, context);
         return;
