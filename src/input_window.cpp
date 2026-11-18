@@ -31,11 +31,15 @@ static const Str ACTION_LABELS[INPUT_ACTION_COUNT] = {
     Str::input_action_left_x_plus, Str::input_action_left_x_minus, Str::input_action_left_y_plus,
     Str::input_action_left_y_minus, Str::input_action_right_x_plus, Str::input_action_right_x_minus,
     Str::input_action_right_y_plus, Str::input_action_right_y_minus, Str::input_action_pad_turbo,
+    Str::input_action_cursor_right, Str::input_action_cursor_left, Str::input_action_cursor_down, Str::input_action_cursor_up,
+    Str::input_action_mouse_left, Str::input_action_mouse_right, Str::input_action_mouse_middle,
+    Str::input_action_mouse_wheel_up, Str::input_action_mouse_wheel_down, Str::input_action_gun_reload,
     Str::input_action_ui_up, Str::input_action_ui_down, Str::input_action_ui_left, Str::input_action_ui_right,
     Str::input_action_ui_accept, Str::input_action_ui_back, Str::input_action_ui_page_left,
     Str::input_action_ui_page_right, Str::input_action_ui_open_menu,
     Str::input_action_hotkey_enable, Str::input_action_hotkey_menu, Str::input_action_hotkey_quick_menu,
     Str::input_action_hotkey_save_state, Str::input_action_hotkey_load_state, Str::input_action_hotkey_fast_forward,
+    Str::input_action_hotkey_grab_mouse,
 };
 
 static const char* with_id(char* buffer, size_t size, const char* text, const char* id)
@@ -179,6 +183,19 @@ void input_window_source_label(const InputSdl* sdl, const InputDevice* device, c
         case InputButton::misc5:          text = "MISC 5"; break;   // MAP CONTROLLER names them L4 / R4 when they are
         case InputButton::misc6:          text = "MISC 6"; break;   // the extra shoulders (the profile's labels)
         case InputButton::count:          break;
+        }
+        break;
+    case InputSourceType::mouse:
+        switch (static_cast<InputMouseButton>(source.code))
+        {
+        case InputMouseButton::left:       text = "MOUSE LEFT"; break;
+        case InputMouseButton::right:      text = "MOUSE RIGHT"; break;
+        case InputMouseButton::middle:     text = "MOUSE MIDDLE"; break;
+        case InputMouseButton::x1:         text = "MOUSE BACK"; break;
+        case InputMouseButton::x2:         text = "MOUSE FORWARD"; break;
+        case InputMouseButton::wheel_up:   text = "WHEEL UP"; break;
+        case InputMouseButton::wheel_down: text = "WHEEL DOWN"; break;
+        case InputMouseButton::count:      break;
         }
         break;
     case InputSourceType::axis_plus:
@@ -1261,7 +1278,7 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
             if (begin_tab(window, piccolo_text(strings, Str::input_section_hotkeys), "hotkeys", 2, target))
             {
                 window->tab = 2;
-                draw_bindings(window, context, InputAction::hotkey_enable, InputAction::hotkey_fast_forward,
+                draw_bindings(window, context, InputAction::hotkey_enable, InputAction::hotkey_grab_mouse,
                               Str::input_column_action, label_width);
                 ImGui::EndTabItem();
             }

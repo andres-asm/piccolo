@@ -1420,7 +1420,24 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     std::vector<RemapControl> controls;
     remap_controls(context, menu->remap_port, &controls);
     RemapControl turbo_button = {InputAction::pad_turbo, piccolo_text(strings, Str::input_action_pad_turbo)};
-    controls.push_back(turbo_button);   // last, in its own section (BIND ALL stops before it)
+    controls.push_back(turbo_button);   // in its own section (BIND ALL stops before it)
+    // The cursor (mouse / pointer / lightgun), last in its own section.
+    static const InputAction CURSOR_ACTIONS[10] = {
+        InputAction::cursor_up,      InputAction::cursor_down,      InputAction::cursor_left,  InputAction::cursor_right,
+        InputAction::mouse_left,     InputAction::mouse_right,      InputAction::mouse_middle, InputAction::mouse_wheel_up,
+        InputAction::mouse_wheel_down, InputAction::gun_reload,
+    };
+    static const Str CURSOR_LABELS[10] = {
+        Str::input_action_cursor_up,      Str::input_action_cursor_down,      Str::input_action_cursor_left,
+        Str::input_action_cursor_right,   Str::input_action_mouse_left,       Str::input_action_mouse_right,
+        Str::input_action_mouse_middle,   Str::input_action_mouse_wheel_up,   Str::input_action_mouse_wheel_down,
+        Str::input_action_gun_reload,
+    };
+    for (uint32_t c = 0; c < 10; c++)
+    {
+        RemapControl control = {CURSOR_ACTIONS[c], piccolo_text(strings, CURSOR_LABELS[c])};
+        controls.push_back(control);
+    }
     remap_run_capture(menu, context, controls);
 
     // <controller> -> <core device> MAPPING: what the controller is mapped to, not what it is.
@@ -1556,6 +1573,12 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             retro_ui_separator_text(piccolo_text(strings, Str::remap_turbo));
             retro_ui_item_tooltip(piccolo_text(strings, Str::remap_turbo_button_help));
         }
+        if (action == InputAction::cursor_up)
+        {
+            ImGui::Spacing();
+            retro_ui_separator_text(piccolo_text(strings, Str::remap_cursor));
+            retro_ui_item_tooltip(piccolo_text(strings, Str::remap_cursor_help));
+        }
         ImGui::PushID(static_cast<int>(index));
         for (uint32_t r = 0; r < rows; r++)
         {
@@ -1579,7 +1602,8 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             }
             float buttons_x = ImGui::GetWindowContentRegionMax().x - (r == 0 ? first_buttons : row_buttons);
             InputSource source = r < count ? sources[r] : InputSource{};
-            bool digital = source.type == InputSourceType::key || source.type == InputSourceType::button;
+            bool digital = source.type == InputSourceType::key || source.type == InputSourceType::button ||
+                           source.type == InputSourceType::mouse;
             bool show_percent = analog && digital && !(waiting && menu->capture_row == r);
             // A RetroPad button's key or button: TURBO for this row.
             bool show_turbo = index < INPUT_PAD_BUTTON_COUNT && digital && !(waiting && menu->capture_row == r);

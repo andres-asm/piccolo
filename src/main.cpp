@@ -97,6 +97,13 @@ struct App
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
     Picture     picture = {};   // the game on screen (viewport + filter)
+    // The part of the core's frame on screen (a cursor maps from it to the
+    // whole frame), and the ports' cursors for the core (mouse, pointer, lightgun).
+    uint32_t           view_source[4] = {};      // x, y, width, height in core pixels
+    uint32_t           view_frame[2] = {};       // the frame's width, height
+    LibretroInputState cursor_input = {};
+    bool               mouse_grabbed = false;
+    bool               mouse_released = false;   // GRAB / RELEASE MOUSE let it go
 
     // Settings (piccolo_settings.h) in <settings>/piccolo.cfg, and their window.
     Settings       settings = {};
@@ -1226,6 +1233,57 @@ static void offer_mapping(App* app, const InputFrame* frame)
     }
 }
 
+// The ports' cursors for the core: from the part of the frame on screen to
+// the whole frame (a crop shows less of it). And the mouse grabbed while a
+// port's core device is a mouse with a mouse on it (no UI up, not let go
+// with GRAB / RELEASE MOUSE).
+static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
+{
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT && p < LIBRETRO_MAX_PORTS; p++)
+    {
+        LibretroCursorState* cursor = &app->cursor_input.cursor[p];
+        float x = (static_cast<float>(frame->cursor_x[p]) / 32767.0f + 1.0f) * 0.5f;
+        float y = (static_cast<float>(frame->cursor_y[p]) / 32767.0f + 1.0f) * 0.5f;
+        if (app->view_frame[0] > 0 && app->view_frame[1] > 0 && app->view_source[2] > 0 && app->view_source[3] > 0)
+        {
+            x = (static_cast<float>(app->view_source[0]) + x * static_cast<float>(app->view_source[2])) /
+                static_cast<float>(app->view_frame[0]);
+            y = (static_cast<float>(app->view_source[1]) + y * static_cast<float>(app->view_source[3])) /
+                static_cast<float>(app->view_frame[1]);
+        }
+        cursor->x = static_cast<int16_t>(x * 65534.0f - 32767.0f);
+        cursor->y = static_cast<int16_t>(y * 65534.0f - 32767.0f);
+        cursor->off_screen = frame->cursor_off[p] || app->input.view_width <= 0.0f;
+        cursor->mouse_dx = frame->mouse_dx[p];
+        cursor->mouse_dy = frame->mouse_dy[p];
+        cursor->buttons = frame->mouse_buttons[p];   // (the same bits: left, right, middle, wheel up / down, reload)
+    }
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_grab_mouse)])
+    {
+        app->mouse_released = !app->mouse_released;
+    }
+    bool mouse_port = false;
+    for (uint32_t p = 0; game_running(app) && p < INPUT_PORT_COUNT; p++)
+    {
+        if ((app->session.host->port_devices[p] & RETRO_DEVICE_MASK) != RETRO_DEVICE_MOUSE)
+        {
+            continue;
+        }
+        for (size_t m = 0; m < app->input.ports[p].size(); m++)
+        {
+            uint32_t controller = app->input.ports[p][m];
+            const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[controller].device_id);
+            mouse_port = mouse_port || (device != nullptr && device->kind == InputDeviceKind::mouse);
+        }
+    }
+    bool grab = mouse_port && !ui_up && !app->mouse_released && app->window_focused;
+    if (grab != app->mouse_grabbed)
+    {
+        SDL_SetWindowRelativeMouseMode(app->shell.window, grab);
+        app->mouse_grabbed = grab;
+    }
+}
+
 // Once per loop, after the events: what the controllers say (ports,
 // hotkeys), handed to the core session before it runs frames.
 static void app_update_input(App* app)
@@ -1244,6 +1302,7 @@ static void app_update_input(App* app)
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());
     offer_mapping(app, &frame);
+    update_cursors(app, &frame, ui_up);
     if (frame.profiles_changed && !app->input_config_path.empty())
     {
         input_config_save(&app->input, app->input_config_path.c_str());   // a turbo's speed, by taps (in the game)
@@ -1356,6 +1415,7 @@ static void draw_game(App* app)
 {
     CoreSession* session = &app->session;
     app->picture.ready = false;
+    app->input.view_width = 0.0f;   // (until it is drawn)
     if (!game_running(app) || !session->texture.has_content || session->texture_id == 0)
     {
         return;
@@ -1373,6 +1433,17 @@ static void draw_game(App* app)
     if (viewport_compute(&input, &viewport) &&
         picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport))
     {
+        // Where the cursors live (window pixels), and the part of the frame it shows.
+        app->input.view_x = static_cast<float>(viewport.x);
+        app->input.view_y = static_cast<float>(viewport.y);
+        app->input.view_width = static_cast<float>(viewport.width);
+        app->input.view_height = static_cast<float>(viewport.height);
+        app->view_source[0] = viewport.source_x;
+        app->view_source[1] = viewport.source_y;
+        app->view_source[2] = viewport.source_width;
+        app->view_source[3] = viewport.source_height;
+        app->view_frame[0] = input.frame_width;
+        app->view_frame[1] = input.frame_height;
         // The background draw list is behind every window, menu bar included.
         picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f, 0.0f);
     }
@@ -1728,7 +1799,7 @@ int main(int argc, char** argv)
             write_running_marker(app);
         }
         app_update_input(app);
-        CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, nullptr, game_has_keyboard(app));
+        CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, &app->cursor_input, game_has_keyboard(app));
         if (ran != CoreSessionFrame::skipped || !game_running(app))
         {
             input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done

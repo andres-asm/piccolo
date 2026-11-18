@@ -1491,6 +1491,54 @@ msgctxt "input_action_pad_turbo"
 msgid "TURBO BUTTON"
 msgstr "BOTÓN TURBO"
 
+msgctxt "input_action_cursor_right"
+msgid "CURSOR RIGHT"
+msgstr "CURSOR DERECHA"
+
+msgctxt "input_action_cursor_left"
+msgid "CURSOR LEFT"
+msgstr "CURSOR IZQUIERDA"
+
+msgctxt "input_action_cursor_down"
+msgid "CURSOR DOWN"
+msgstr "CURSOR ABAJO"
+
+msgctxt "input_action_cursor_up"
+msgid "CURSOR UP"
+msgstr "CURSOR ARRIBA"
+
+msgctxt "input_action_mouse_left"
+msgid "CLICK / TRIGGER / TOUCH"
+msgstr "CLIC / GATILLO / TOQUE"
+
+msgctxt "input_action_mouse_right"
+msgid "RIGHT CLICK"
+msgstr "CLIC DERECHO"
+
+msgctxt "input_action_mouse_middle"
+msgid "MIDDLE CLICK"
+msgstr "CLIC CENTRAL"
+
+msgctxt "input_action_mouse_wheel_up"
+msgid "WHEEL UP"
+msgstr "RUEDA ARRIBA"
+
+msgctxt "input_action_mouse_wheel_down"
+msgid "WHEEL DOWN"
+msgstr "RUEDA ABAJO"
+
+msgctxt "input_action_gun_reload"
+msgid "LIGHTGUN RELOAD"
+msgstr "RECARGA DE PISTOLA"
+
+msgctxt "remap_cursor"
+msgid "MOUSE / POINTER / LIGHTGUN"
+msgstr "MOUSE / PUNTERO / PISTOLA"
+
+msgctxt "remap_cursor_help"
+msgid "The port's cursor: whatever the core asks for (a mouse, a touch pointer or a lightgun) comes from it. A mouse moves it; these move it with a stick and press its buttons. The lightgun's other buttons are the RetroPad's (A, B, Y, START, SELECT, D-PAD)."
+msgstr "El cursor del puerto: lo que el core pida (un mouse, un puntero táctil o una pistola) sale de él. Un mouse lo mueve; estas filas lo mueven con un stick y presionan sus botones. Los otros botones de la pistola son los del RetroPad (A, B, Y, START, SELECT, D-PAD)."
+
 msgctxt "remap_turbo"
 msgid "TURBO"
 msgstr "TURBO"
@@ -1562,6 +1610,10 @@ msgstr "CARGAR ESTADO"
 msgctxt "input_action_hotkey_fast_forward"
 msgid "FAST FORWARD"
 msgstr "AVANCE RÁPIDO"
+
+msgctxt "input_action_hotkey_grab_mouse"
+msgid "GRAB / RELEASE MOUSE"
+msgstr "ATRAPAR / SOLTAR MOUSE"
 
 
 
