@@ -67,7 +67,7 @@ struct QuickMenu
     InputAction   pad_action = InputAction::count;   // the row the drawn pad shows when not capturing (focused or hovered)
     std::string   pad_combo;            // ...or this combo's row (its id)
     uint32_t      pad_row = 0;          // which of its sources
-    // COMBOS: making or changing one (the core's, any game of it can bind it).
+    // COMBOS: making or changing one, in a modal (the core's, any game of it can bind it).
     bool          combo_editing = false;
     std::string   combo_edit_id;        // "" = a new one
     char          combo_edit_name[64] = {};

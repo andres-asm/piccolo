@@ -50,6 +50,7 @@ void quick_menu_open(QuickMenu* menu, uint32_t slot)
     menu->capturing = false;
     menu->bind_all = false;
     menu->pad_action = InputAction::count;
+    menu->combo_editing = false;
     menu->open = true;
     menu->slot = slot >= LIBRETRO_STATE_SLOT_FIRST && slot <= LIBRETRO_STATE_SLOT_LAST ? slot : LIBRETRO_STATE_SLOT_FIRST;
     menu->refresh = true;
@@ -677,7 +678,7 @@ static std::string combo_label(const InputCombo* combo, const std::vector<RemapC
     return text;
 }
 
-// Making or changing a combo: its NAME (optional) and its buttons.
+// Making or changing a combo (in its modal): its NAME (optional) and its buttons.
 static void draw_combo_editor(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
                               float label_width)
 {
@@ -768,6 +769,37 @@ static void open_combo_editor(QuickMenu* menu, const InputCombo* combo)
     menu->combo_edit_buttons = combo != nullptr ? combo->buttons : 0;
 }
 
+// The combo editor as a modal over the quick menu (B / Escape = CANCEL).
+static void draw_combo_modal(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+                             float label_width)
+{
+    char title[128] = {};
+    std::snprintf(title, sizeof(title), "%s###combo_editor", piccolo_text(context->strings, Str::remap_combos));
+    if (menu->combo_editing && !ImGui::IsPopupOpen(title))
+    {
+        ImGui::OpenPopup(title);
+    }
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.45f)), 0.0f), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+    {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+        {
+            menu->combo_editing = false;   // (B on a gamepad sends Escape while a popup is up)
+        }
+        else
+        {
+            draw_combo_editor(menu, context, controls, label_width);
+        }
+        if (!menu->combo_editing)
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
 // COMBOS: the core's combos, each bound to inputs in this remap like a
 // control (+ / SET / CLEAR), EDIT to change it; + NEW COMBO.
 static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
@@ -779,11 +811,6 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
     ImGui::Spacing();
     retro_ui_separator_text(piccolo_text(strings, Str::remap_combos));
     retro_ui_item_tooltip(piccolo_text(strings, Str::remap_combos_help));
-    if (menu->combo_editing)
-    {
-        draw_combo_editor(menu, context, controls, label_width);
-        return;
-    }
     const InputCoreProfile* active = input_active_core_profile(input, menu->remap_controller, menu->remap_port);
     const char* set = piccolo_text(strings, Str::input_set);
     const char* clear = piccolo_text(strings, Str::input_clear);
@@ -1163,6 +1190,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     draw_combo_rows(menu, context, controls, pad, pad_layout, pad_profile, label_width);
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    draw_combo_modal(menu, context, controls, 60.0f * block);
     if (show_pad)
     {
         pad_picture_draw_floating(input_window_layout(input, context->layouts, pad), lit, minus, 1.25f * block);
