@@ -1116,21 +1116,9 @@ static void update_remap_prompt(App* app, uint64_t now_ms)
     }
     for (uint32_t port = 0; port < INPUT_PORT_COUNT; port++)
     {
-        int32_t candidates[2] = {input->ports[port], -1};
-        if (port == 0)
+        for (size_t m = 0; m < input->ports[port].size(); m++)
         {
-            for (uint32_t c = 0; c < input->controllers.size(); c++)
-            {
-                candidates[1] = input_controller_shares_port1(input, c) ? static_cast<int32_t>(c) : candidates[1];
-            }
-        }
-        for (int i = 0; i < 2; i++)
-        {
-            if (candidates[i] < 0)
-            {
-                continue;
-            }
-            uint32_t controller = static_cast<uint32_t>(candidates[i]);
+            uint32_t controller = input->ports[port][m];
             const InputCoreProfile* profile = input_core_profile(input, input->core_name.c_str(), input->port_devices[port],
                                                                  input_controller_profile_id(input, controller));
             if (profile == nullptr || !profile->decided)

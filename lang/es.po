@@ -1573,8 +1573,8 @@ msgid "GAMEPAD 1 AND KEYBOARD SHARE PORT 1"
 msgstr "GAMEPAD 1 Y TECLADO COMPARTEN EL PUERTO 1"
 
 msgctxt "setting_input_share_port1_help"
-msgid "The keyboard plays on port 1 together with the gamepad that joined port 1. Off: the keyboard joins its own port with START."
-msgstr "El teclado juega en el puerto 1 junto con el gamepad que se unió al puerto 1. Apagado: el teclado se une a su propio puerto con START."
+msgid "The keyboard starts on port 1, and the first gamepad to press START joins it there (QUICK MENU > CONTROLS can take it off). Off: the keyboard joins its own port with START."
+msgstr "El teclado empieza en el puerto 1, y el primer gamepad que presione START se une ahí con él (MENÚ RÁPIDO > CONTROLES puede sacarlo). Apagado: el teclado se une a su propio puerto con START."
 
 msgctxt "setting_input_press_time"
 msgid "TIME TO PRESS"
@@ -1678,9 +1678,9 @@ msgctxt "input_move_up"
 msgid "MOVE UP"
 msgstr "SUBIR"
 
-msgctxt "input_keyboard_shared"
-msgid "KEYBOARD (SHARED)"
-msgstr "TECLADO (COMPARTIDO)"
+msgctxt "input_port_add"
+msgid "+ ADD CONTROLLER"
+msgstr "+ AGREGAR CONTROL"
 
 msgctxt "setting_input_port_device"
 msgid "DEVICE"

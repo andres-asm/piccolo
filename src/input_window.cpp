@@ -571,9 +571,9 @@ static uint32_t mapped_controller(InputWindow* window, const InputWindowContext*
     {
         return window->mapping;
     }
-    if (input->ports[0] >= 0)
+    if (!input->ports[0].empty())
     {
-        window->mapping = static_cast<uint32_t>(input->ports[0]);
+        window->mapping = input->ports[0][0];
         return window->mapping;
     }
     window->mapping = 0;

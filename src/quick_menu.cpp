@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include <SDL3/SDL.h>
 
@@ -789,8 +790,22 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     }
 }
 
-// CONTROLS: the ports, who is on each (the keyboard too, when it shares
-// port 1), MOVE UP and LEAVE. START on a controller joins it.
+// The buttons at the right of a row, `width` wide: where they start.
+static void right_align(float width)
+{
+    float x = ImGui::GetWindowContentRegionMax().x - width;
+    ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
+}
+
+static float button_width(const char* text)
+{
+    return ImGui::CalcTextSize(text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+// CONTROLS: the ports and who is on each (N:N: a port can have several
+// controllers, a controller can be on several ports). Per member REMAP and
+// LEAVE (that port only), per port ADD (any connected controller not on it)
+// and MOVE UP (the whole port). START on a controller joins it.
 static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, float block)
 {
     if (menu->remap)
@@ -801,6 +816,11 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     InputSystem* input = context->input;
     const Localization* strings = context->strings;
     float label_width = 60.0f * block;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    bool can_remap = context->host != nullptr && context->host->game_loaded;
+    const char* leave = piccolo_text(strings, Str::input_leave);
+    const char* up = piccolo_text(strings, Str::input_move_up);
+    const char* remap = piccolo_text(strings, Str::quick_menu_remap);
     bool anybody = false;
     // PORTS: who plays where (the physical controllers).
     retro_ui_separator_text(piccolo_text(strings, Str::quick_menu_ports));
@@ -809,81 +829,79 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         ImGui::PushID(static_cast<int>(p));
         ImGui::AlignTextToFramePadding();
         ImGui::Text("%s %u", piccolo_text(strings, Str::input_port), static_cast<unsigned>(p + 1));
-        ImGui::SameLine(label_width);
-        int32_t controller = input->ports[p];
-        bool keyboard_here = p == 0 && input->settings.keyboard_shares_port1;
-        if (controller < 0)
+        // (A copy: LEAVE and MOVE UP change the list while it is drawn.)
+        std::vector<uint32_t> members = input->ports[p];
+        anybody = anybody || !members.empty();
+        if (members.empty())
         {
-            if (keyboard_here)
-            {
-                ImGui::TextUnformatted(piccolo_text(strings, Str::input_keyboard_shared));
-                int32_t keyboard = -1;
-                for (uint32_t c = 0; keyboard < 0 && c < input->controllers.size(); c++)
-                {
-                    keyboard = input_controller_shares_port1(input, c) ? static_cast<int32_t>(c) : -1;
-                }
-                const char* remap = piccolo_text(strings, Str::quick_menu_remap);
-                if (keyboard >= 0 && context->host != nullptr && context->host->game_loaded)
-                {
-                    float width = ImGui::CalcTextSize(remap).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-                    float x = ImGui::GetWindowContentRegionMax().x - width;
-                    ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
-                    if (retro_ui_button(remap))
-                    {
-                        menu->remap = true;
-                        menu->remap_port = 0;
-                        menu->remap_controller = static_cast<uint32_t>(keyboard);
-                    }
-                }
-            }
-            else
-            {
-                ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_port_empty));
-            }
-            ImGui::PopID();
-            continue;
+            ImGui::SameLine(label_width);
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_port_empty));
         }
-        anybody = true;
-        if (keyboard_here)
+        if (p > 0 && (!members.empty() || !input->ports[p - 1].empty()))
         {
-            ImGui::Text("%s + %s", input->controllers[static_cast<size_t>(controller)].name.c_str(),
-                        piccolo_text(strings, Str::input_keyboard_shared));
-        }
-        else
-        {
-            ImGui::TextUnformatted(input->controllers[static_cast<size_t>(controller)].name.c_str());
-        }
-        const char* leave = piccolo_text(strings, Str::input_leave);
-        const char* up = piccolo_text(strings, Str::input_move_up);
-        float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float pad = ImGui::GetStyle().FramePadding.x * 2.0f;
-        const char* remap = piccolo_text(strings, Str::quick_menu_remap);
-        bool can_remap = context->host != nullptr && context->host->game_loaded;
-        float width = ImGui::CalcTextSize(leave).x + pad + (p > 0 ? ImGui::CalcTextSize(up).x + pad + spacing : 0.0f) +
-                      (can_remap ? ImGui::CalcTextSize(remap).x + pad + spacing : 0.0f);
-        float x = ImGui::GetWindowContentRegionMax().x - width;
-        ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
-        if (p > 0)
-        {
+            right_align(button_width(up));
             if (retro_ui_button(up))
             {
                 input_swap_ports(input, p, p - 1);
             }
-            ImGui::SameLine();
         }
-        if (retro_ui_button(leave))
+        for (size_t m = 0; m < members.size(); m++)
         {
-            input_leave(input, static_cast<uint32_t>(controller));
-        }
-        if (can_remap)
-        {
-            ImGui::SameLine();
-            if (retro_ui_button(remap))
+            uint32_t controller = members[m];
+            if (controller >= input->controllers.size())
             {
-                menu->remap = true;
-                menu->remap_port = p;
-                menu->remap_controller = static_cast<uint32_t>(controller);
+                continue;
             }
+            ImGui::PushID(static_cast<int>(controller));
+            ImGui::AlignTextToFramePadding();
+            ImGui::Indent(label_width);
+            ImGui::TextUnformatted(input->controllers[controller].name.c_str());
+            ImGui::Unindent(label_width);
+            right_align(button_width(leave) + (can_remap ? button_width(remap) + spacing : 0.0f));
+            if (can_remap)
+            {
+                if (retro_ui_button(remap))
+                {
+                    menu->remap = true;
+                    menu->remap_port = p;
+                    menu->remap_controller = controller;
+                }
+                ImGui::SameLine();
+            }
+            if (retro_ui_button(leave))
+            {
+                input_port_remove(input, p, controller);
+            }
+            ImGui::PopID();
+        }
+        // ADD: a connected controller that isn't on this port (it may be on others).
+        std::vector<uint32_t> others;
+        for (uint32_t c = 0; c < input->controllers.size(); c++)
+        {
+            const InputDevice* device = input_devices_find_const(&input->devices, input->controllers[c].device_id);
+            if (device != nullptr && device->connected && !input_devices_ignored(device) && !input_port_has(input, p, c))
+            {
+                others.push_back(c);
+            }
+        }
+        if (!others.empty())
+        {
+            ImGui::Indent(label_width);
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            if (retro_ui_begin_combo("##add", piccolo_text(strings, Str::input_port_add)))
+            {
+                for (size_t o = 0; o < others.size(); o++)
+                {
+                    ImGui::PushID(static_cast<int>(others[o]));
+                    if (ImGui::Selectable(input->controllers[others[o]].name.c_str(), false))
+                    {
+                        input_port_add(input, p, others[o]);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::Unindent(label_width);
         }
         ImGui::PopID();
     }
@@ -904,7 +922,7 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         }
     }
 
-    if (!anybody && !input->settings.keyboard_shares_port1)
+    if (!anybody)
     {
         ImGui::Spacing();
         ImGui::TextDisabled("%s", piccolo_text(strings, Str::quick_menu_no_ports));
