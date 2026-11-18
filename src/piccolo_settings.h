@@ -23,6 +23,8 @@ constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
+constexpr const char* PICCOLO_INPUT_PRESS_TIME = "input_press_seconds";   // binding: wait for a press this long, then go on
+constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // binding with SET / MAP CONTROLLER: hold this long
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
 constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "input_port2_device", "input_port3_device",

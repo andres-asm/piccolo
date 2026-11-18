@@ -428,6 +428,8 @@ static void draw_intro_buttons(MapWindow* window, const MapWindowContext* contex
         }
         if (input_sdl_mapper_begin(&window->mapper, window->joystick_id, ROLE_COUNT, optional, wanted, context->now_ms))
         {
+            window->mapper.role_hold_ms = context->input->settings.hold_ms;        // SETTINGS > INPUT
+            window->mapper.optional_wait_ms = context->input->settings.press_ms;
             window->stage = MapStage::mapping;
             window->interface_intro_done = false;
             context->input->suspended = true;   // its presses are the mapping's alone
@@ -539,7 +541,7 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     section(text);
     if (role >= 0)
     {
-        // Held 2 s to be taken: how far it has come (let go sooner to choose another).
+        // Held (SETTINGS > INPUT > HOLD TO BIND) to be taken: how far it has come.
         wrapped(piccolo_text(strings, Str::map_hold_hint));
         ImGui::ProgressBar(input_sdl_mapper_hold_progress(&window->mapper, context->now_ms),
                            ImVec2(-1.0f, ImGui::GetTextLineHeight()), "");

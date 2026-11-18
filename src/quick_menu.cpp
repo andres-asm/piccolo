@@ -275,7 +275,6 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
 // CONTROLS: remap one port's controller for this core and device
 // ---------------------------------------------------------------------------
 
-constexpr uint64_t REMAP_CAPTURE_TIMEOUT_MS = 5000;
 constexpr uint64_t REMAP_COOL_OFF_MS = 500;   // BIND ALL: before taking the next control
 constexpr uint16_t HID_ESCAPE_KEY = 41;
 
@@ -396,7 +395,8 @@ static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context
     menu->capture_action = action;
     menu->capture_started_ms = context->now_ms;
     menu->capture_seen = true;
-    input_capture_begin(input, input->controllers[menu->remap_controller].device_id);
+    // SET: held to be taken (the pad shows it); BIND ALL names each control: a press is enough.
+    input_capture_begin(input, input->controllers[menu->remap_controller].device_id, !menu->bind_all);
 }
 
 // The next control of a BIND ALL (in the list's order), or the end.
@@ -442,7 +442,7 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
     InputSource held = {};
     bool holding = input_capture_candidate(context->input, &held);   // no time-out while a control is being held
     if (!context->input->capture.active ||
-        (!holding && since > REMAP_CAPTURE_TIMEOUT_MS + (menu->bind_all ? REMAP_COOL_OFF_MS : 0)))
+        (!holding && since > context->input->settings.press_ms + (menu->bind_all ? REMAP_COOL_OFF_MS : 0)))
     {
         remap_next(menu, context, controls);
     }
@@ -605,7 +605,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         if (waiting)
         {
             uint64_t elapsed = context->now_ms - menu->capture_started_ms;
-            uint64_t total = REMAP_CAPTURE_TIMEOUT_MS + (menu->bind_all ? REMAP_COOL_OFF_MS : 0);
+            uint64_t total = context->input->settings.press_ms + (menu->bind_all ? REMAP_COOL_OFF_MS : 0);
             uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
             input_window_draw_waiting(pad != nullptr && pad->kind == InputDeviceKind::keyboard, left,
                                       input_capture_hold_progress(input, context->now_ms), strings);

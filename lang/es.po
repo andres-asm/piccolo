@@ -1576,6 +1576,22 @@ msgctxt "setting_input_share_port1_help"
 msgid "The keyboard plays on port 1 together with the gamepad that joined port 1. Off: the keyboard joins its own port with START."
 msgstr "El teclado juega en el puerto 1 junto con el gamepad que se unió al puerto 1. Apagado: el teclado se une a su propio puerto con START."
 
+msgctxt "setting_input_press_time"
+msgid "TIME TO PRESS"
+msgstr "TIEMPO PARA PRESIONAR"
+
+msgctxt "setting_input_press_time_help"
+msgid "Seconds each control waits for a press (BIND ALL, SET, MAP CONTROLLER's optional buttons) before going on."
+msgstr "Segundos que cada control espera que lo presiones (ASIGNAR TODO, SET, los botones opcionales de MAPEAR CONTROL) antes de seguir."
+
+msgctxt "setting_input_hold_time"
+msgid "HOLD TO BIND"
+msgstr "MANTENER PARA ASIGNAR"
+
+msgctxt "setting_input_hold_time_help"
+msgid "Seconds a gamepad's button must be held to be bound with SET and in MAP CONTROLLER. Let go sooner and it isn't."
+msgstr "Segundos que hay que mantener un botón del gamepad para asignarlo con SET y en MAPEAR CONTROL. Si lo sueltas antes, no se asigna."
+
 
 
 
@@ -1667,12 +1683,12 @@ msgid "%s -> %s MAPPING"
 msgstr "ASIGNACIÓN %s -> %s"
 
 msgctxt "remap_use_retropad"
-msgid "USE RETROPAD"
-msgstr "USAR RETROPAD"
+msgid "DEFAULT ALL"
+msgstr "TODO POR DEFECTO"
 
 msgctxt "remap_use_retropad_help"
-msgid "This controller plays this core with its RetroPad bindings, unchanged."
-msgstr "Este control juega este core con sus asignaciones de RetroPad, sin cambios."
+msgid "Every control back to this controller's RetroPad bindings, unchanged, for this core."
+msgstr "Todos los controles vuelven a las asignaciones de RetroPad de este control, sin cambios, para este core."
 
 msgctxt "remap_done"
 msgid "DONE"
@@ -1844,8 +1860,8 @@ msgid "HOLD THE BUTTON FOR %s"
 msgstr "MANTÉN EL BOTÓN PARA %s"
 
 msgctxt "map_hold_hint"
-msgid "Hold it 2 seconds. Let go sooner to choose another."
-msgstr "Mantenlo 2 segundos. Suéltalo antes para elegir otro."
+msgid "Hold it until the bar fills. Let go sooner to choose another."
+msgstr "Mantenlo hasta que se llene la barra. Suéltalo antes para elegir otro."
 
 msgctxt "map_role_up"
 msgid "UP"

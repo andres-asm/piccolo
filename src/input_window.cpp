@@ -14,7 +14,6 @@
 #include "settings_ui.h"
 
 // SET gives up after this long without a key or button.
-constexpr uint64_t CAPTURE_TIMEOUT_MS = 5000;
 // BIND ALL waits this long before taking the next control, so one press
 // doesn't land on two.
 constexpr uint64_t BIND_ALL_COOL_OFF_MS = 500;
@@ -322,8 +321,8 @@ static void draw_scoped_settings(InputWindow* window, const InputWindowContext* 
 
 static void draw_settings(InputWindow* window, const InputWindowContext* context)
 {
-    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1};
-    draw_scoped_settings(window, context, KEYS, 1);
+    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_PRESS_TIME, PICCOLO_INPUT_HOLD_TIME};
+    draw_scoped_settings(window, context, KEYS, 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +335,8 @@ static void start_capture(InputWindow* window, const InputWindowContext* context
     window->capture_action = action;
     window->capture_controller = controller;
     window->capture_started_ms = context->now_ms;
-    input_capture_begin(context->input, context->input->controllers[controller].device_id);
+    // SET: held to be taken (the pad shows it); BIND ALL names each control: a press is enough.
+    input_capture_begin(context->input, context->input->controllers[controller].device_id, !window->bind_all);
 }
 
 void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
@@ -431,7 +431,7 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
     if (waiting)
     {
         uint64_t elapsed = context->now_ms - window->capture_started_ms;
-        uint64_t total = CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
+        uint64_t total = context->input->settings.press_ms + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0);
         uint64_t left = elapsed < total ? (total - elapsed + 999) / 1000 : 0;
         input_window_draw_waiting(device != nullptr && device->kind == InputDeviceKind::keyboard, left,
                                   input_capture_hold_progress(input, context->now_ms), strings);
@@ -831,7 +831,7 @@ static void run_capture(InputWindow* window, const InputWindowContext* context)
     }
     InputSource held = {};
     bool holding = input_capture_candidate(input, &held);   // no time-out while a control is being held
-    if (!input->capture.active || (!holding && since > CAPTURE_TIMEOUT_MS + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0)))
+    if (!input->capture.active || (!holding && since > context->input->settings.press_ms + (window->bind_all ? BIND_ALL_COOL_OFF_MS : 0)))
     {
         next_or_stop(window, context);
     }

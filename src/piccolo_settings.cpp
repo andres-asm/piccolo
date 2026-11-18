@@ -140,6 +140,10 @@ static const SettingDescriptor SETTINGS[] = {
     // Input (overridable per core / game; the bindings are per controller, in input.cfg)
     {.key = PICCOLO_INPUT_SHARE_PORT1, .type = SettingType::boolean, .default_value = "true", .overridable = true,
      .label = text_id(Str::setting_input_share_port1), .help = text_id(Str::setting_input_share_port1_help)},
+    {.key = PICCOLO_INPUT_PRESS_TIME, .type = SettingType::real, .default_value = "5", .min_real = 1.0, .max_real = 15.0,
+     .step_real = 0.5, .label = text_id(Str::setting_input_press_time), .help = text_id(Str::setting_input_press_time_help)},
+    {.key = PICCOLO_INPUT_HOLD_TIME, .type = SettingType::real, .default_value = "2", .min_real = 0.5, .max_real = 5.0,
+     .step_real = 0.5, .label = text_id(Str::setting_input_hold_time), .help = text_id(Str::setting_input_hold_time_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[1], .type = SettingType::integer, .default_value = "1", .overridable = true,
@@ -755,4 +759,6 @@ bool piccolo_settings_complete_ui_theme(Settings* settings)
 void piccolo_settings_input(const Settings* settings, InputSettings* input)
 {
     input->keyboard_shares_port1 = settings_get_bool(settings, PICCOLO_INPUT_SHARE_PORT1);
+    input->press_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_PRESS_TIME) * 1000.0 + 0.5);
+    input->hold_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_HOLD_TIME) * 1000.0 + 0.5);
 }
