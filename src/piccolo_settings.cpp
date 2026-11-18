@@ -142,7 +142,7 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_input_share_port1), .help = text_id(Str::setting_input_share_port1_help)},
     {.key = PICCOLO_INPUT_PRESS_TIME, .type = SettingType::real, .default_value = "5", .min_real = 1.0, .max_real = 15.0,
      .step_real = 0.5, .label = text_id(Str::setting_input_press_time), .help = text_id(Str::setting_input_press_time_help)},
-    {.key = PICCOLO_INPUT_HOLD_TIME, .type = SettingType::real, .default_value = "2", .min_real = 0.5, .max_real = 5.0,
+    {.key = PICCOLO_INPUT_HOLD_TIME, .type = SettingType::real, .default_value = "1", .min_real = 0.5, .max_real = 5.0,
      .step_real = 0.5, .label = text_id(Str::setting_input_hold_time), .help = text_id(Str::setting_input_hold_time_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},

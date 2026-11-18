@@ -31,22 +31,21 @@ struct MapRole
     InputAction action;
     InputAction also;       // the same button goes here too (count = nothing more)
     bool        optional;   // a pad may not have it (shoulders for the pages)
-    bool        navigate;   // keeps the default's sources of the other kind (d-pad role: the stick stays)
 };
 
 static const MapRole ROLES[] = {
-    {Str::map_role_up, InputAction::ui_up, InputAction::count, false, true},
-    {Str::map_role_down, InputAction::ui_down, InputAction::count, false, true},
-    {Str::map_role_left, InputAction::ui_left, InputAction::count, false, true},
-    {Str::map_role_right, InputAction::ui_right, InputAction::count, false, true},
-    {Str::map_role_page_left, InputAction::ui_page_left, InputAction::count, true, false},
-    {Str::map_role_page_right, InputAction::ui_page_right, InputAction::count, true, false},
-    {Str::map_role_accept, InputAction::ui_accept, InputAction::count, false, false},
-    {Str::map_role_back, InputAction::ui_back, InputAction::count, false, false},
+    {Str::map_role_up, InputAction::ui_up, InputAction::count, false},
+    {Str::map_role_down, InputAction::ui_down, InputAction::count, false},
+    {Str::map_role_left, InputAction::ui_left, InputAction::count, false},
+    {Str::map_role_right, InputAction::ui_right, InputAction::count, false},
+    {Str::map_role_page_left, InputAction::ui_page_left, InputAction::count, true},
+    {Str::map_role_page_right, InputAction::ui_page_right, InputAction::count, true},
+    {Str::map_role_accept, InputAction::ui_accept, InputAction::count, false},
+    {Str::map_role_back, InputAction::ui_back, InputAction::count, false},
     // The main menu: opens it in the interface, and with HOTKEY ENABLE in a game.
-    {Str::map_role_menu, InputAction::ui_open_menu, InputAction::hotkey_menu, false, false},
-    {Str::map_role_modifier, InputAction::hotkey_enable, InputAction::count, false, false},
-    {Str::map_role_quick_menu, InputAction::hotkey_quick_menu, InputAction::count, false, false},
+    {Str::map_role_menu, InputAction::ui_open_menu, InputAction::hotkey_menu, false},
+    {Str::map_role_modifier, InputAction::hotkey_enable, InputAction::count, false},
+    {Str::map_role_quick_menu, InputAction::hotkey_quick_menu, InputAction::count, false},
 };
 constexpr uint32_t ROLE_COUNT = sizeof(ROLES) / sizeof(ROLES[0]);
 
@@ -114,14 +113,14 @@ bool map_window_open_now(const MapWindow* window)
 // ---------------------------------------------------------------------------
 
 // The roles as changes to the profile's bindings (and to the controller's
-// own, if it is in use: what is kept is taken from it).
+// own, if it is in use: what is kept is taken from it). Each role gets the
+// button pressed for it and nothing else (more sources for one action are
+// added by hand).
 static void apply_roles(MapWindow* window, const MapWindowContext* context)
 {
     InputSystem* input = context->input;
     InputProfile* profile = input_profile_for(input, window->guid);
     profile->hotkey_mode = window->hotkey_mode;
-    InputBindingSet defaults = {};
-    input_default_gamepad_bindings(&defaults);
     for (uint32_t r = 0; r < ROLE_COUNT; r++)
     {
         InputSource source = input_sdl_mapper_role_source(&window->mapper, r);
@@ -136,15 +135,6 @@ static void apply_roles(MapWindow* window, const MapWindowContext* context)
         else if (!ROLES[r].optional)
         {
             continue;   // skipped: the default stays
-        }
-        for (uint32_t s = 0; ROLES[r].navigate && s < INPUT_SOURCES_PER_ACTION; s++)
-        {
-            InputSource kept = defaults.sources[static_cast<uint32_t>(action)][s];
-            bool other_kind = (kept.type == InputSourceType::button) != (source.type == InputSourceType::button);
-            if (kept.type != InputSourceType::none && other_kind && count < INPUT_SOURCES_PER_ACTION)
-            {
-                change.sources[count++] = kept;
-            }
         }
         InputAction targets[2] = {action, ROLES[r].also};
         for (uint32_t t = 0; t < 2 && targets[t] != InputAction::count; t++)
