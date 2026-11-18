@@ -118,7 +118,7 @@ void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapCont
     {
         // Only what this kind of pad has (a stick: its click or its axes).
         InputMapControl control = PARTS[p].control;
-        bool present = layout == nullptr || input_layout_has(layout, control) ||
+        bool present = layout == nullptr || control == lit || input_layout_has(layout, control) ||
                        (control == InputMapControl::left_stick && input_layout_has(layout, InputMapControl::left_x)) ||
                        (control == InputMapControl::right_stick && input_layout_has(layout, InputMapControl::right_x));
         if (!present || (six && replaced_by_six_face(control)))

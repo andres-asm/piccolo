@@ -1872,8 +1872,12 @@ msgid "Hold it until the ring closes. Let go sooner to choose another."
 msgstr "Mantenlo hasta que se cierre el círculo. Suéltalo antes para elegir otro."
 
 msgctxt "map_step_extras"
-msgid "STEP 3: EXTRA BUTTONS"
-msgstr "PASO 3: BOTONES EXTRA"
+msgid "STEP 4: EXTRA BUTTONS"
+msgstr "PASO 4: BOTONES EXTRA"
+
+msgctxt "map_extras_guide"
+msgid "Does it have a GUIDE / HOME button (the logo in the middle)?"
+msgstr "¿Tiene un botón GUIDE / HOME (el logo del medio)?"
 
 msgctxt "map_extras_paddles"
 msgid "Does it have paddles on the back?"
@@ -1931,6 +1935,58 @@ msgctxt "map_other_button"
 msgid "ANOTHER BUTTON"
 msgstr "OTRO BOTÓN"
 
+msgctxt "map_guide"
+msgid "GUIDE / HOME"
+msgstr "GUIDE / HOME"
+
+msgctxt "map_reset"
+msgid "RESET"
+msgstr "REINICIAR"
+
+msgctxt "map_skip_n"
+msgid "SKIP (%d)"
+msgstr "SALTAR (%d)"
+
+msgctxt "map_restart"
+msgid "RESTART"
+msgstr "EMPEZAR DE NUEVO"
+
+msgctxt "map_summary"
+msgid "SUMMARY"
+msgstr "RESUMEN"
+
+msgctxt "map_summary_type"
+msgid "TYPE"
+msgstr "TIPO"
+
+msgctxt "map_summary_buttons"
+msgid "BUTTONS"
+msgstr "BOTONES"
+
+msgctxt "map_summary_interface"
+msgid "INTERFACE"
+msgstr "INTERFAZ"
+
+msgctxt "map_summary_extras"
+msgid "EXTRA BUTTONS"
+msgstr "BOTONES EXTRA"
+
+msgctxt "map_summary_changed"
+msgid "MAPPED"
+msgstr "MAPEADO"
+
+msgctxt "map_summary_unchanged"
+msgid "UNCHANGED"
+msgstr "SIN CAMBIOS"
+
+msgctxt "map_summary_added"
+msgid "%d ADDED"
+msgstr "%d AGREGADOS"
+
+msgctxt "map_summary_text"
+msgid "Nothing is kept until FINISH. RESTART begins again; CANCEL leaves the controller as it was."
+msgstr "Nada se guarda hasta TERMINAR. EMPEZAR DE NUEVO vuelve al inicio; CANCELAR deja el control como estaba."
+
 msgctxt "map_role_up"
 msgid "UP"
 msgstr "ARRIBA"
@@ -1979,17 +2035,21 @@ msgctxt "map_detected"
 msgid "NEW CONTROLLER DETECTED"
 msgstr "NUEVO CONTROL DETECTADO"
 
+msgctxt "map_step_type"
+msgid "STEP 1: CONTROLLER TYPE"
+msgstr "PASO 1: TIPO DE CONTROL"
+
 msgctxt "map_step_buttons"
-msgid "STEP 1: CONTROLLER BUTTONS"
-msgstr "PASO 1: BOTONES DEL CONTROL"
+msgid "STEP 2: CONTROLLER BUTTONS"
+msgstr "PASO 2: BOTONES DEL CONTROL"
 
 msgctxt "map_step_buttons_text"
 msgid "Press each button as it lights up, so piccolo knows where each one is on this controller. Then it works in games and in the next step."
 msgstr "Presiona cada botón cuando se ilumine, para que piccolo sepa dónde está cada uno en este control. Así funciona en los juegos y en el paso siguiente."
 
 msgctxt "map_step_interface"
-msgid "STEP 2: USER INTERFACE"
-msgstr "PASO 2: INTERFAZ"
+msgid "STEP 3: USER INTERFACE"
+msgstr "PASO 3: INTERFAZ"
 
 msgctxt "map_step_interface_text"
 msgid "Press the button you want for each control of the menus and windows. The drawing lights up the one you press."
