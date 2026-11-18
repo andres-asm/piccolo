@@ -86,14 +86,13 @@ static void draw_part(ImDrawList* draw_list, ImVec2 origin, float unit, const Pa
                              ImVec2(origin.x + part->x1 * unit, origin.y + part->y1 * unit), color);
 }
 
-void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapControl lit, bool minus, float unit)
+// The drawing at `origin` (its top left, 100 x 46 units), the body and its
+// parts at `alpha` (the lit part always solid).
+static void draw_pad(ImDrawList* draw_list, ImVec2 origin, const InputLayout* layout, PadView view, InputMapControl lit,
+                     bool minus, float unit, float alpha)
 {
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    ImVec2 origin = ImGui::GetCursorScreenPos();
-    float width = ImGui::GetContentRegionAvail().x;
-    origin.x += static_cast<float>(static_cast<int>((width - 100.0f * unit) * 0.5f));
-    ImU32 body = ImGui::GetColorU32(ImGuiCol_Button);
-    ImU32 part = ImGui::GetColorU32(ImGuiCol_FrameBg);
+    ImU32 body = ImGui::GetColorU32(ImGuiCol_Button, alpha);
+    ImU32 part = ImGui::GetColorU32(ImGuiCol_FrameBg, alpha);
     ImU32 light = IM_COL32(255, 220, 80, 255);   // the same yellow in every theme (and in Test libretro)
 
     if (view == PadView::back)
@@ -104,7 +103,6 @@ void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapCont
         {
             draw_part(draw_list, origin, unit, &BACK[p], BACK[p].control == lit ? light : part);
         }
-        ImGui::Dummy(ImVec2(width, 46.0f * unit));
         return;
     }
 
@@ -156,13 +154,35 @@ void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapCont
         draw_list->AddRectFilled(ImVec2(origin.x + mx * unit, origin.y + my * unit),
                                  ImVec2(origin.x + (mx + 2.0f) * unit, origin.y + (my + 2.0f) * unit), light);
     }
+}
+
+void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapControl lit, bool minus, float unit)
+{
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    float width = ImGui::GetContentRegionAvail().x;
+    origin.x += static_cast<float>(static_cast<int>((width - 100.0f * unit) * 0.5f));
+    draw_pad(ImGui::GetWindowDrawList(), origin, layout, view, lit, minus, unit, 1.0f);
     ImGui::Dummy(ImVec2(width, 46.0f * unit));
+}
+
+// A paddle lit shows the pad from behind; L4 / R4, the extra shoulders.
+static PadView view_for(InputMapControl lit)
+{
+    bool paddle = lit == InputMapControl::paddle1 || lit == InputMapControl::paddle2 || lit == InputMapControl::paddle3 ||
+                  lit == InputMapControl::paddle4;
+    return paddle ? PadView::back : PadView::front;
+}
+
+void pad_picture_draw_floating(const InputLayout* layout, InputMapControl lit, bool minus, float unit)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    float margin = 4.0f * unit;
+    ImVec2 origin(static_cast<float>(static_cast<int>(io.DisplaySize.x - 100.0f * unit - margin)),
+                  static_cast<float>(static_cast<int>(io.DisplaySize.y - 46.0f * unit - margin)));
+    draw_pad(ImGui::GetForegroundDrawList(), origin, layout, view_for(lit), lit, minus, unit, 0.8f);
 }
 
 void pad_picture_draw(const InputLayout* layout, InputMapControl lit, bool minus, float unit)
 {
-    // A paddle lit shows the pad from behind.
-    bool paddle = lit == InputMapControl::paddle1 || lit == InputMapControl::paddle2 || lit == InputMapControl::paddle3 ||
-                  lit == InputMapControl::paddle4;
-    pad_picture_draw_view(layout, paddle ? PadView::back : PadView::front, lit, minus, unit);
+    pad_picture_draw_view(layout, view_for(lit), lit, minus, unit);
 }

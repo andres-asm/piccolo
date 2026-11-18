@@ -40,6 +40,8 @@ struct InputWindow
     InputAction capture_action = InputAction::pad_b;
     uint32_t    capture_row = 0;             // the row (source) being set; its count = a new row (+)
     uint32_t    capture_controller = 0;
+    InputAction pad_action = InputAction::count;   // the row the floating pad shows (focused or hovered)
+    uint32_t    pad_row = 0;
     uint64_t    capture_started_ms = 0;
     bool        bind_all = false;            // BIND ALL: go on to the next action...
     InputAction bind_all_last = InputAction::pad_b;   // ...up to this one
@@ -79,7 +81,8 @@ void input_window_source_label(const InputSdl* sdl, const InputDevice* device, c
 
 // A binding's sources in `width`: all of them ("D-PAD UP, LEFT STICK UP"),
 // or when they don't fit the first and how many more ("D-PAD UP +1") with
-// all of them in the tooltip; NONE when there's none.
+// all of them in the tooltip; one alone that doesn't fit is cut short with
+// "…" (all of it in the tooltip); NONE when there's none.
 void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
                                const InputProfile* profile, const InputSource* sources, float width, const Localization* strings);
 

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "imgui.h"
+#include "pad_picture.h"
 #include "piccolo_text.h"
 #include "pixel_font_imgui.h"
 #include "piccolo_settings.h"
@@ -376,9 +377,26 @@ void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, c
         all += s == 0 ? "" : ", ";
         all += names[s];
     }
-    if (count == 1 || ImGui::CalcTextSize(all.c_str()).x <= width)
+    if (ImGui::CalcTextSize(all.c_str()).x <= width)
     {
         ImGui::TextUnformatted(all.c_str());
+        return;
+    }
+    if (count == 1)
+    {
+        // One that doesn't fit: cut short with "…" (whole characters), all of it in the tooltip.
+        const char* ellipsis = "\xE2\x80\xA6";
+        std::string cut = all;
+        while (!cut.empty() && ImGui::CalcTextSize((cut + ellipsis).c_str()).x > width)
+        {
+            cut.pop_back();
+            while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0u) == 0x80u)
+            {
+                cut.pop_back();   // the rest of a UTF-8 character
+            }
+        }
+        ImGui::TextUnformatted((cut + ellipsis).c_str());
+        retro_ui_item_tooltip(all.c_str());
         return;
     }
     // Doesn't fit: the first one and how many more; all of them in the tooltip.
@@ -519,6 +537,13 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
             window->bind_all = false;
             start_capture(window, context, controller_index, action, r < count ? r : count);
         }
+        // The floating pad shows the row under the mouse, or the one in focus
+        // while navigating with a gamepad or keys.
+        if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
+        {
+            window->pad_action = action;   // shown on the next frame
+            window->pad_row = r;
+        }
         ImGui::SameLine();
         ImGui::BeginDisabled(r >= count);
         if (retro_ui_button(clear))
@@ -655,6 +680,28 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
     ImGui::TextDisabled("%s", piccolo_text(strings, left_title));
     ImGui::SameLine(label_width);
     ImGui::TextDisabled("%s", piccolo_text(strings, is_keyboard(input, controller) ? Str::input_column_key : Str::input_column_pad));
+    // A gamepad's pad floats in the screen's corner: the control being bound
+    // while it is held, else where the row in focus is now.
+    InputMapControl lit = InputMapControl::count;
+    bool minus = false;
+    InputSource held = {};
+    if (window->capturing && window->capture_controller == controller && input_capture_candidate(input, &held))
+    {
+        lit = input_map_control_for_source(held);
+        minus = held.type == InputSourceType::axis_minus;
+    }
+    else
+    {
+        InputAction shown = window->capturing ? window->capture_action : window->pad_action;
+        uint32_t row = window->capturing ? window->capture_row : window->pad_row;
+        if (static_cast<uint32_t>(shown) < INPUT_ACTION_COUNT && row < INPUT_SOURCES_PER_ACTION)
+        {
+            InputSource source = input->controllers[controller].bindings.sources[static_cast<uint32_t>(shown)][row];
+            lit = input_map_control_for_source(source);
+            minus = source.type == InputSourceType::axis_minus;
+        }
+    }
+    window->pad_action = InputAction::count;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::BeginChild("rows", ImVec2(0.0f, 0.0f));
     for (uint32_t a = static_cast<uint32_t>(first); a <= static_cast<uint32_t>(last); a++)
@@ -663,6 +710,11 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    if (device != nullptr && device->kind == InputDeviceKind::gamepad)
+    {
+        float block = ImGui::GetFontSize() / PIXEL_FONT_IMGUI_UNIT;
+        pad_picture_draw_floating(input_window_layout(input, context->layouts, device), lit, minus, 1.25f * block);
+    }
 }
 
 // ---------------------------------------------------------------------------

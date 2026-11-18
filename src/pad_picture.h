@@ -20,3 +20,8 @@ enum class PadView
 void pad_picture_draw(const InputLayout* layout, InputMapControl lit, bool minus, float unit);
 
 void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapControl lit, bool minus, float unit);
+
+// Over everything, in the screen's bottom right corner (no window, no
+// background), slightly see-through but its lit part solid: the binding
+// tables keep their width.
+void pad_picture_draw_floating(const InputLayout* layout, InputMapControl lit, bool minus, float unit);

@@ -575,8 +575,9 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     InputBindingSet effective = {};
     input_effective_bindings(input, menu->remap_controller, menu->remap_port, &effective);
     const InputDevice* pad = input_devices_find_const(&input->devices, input->controllers[menu->remap_controller].device_id);
-    // A gamepad's pad, on the right of the rows, with where the control being
-    // bound (or the row in focus) is now.
+    // A gamepad's pad, floating in the screen's corner (the rows keep the
+    // window's width), with where the control being bound (or the row in
+    // focus) is now.
     bool show_pad = pad != nullptr && pad->kind == InputDeviceKind::gamepad;
     InputAction shown = menu->capturing ? menu->capture_action : menu->pad_action;
     InputMapControl lit = InputMapControl::count;
@@ -597,11 +598,9 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         minus = source.type == InputSourceType::axis_minus;
     }
     menu->pad_action = InputAction::count;
-    float pad_unit = 0.8f * block;
-    float pad_width = show_pad ? 100.0f * pad_unit + ImGui::GetStyle().ItemSpacing.x : 0.0f;
     float label_width = 110.0f * block;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGui::BeginChild("remap_rows", ImVec2(show_pad ? -pad_width : 0.0f, 0.0f));
+    ImGui::BeginChild("remap_rows", ImVec2(0.0f, 0.0f));
     const InputLayout* pad_layout = input_window_layout(input, context->layouts, pad);
     const InputProfile* pad_profile = input_profile(input, input_controller_profile_id(input, menu->remap_controller));
     const char* set = piccolo_text(strings, Str::input_set);
@@ -737,10 +736,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     ImGui::PopStyleColor();
     if (show_pad)
     {
-        ImGui::SameLine();
-        ImGui::BeginGroup();
-        pad_picture_draw(input_window_layout(input, context->layouts, pad), lit, minus, pad_unit);
-        ImGui::EndGroup();
+        pad_picture_draw_floating(input_window_layout(input, context->layouts, pad), lit, minus, 1.25f * block);
     }
 }
 
