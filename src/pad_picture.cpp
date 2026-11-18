@@ -45,19 +45,17 @@ static const PadPart SIX_FACE[] = {
 };
 constexpr size_t SIX_FACE_COUNT = sizeof(SIX_FACE) / sizeof(SIX_FACE[0]);
 
-// The back, as if the pad were see-through (left stays left): shoulders and
-// triggers at the top as on the front, two paddles under each hand, one
-// above the other (SDL's paddle1 / paddle3 on the right, paddle2 / paddle4
-// on the left).
+// The back, seen from behind but upright: left and right swap places (the
+// left paddles show on the right), the shoulders and triggers on top.
 static const PadPart BACK[] = {
-    {InputMapControl::left_trigger, 14, 0, 28, 4},
-    {InputMapControl::right_trigger, 72, 0, 86, 4},
-    {InputMapControl::left_shoulder, 12, 5, 30, 9},
-    {InputMapControl::right_shoulder, 70, 5, 88, 9},
-    {InputMapControl::paddle2, 22, 16, 30, 26},
-    {InputMapControl::paddle4, 22, 29, 30, 39},
-    {InputMapControl::paddle1, 70, 16, 78, 26},
-    {InputMapControl::paddle3, 70, 29, 78, 39},
+    {InputMapControl::right_trigger, 14, 0, 28, 4},
+    {InputMapControl::left_trigger, 72, 0, 86, 4},
+    {InputMapControl::right_shoulder, 12, 5, 30, 9},
+    {InputMapControl::left_shoulder, 70, 5, 88, 9},
+    {InputMapControl::right_paddle1, 22, 16, 30, 26},
+    {InputMapControl::right_paddle2, 22, 29, 30, 39},
+    {InputMapControl::left_paddle1, 70, 16, 78, 26},
+    {InputMapControl::left_paddle2, 70, 29, 78, 39},
 };
 constexpr size_t BACK_COUNT = sizeof(BACK) / sizeof(BACK[0]);
 
@@ -168,8 +166,8 @@ void pad_picture_draw_view(const InputLayout* layout, PadView view, InputMapCont
 // A paddle lit shows the pad from behind; L4 / R4, the extra shoulders.
 static PadView view_for(InputMapControl lit)
 {
-    bool paddle = lit == InputMapControl::paddle1 || lit == InputMapControl::paddle2 || lit == InputMapControl::paddle3 ||
-                  lit == InputMapControl::paddle4;
+    bool paddle = lit == InputMapControl::right_paddle1 || lit == InputMapControl::left_paddle1 || lit == InputMapControl::right_paddle2 ||
+                  lit == InputMapControl::left_paddle2;
     return paddle ? PadView::back : PadView::front;
 }
 

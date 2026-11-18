@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "imgui.h"
@@ -30,7 +31,7 @@ static const Str DEFAULT_LABELS[INPUT_MAP_CONTROL_COUNT] = {
     Str::map_dpad_left, Str::map_dpad_right, Str::map_title, Str::map_title, Str::map_title, Str::map_title,
     Str::map_title, Str::map_title, Str::map_title, Str::map_title, Str::map_guide, Str::map_left_x, Str::map_left_y,
     Str::map_right_x, Str::map_right_y, Str::map_paddle_1, Str::map_paddle_2, Str::map_paddle_3, Str::map_paddle_4,
-    Str::map_l4, Str::map_r4, Str::map_other_button, Str::map_other_button, Str::map_other_button, Str::map_other_button,
+    Str::map_other_button, Str::map_other_button, Str::map_other_button, Str::map_other_button, Str::map_l4, Str::map_r4,
 };
 
 // STEP 3: the actions each role binds, in the order asked.
@@ -96,11 +97,10 @@ static void forget_choices(MapWindow* window)
     }
     window->pending_mapping.clear();
     window->interface_intro_done = false;
-    window->want_guide = false;
-    window->want_paddles = false;
-    window->want_shoulders = false;
-    window->want_others = false;
+    window->extras_part = MapStage::closed;
     window->extras_mapped = 0;
+    window->shoulders_mapped = false;
+    window->others_total = 0;
     window->layout = window->initial_layout;
     window->hotkey_mode = window->initial_hotkey_mode;
 }
@@ -270,6 +270,14 @@ static void finish(MapWindow* window, const MapWindowContext* context)
     if (window->roles_done)
     {
         apply_roles(window, context);
+    }
+    if (window->shoulders_mapped)
+    {
+        // misc5 / misc6 as the extra shoulders: named so (unless named already).
+        std::string* l4 = &profile->button_labels[static_cast<uint32_t>(InputButton::misc5)];
+        std::string* r4 = &profile->button_labels[static_cast<uint32_t>(InputButton::misc6)];
+        *l4 = l4->empty() ? std::string(piccolo_text(context->strings, Str::map_l4)) : *l4;
+        *r4 = r4->empty() ? std::string(piccolo_text(context->strings, Str::map_r4)) : *r4;
     }
     window->profiles_dirty = true;
     char text[300] = {};
@@ -494,61 +502,101 @@ static void back_to_buttons(MapWindow* window, const MapWindowContext* context)
     go(window, context, MapStage::intro_buttons);
 }
 
-// STEP 4's inputs: the extras answered YES, added to the mapping it has now.
-static void start_extras(MapWindow* window, const MapWindowContext* context)
+// The STEP 4 part after this one (its question's stage), the summary after the last.
+static MapStage next_part(MapStage part)
 {
-    bool wanted[INPUT_MAP_CONTROL_COUNT] = {};
-    bool any = false;
-    wanted[static_cast<uint32_t>(InputMapControl::guide)] = window->want_guide;
-    any = window->want_guide;
-    for (uint32_t c = static_cast<uint32_t>(INPUT_MAP_FIRST_EXTRA); c < INPUT_MAP_CONTROL_COUNT; c++)
+    switch (part)
     {
-        InputMapControl control = static_cast<InputMapControl>(c);
-        bool paddle = control == InputMapControl::paddle1 || control == InputMapControl::paddle2 ||
-                      control == InputMapControl::paddle3 || control == InputMapControl::paddle4;
-        bool shoulder = control == InputMapControl::l4 || control == InputMapControl::r4;
-        wanted[c] = paddle ? window->want_paddles : (shoulder ? window->want_shoulders : window->want_others);
-        any = any || wanted[c];
+        case MapStage::extras_guide:     return MapStage::extras_paddles;
+        case MapStage::extras_paddles:   return MapStage::extras_shoulders;
+        case MapStage::extras_shoulders: return MapStage::extras_others;
+        default:                         return MapStage::summary;
     }
-    if (!any)
+}
+
+static bool mapping_has(const char* mapping, const char* field)
+{
+    return mapping != nullptr && std::strstr(mapping, field) != nullptr;
+}
+
+// A STEP 4 part answered YES: its inputs, added to the mapping SDL has now.
+static void start_extras(MapWindow* window, const MapWindowContext* context, MapStage part)
+{
+    char* mapping = SDL_GetGamepadMappingForID(static_cast<SDL_JoystickID>(window->joystick_id));
+    bool wanted[INPUT_MAP_CONTROL_COUNT] = {};
+    InputMapControl first = InputMapControl::count;
+    window->others_total = 0;
+    switch (part)
     {
-        go(window, context, MapStage::summary);
-        return;
+        case MapStage::extras_guide:
+            wanted[static_cast<uint32_t>(InputMapControl::guide)] = true;
+            break;
+        case MapStage::extras_paddles:
+            for (uint32_t c = static_cast<uint32_t>(InputMapControl::left_paddle1);
+                 c <= static_cast<uint32_t>(InputMapControl::right_paddle2); c++)
+            {
+                wanted[c] = true;
+            }
+            first = InputMapControl::left_paddle1;   // a pad with two paddles: ends when the third doesn't come
+            break;
+        case MapStage::extras_shoulders:
+            wanted[static_cast<uint32_t>(InputMapControl::l4)] = true;
+            wanted[static_cast<uint32_t>(InputMapControl::r4)] = true;
+            break;
+        default:
+        {
+            // Other buttons: misc1..4, and misc5 / misc6 (L4 / R4's) when nothing uses them.
+            bool shoulders_free = !window->shoulders_mapped && !mapping_has(mapping, "misc5:") && !mapping_has(mapping, "misc6:");
+            for (uint32_t c = static_cast<uint32_t>(InputMapControl::misc1); c <= static_cast<uint32_t>(InputMapControl::r4); c++)
+            {
+                bool shoulder = c >= static_cast<uint32_t>(InputMapControl::l4);
+                wanted[c] = !shoulder || shoulders_free;
+                window->others_total += wanted[c] ? 1u : 0u;
+            }
+            first = InputMapControl::misc1;   // until one doesn't come
+            break;
+        }
     }
     if (!input_sdl_mapper_begin(&window->mapper, window->joystick_id, 0, nullptr, wanted, context->now_ms))
     {
+        SDL_free(mapping);
         map_window_close(window, context->input);   // went away
         return;
     }
     window->mapper.hold_ms = context->input->settings.hold_ms;
     window->mapper.optional_wait_ms = context->input->settings.press_ms;
-    window->mapper.end_on_skip_from = InputMapControl::misc1;   // other buttons: until none comes
-    char* mapping = SDL_GetGamepadMappingForID(static_cast<SDL_JoystickID>(window->joystick_id));
+    window->mapper.end_on_skip_from = first;
     input_sdl_mapper_load(&window->mapper, mapping);
     SDL_free(mapping);
+    window->extras_part = part;
     go(window, context, MapStage::extras_mapping);
     context->input->suspended = true;
 }
 
-// STEP 4's inputs done: the extras into the mapping SDL uses now.
+// A STEP 4 part's inputs done: into the mapping SDL uses now; the next part.
 static void extras_done(MapWindow* window, const MapWindowContext* context)
 {
-    window->extras_mapped = 0;
+    uint32_t mapped = 0;
     for (uint32_t c = 0; c < INPUT_MAP_CONTROL_COUNT; c++)
     {
         if (window->mapper.wanted[c] && !window->mapper.elements[c].empty())
         {
-            window->extras_mapped++;
+            mapped++;
         }
     }
     std::string line;
-    if (window->extras_mapped > 0 && input_sdl_mapper_line(&window->mapper, &line))
+    if (mapped > 0 && input_sdl_mapper_line(&window->mapper, &line))
     {
         use_mapping(window, line);
+        window->extras_mapped += mapped;
+        if (window->extras_part == MapStage::extras_shoulders)
+        {
+            window->shoulders_mapped = true;
+        }
     }
     input_sdl_mapper_cancel(&window->mapper);
     context->input->suspended = false;
-    go(window, context, MapStage::summary);
+    go(window, context, next_part(window->extras_part));
 }
 
 // ---------------------------------------------------------------------------
@@ -834,11 +882,13 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     step_buttons(window, context);
 }
 
-// A STEP 4 question: YES, or NO (by itself after a while).
+// A STEP 4 part's first page: its question. YES enters it (its inputs),
+// NO (by itself after a while) goes on to the next part.
 static void draw_question(MapWindow* window, const MapWindowContext* context, float block, Str question, PadView view,
-                          InputMapControl lit, bool* answer, MapStage back, MapStage next)
+                          InputMapControl lit, MapStage back)
 {
     const Localization* strings = context->strings;
+    MapStage part = window->stage;
     header(window, strings, Str::map_step_extras, piccolo_text(strings, question));
     pad_area(picked_layout(window, context), view, lit, false, block);
     footer();
@@ -856,30 +906,17 @@ static void draw_question(MapWindow* window, const MapWindowContext* context, fl
         return;
     }
     ImGui::SameLine();
-    bool answered = false;
     if (retro_ui_button(piccolo_text(strings, Str::map_yes)))
     {
-        *answer = true;
-        answered = true;
+        start_extras(window, context, part);
+        return;
     }
     ImGui::SameLine();
-    if (!answered && (countdown_button(piccolo_text(strings, Str::map_no),
-                                       seconds_left(context->now_ms, window->page_started_ms, QUESTION_MS), "no") ||
-                      context->now_ms - window->page_started_ms >= QUESTION_MS))
+    if (countdown_button(piccolo_text(strings, Str::map_no), seconds_left(context->now_ms, window->page_started_ms, QUESTION_MS),
+                         "no") ||
+        context->now_ms - window->page_started_ms >= QUESTION_MS)
     {
-        *answer = false;
-        answered = true;
-    }
-    if (answered)
-    {
-        if (next == MapStage::extras_mapping)
-        {
-            start_extras(window, context);
-        }
-        else
-        {
-            go(window, context, next);
-        }
+        go(window, context, next_part(part));
         return;
     }
     ImGui::SameLine();
@@ -889,7 +926,26 @@ static void draw_question(MapWindow* window, const MapWindowContext* context, fl
     }
 }
 
-// STEP 4's inputs: each extra answered YES.
+// Which other button this is, as small squares under the drawing (the
+// current one lit), like the page indicator.
+static void draw_other_squares(uint32_t current, uint32_t total)
+{
+    float size = static_cast<float>(static_cast<int>(ImGui::GetFontSize() * 0.5f));
+    float gap = size;
+    float width = static_cast<float>(total) * size + static_cast<float>(total - 1) * gap;
+    ImVec2 at = ImGui::GetCursorScreenPos();
+    at.x += static_cast<float>(static_cast<int>((ImGui::GetContentRegionAvail().x - width) * 0.5f));
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    for (uint32_t s = 0; s < total; s++)
+    {
+        float x = at.x + static_cast<float>(s) * (size + gap);
+        ImU32 color = s == current ? IM_COL32(255, 220, 80, 255) : ImGui::GetColorU32(ImGuiCol_TextDisabled);
+        draw->AddRectFilled(ImVec2(x, at.y), ImVec2(x + size, at.y + size), color);
+    }
+    ImGui::Dummy(ImVec2(width, size + ImGui::GetStyle().ItemSpacing.y));
+}
+
+// A STEP 4 part's inputs.
 static void draw_extras_mapping(MapWindow* window, const MapWindowContext* context, float block)
 {
     const Localization* strings = context->strings;
@@ -907,13 +963,29 @@ static void draw_extras_mapping(MapWindow* window, const MapWindowContext* conte
     const InputLayout* layout = picked_layout(window, context);
     char text[300] = {};
     header(window, strings, Str::map_step_extras, nullptr);
-    bool paddle = control == InputMapControl::paddle1 || control == InputMapControl::paddle2 ||
-                  control == InputMapControl::paddle3 || control == InputMapControl::paddle4;
-    bool shoulder = control == InputMapControl::l4 || control == InputMapControl::r4;
-    pad_area(layout, paddle ? PadView::back : (shoulder ? PadView::extra_shoulders : PadView::front), control, false, block);
-    bool other = static_cast<uint32_t>(control) >= static_cast<uint32_t>(InputMapControl::misc1) && control != InputMapControl::count;
-    std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_press), control_label(layout, strings, control));
-    prompt(window, context, text, other ? Str::map_extras_others_text : Str::map_hold_hint);
+    bool others = window->extras_part == MapStage::extras_others;
+    if (others)
+    {
+        // Other buttons aren't on the drawing: the squares say which one.
+        pad_area(layout, PadView::front, InputMapControl::count, false, block);
+        uint32_t current = 0;
+        for (uint32_t c = static_cast<uint32_t>(InputMapControl::misc1); c < static_cast<uint32_t>(control); c++)
+        {
+            current += window->mapper.wanted[c] ? 1u : 0u;
+        }
+        draw_other_squares(current, window->others_total);
+        std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_other_n), static_cast<int>(current + 1));
+    }
+    else
+    {
+        // A paddle shows the pad from behind, L4 / R4 the extra shoulders.
+        bool paddle = control == InputMapControl::left_paddle1 || control == InputMapControl::right_paddle1 ||
+                      control == InputMapControl::left_paddle2 || control == InputMapControl::right_paddle2;
+        bool shoulder = control == InputMapControl::l4 || control == InputMapControl::r4;
+        pad_area(layout, paddle ? PadView::back : (shoulder ? PadView::extra_shoulders : PadView::front), control, false, block);
+        std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_press), control_label(layout, strings, control));
+    }
+    prompt(window, context, text, others ? Str::map_extras_others_text : Str::map_hold_hint);
     step_buttons(window, context);
 }
 
@@ -1064,19 +1136,19 @@ void map_window_draw(MapWindow* window, const MapWindowContext* context, ImFont*
             break;
         case MapStage::extras_guide:
             draw_question(window, context, block, Str::map_extras_guide, PadView::front, InputMapControl::guide,
-                          &window->want_guide, MapStage::intro_interface, MapStage::extras_paddles);
+                          MapStage::intro_interface);
             break;
         case MapStage::extras_paddles:
             draw_question(window, context, block, Str::map_extras_paddles, PadView::back, InputMapControl::count,
-                          &window->want_paddles, MapStage::extras_guide, MapStage::extras_shoulders);
+                          MapStage::extras_guide);
             break;
         case MapStage::extras_shoulders:
             draw_question(window, context, block, Str::map_extras_shoulders, PadView::extra_shoulders, InputMapControl::count,
-                          &window->want_shoulders, MapStage::extras_paddles, MapStage::extras_others);
+                          MapStage::extras_paddles);
             break;
         case MapStage::extras_others:
             draw_question(window, context, block, Str::map_extras_others, PadView::front, InputMapControl::count,
-                          &window->want_others, MapStage::extras_shoulders, MapStage::extras_mapping);
+                          MapStage::extras_shoulders);
             break;
         case MapStage::extras_mapping:
             draw_extras_mapping(window, context, block);

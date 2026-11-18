@@ -10,7 +10,7 @@
 enum class PadView
 {
     front,
-    back,              // the back, see-through (left stays left): two paddles under each hand
+    back,              // the back, seen from behind (left on the right): two paddles under each hand
     extra_shoulders,   // the front with L4 / R4 next to L / R
 };
 

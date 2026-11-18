@@ -18,10 +18,13 @@
 //            wherever it is, but one STEP 2 mapped. BACK / START / SKIP /
 //            CANCEL, then held like STEP 2's. MAIN MENU also becomes HOTKEY
 //            ENABLE + that button.
-//   STEP 4   EXTRA BUTTONS (only from SETTINGS > INPUT > DEVICES > MAP...):
-//            GUIDE / HOME?, paddles?, extra shoulders (L4 / R4)?, other
-//            buttons? BACK / YES / NO (15 s) / CANCEL; then the ones answered
-//            YES, held like STEP 2's (the others until none comes).
+//   STEP 4   EXTRA BUTTONS (only from SETTINGS > INPUT > DEVICES > MAP...),
+//            in parts, each entered like a step: its question (BACK / YES /
+//            NO (15 s) / CANCEL), then on YES its inputs held like STEP 2's:
+//            GUIDE / HOME; the paddles (left, right, left, right, the pad
+//            drawn from behind); L4 / R4; other buttons (until none comes,
+//            small squares under the drawing: 6, or 4 when L4 / R4 use SDL's
+//            misc5 / misc6).
 //   SUMMARY  what changes; RESTART / CANCEL / FINISH.
 //
 // While a step takes its inputs: BACK (the previous input), RESET (the
@@ -91,11 +94,10 @@ struct MapWindow
     std::string    original_mapping;         // SDL's when it opened ("" = none): CANCEL puts it back
     bool           mapping_changed = false;  // SDL has pending_mapping now
     bool           interface_intro_done = false;   // STEP 3's first page was shown
-    bool           want_guide = false;       // STEP 4's answers
-    bool           want_paddles = false;
-    bool           want_shoulders = false;
-    bool           want_others = false;
-    uint32_t       extras_mapped = 0;        // STEP 4: how many extras it took
+    MapStage       extras_part = MapStage::closed;   // STEP 4: the part being mapped (its question's stage)
+    uint32_t       extras_mapped = 0;        // STEP 4: how many extras it took, all parts
+    bool           shoulders_mapped = false; // L4 / R4 mapped as the extra shoulders (FINISH names them)
+    uint32_t       others_total = 0;         // other buttons this part can take (4, or 6 when misc5 / misc6 are free)
 
     InputSdlMapper mapper;
     InputSdlPress  press;                    // any button on it: the page's main button (it can't drive the interface)

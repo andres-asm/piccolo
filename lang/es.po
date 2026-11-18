@@ -1908,8 +1908,8 @@ msgid "Does it have any other buttons?"
 msgstr "¿Tiene otros botones?"
 
 msgctxt "map_extras_others_text"
-msgid "Hold each one, one at a time. When none are left, wait or press FINISH."
-msgstr "Mantén cada uno, de a uno. Cuando no queden más, espera o presiona TERMINAR."
+msgid "Hold each other button, one at a time. When none are left, wait: it goes on by itself."
+msgstr "Mantén cada otro botón, de a uno. Cuando no queden más, espera: sigue solo."
 
 msgctxt "map_yes"
 msgid "YES"
@@ -1924,20 +1924,24 @@ msgid "FINISH"
 msgstr "TERMINAR"
 
 msgctxt "map_paddle_1"
-msgid "PADDLE 1"
-msgstr "PADDLE 1"
+msgid "LEFT PADDLE 1"
+msgstr "PADDLE IZQUIERDO 1"
 
 msgctxt "map_paddle_2"
-msgid "PADDLE 2"
-msgstr "PADDLE 2"
+msgid "RIGHT PADDLE 1"
+msgstr "PADDLE DERECHO 1"
 
 msgctxt "map_paddle_3"
-msgid "PADDLE 3"
-msgstr "PADDLE 3"
+msgid "LEFT PADDLE 2"
+msgstr "PADDLE IZQUIERDO 2"
 
 msgctxt "map_paddle_4"
-msgid "PADDLE 4"
-msgstr "PADDLE 4"
+msgid "RIGHT PADDLE 2"
+msgstr "PADDLE DERECHO 2"
+
+msgctxt "map_other_n"
+msgid "OTHER BUTTON %d"
+msgstr "OTRO BOTÓN %d"
 
 msgctxt "map_l4"
 msgid "L4"

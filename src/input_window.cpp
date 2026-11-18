@@ -175,8 +175,8 @@ void input_window_source_label(const InputSdl* sdl, const InputDevice* device, c
         case InputButton::misc2:          text = "MISC 2"; break;
         case InputButton::misc3:          text = "MISC 3"; break;
         case InputButton::misc4:          text = "MISC 4"; break;
-        case InputButton::misc5:          text = "L4"; break;   // MAP CONTROLLER puts the extra shoulders here
-        case InputButton::misc6:          text = "R4"; break;
+        case InputButton::misc5:          text = "MISC 5"; break;   // MAP CONTROLLER names them L4 / R4 when they are
+        case InputButton::misc6:          text = "MISC 6"; break;   // the extra shoulders (the profile's labels)
         case InputButton::count:          break;
         }
         break;
