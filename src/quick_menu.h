@@ -57,6 +57,7 @@ struct QuickMenu
     bool          capturing = false;
     InputAction   capture_action = InputAction::pad_b;
     uint32_t      capture_row = 0;      // the row (source) being set; its count = a new row (+)
+    InputCoreProfile capture_backup;    // the remap as the SET / BIND ALL began (CANCEL)
     uint64_t      capture_started_ms = 0;
     bool          bind_all = false;
     bool          capture_seen = false; // the remap view looked at the capture this frame (else it's dropped)

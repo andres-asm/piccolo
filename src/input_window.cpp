@@ -345,6 +345,10 @@ static void draw_settings(InputWindow* window, const InputWindowContext* context
 static void start_capture(InputWindow* window, const InputWindowContext* context, uint32_t controller, InputAction action,
                           uint32_t row)
 {
+    if (!window->capturing)
+    {
+        window->capture_backup = context->input->controllers[controller].bindings;   // a new pass: CANCEL goes back to this
+    }
     window->capturing = true;
     window->capture_action = action;
     window->capture_row = row;
@@ -674,6 +678,18 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
         window->dirty = true;
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::input_defaults_help));
+    ImGui::EndDisabled();
+    // CANCEL: stops a SET / BIND ALL and puts back what it changed.
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!window->capturing || window->capture_controller != controller);
+    if (retro_ui_button(piccolo_text(strings, Str::input_cancel_binding)))
+    {
+        input->controllers[controller].bindings = window->capture_backup;
+        input_capture_cancel(input);
+        window->capturing = false;
+        window->bind_all = false;
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, Str::input_cancel_binding_help));
     ImGui::EndDisabled();
 
     // GAME / GAMEPAD (or KEY), then the rows, which scroll under the titles.

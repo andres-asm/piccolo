@@ -408,6 +408,10 @@ static void remap_set(QuickMenu* menu, const QuickMenuContext* context, InputAct
 static void remap_start_capture(QuickMenu* menu, const QuickMenuContext* context, InputAction action, uint32_t row)
 {
     InputSystem* input = context->input;
+    if (!menu->capturing)
+    {
+        menu->capture_backup = *remap_profile(menu, context);   // a new pass: CANCEL goes back to this
+    }
     menu->capturing = true;
     menu->capture_action = action;
     menu->capture_row = row;
@@ -570,6 +574,18 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         menu->input_dirty = true;
         menu->remap = false;
     }
+    ImGui::EndDisabled();
+    // CANCEL: stops a SET / BIND ALL and puts back what it changed.
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!menu->capturing);
+    if (retro_ui_button(piccolo_text(strings, Str::input_cancel_binding)))
+    {
+        *remap_profile(menu, context) = menu->capture_backup;
+        input_capture_cancel(input);
+        menu->capturing = false;
+        menu->bind_all = false;
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, Str::input_cancel_binding_help));
     ImGui::EndDisabled();
 
     InputBindingSet effective = {};

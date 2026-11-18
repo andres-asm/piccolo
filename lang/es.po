@@ -1609,6 +1609,14 @@ msgctxt "input_bind_all_help"
 msgid "Asks for every control below in turn; nothing pressed for 5 seconds skips one, Esc stops."
 msgstr "Pide cada control de abajo en orden; si no presionas nada en 5 segundos se salta, Esc termina."
 
+msgctxt "input_cancel_binding"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "input_cancel_binding_help"
+msgid "Stops the SET or BIND ALL under way and puts back every binding it changed."
+msgstr "Detiene el SET o ASIGNAR TODO en curso y vuelve a poner cada asignación que cambió."
+
 msgctxt "input_extra_names"
 msgid "EXTRA BUTTONS"
 msgstr "BOTONES EXTRA"

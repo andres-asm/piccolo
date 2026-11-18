@@ -40,6 +40,7 @@ struct InputWindow
     InputAction capture_action = InputAction::pad_b;
     uint32_t    capture_row = 0;             // the row (source) being set; its count = a new row (+)
     uint32_t    capture_controller = 0;
+    InputBindingSet capture_backup;          // the controller's bindings as the SET / BIND ALL began (CANCEL)
     InputAction pad_action = InputAction::count;   // the row the floating pad shows (focused or hovered)
     uint32_t    pad_row = 0;
     uint64_t    capture_started_ms = 0;
