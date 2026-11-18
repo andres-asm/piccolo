@@ -71,16 +71,17 @@ void input_window_draw(InputWindow* window, const InputWindowContext* context, I
 const InputLayout* input_window_layout(const InputSystem* input, const InputLayouts* layouts, const InputDevice* device);
 
 // A source as the user sees it on that device: "RETURN", "A", "CROSS",
-// "D-PAD UP", "LEFT STICK RIGHT", "ZL"... Buttons are named by the
-// controller's layout; without one, by SDL's labels.
-void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout, InputSource source,
-                               char* out, size_t out_size);
+// "D-PAD UP", "LEFT STICK RIGHT", "ZL"... A button the controller's profile
+// gave a name to has that name; the rest are named by its layout, without
+// one by SDL's labels. `profile` may be nullptr.
+void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
+                               const InputProfile* profile, InputSource source, char* out, size_t out_size);
 
 // A binding's sources in `width`: all of them ("D-PAD UP, LEFT STICK UP"),
 // or when they don't fit the first and how many more ("D-PAD UP +1") with
 // all of them in the tooltip; NONE when there's none.
 void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
-                               const InputSource* sources, float width, const Localization* strings);
+                               const InputProfile* profile, const InputSource* sources, float width, const Localization* strings);
 
 // Waiting for a binding: PRESS A BUTTON (4) / PRESS A KEY (4).
 void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_progress, const Localization* strings);

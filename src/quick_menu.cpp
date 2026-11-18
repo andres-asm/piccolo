@@ -603,6 +603,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
     ImGui::BeginChild("remap_rows", ImVec2(show_pad ? -pad_width : 0.0f, 0.0f));
     const InputLayout* pad_layout = input_window_layout(input, context->layouts, pad);
+    const InputProfile* pad_profile = input_profile(input, input_controller_profile_id(input, menu->remap_controller));
     const char* set = piccolo_text(strings, Str::input_set);
     const char* clear = piccolo_text(strings, Str::input_clear);
     const char* add = "+";
@@ -666,7 +667,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             {
                 InputSource one[INPUT_SOURCES_PER_ACTION] = {};
                 one[0] = source;
-                input_window_draw_sources(context->sdl, pad, pad_layout, one, text_end - ImGui::GetCursorPosX(), strings);
+                input_window_draw_sources(context->sdl, pad, pad_layout, pad_profile, one, text_end - ImGui::GetCursorPosX(), strings);
             }
             if (show_percent)
             {

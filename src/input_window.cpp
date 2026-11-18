@@ -112,9 +112,15 @@ const InputLayout* input_window_layout(const InputSystem* input, const InputLayo
     return profile != nullptr ? input_layouts_find(layouts, profile->appearance.c_str()) : nullptr;
 }
 
-void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout, InputSource source,
-                               char* out, size_t out_size)
+void input_window_source_label(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
+                               const InputProfile* profile, InputSource source, char* out, size_t out_size)
 {
+    if (profile != nullptr && source.type == InputSourceType::button && source.code < INPUT_BUTTON_COUNT &&
+        !profile->button_labels[source.code].empty())
+    {
+        std::snprintf(out, out_size, "%s", profile->button_labels[source.code].c_str());   // a name given to it
+        return;
+    }
     SDL_Gamepad* gamepad = device != nullptr ? input_sdl_gamepad(sdl, device->id) : nullptr;
     InputMapControl control = layout_control(source);
     if (layout != nullptr && control != InputMapControl::count && !layout->labels[static_cast<uint32_t>(control)].empty())
@@ -159,7 +165,7 @@ void input_window_source_label(const InputSdl* sdl, const InputDevice* device, c
         case InputButton::dpad_down:      text = "D-PAD DOWN"; break;
         case InputButton::dpad_left:      text = "D-PAD LEFT"; break;
         case InputButton::dpad_right:     text = "D-PAD RIGHT"; break;
-        case InputButton::misc1:          text = "MISC"; break;
+        case InputButton::misc1:          text = "MISC 1"; break;
         case InputButton::right_paddle1:  text = "RIGHT PADDLE 1"; break;
         case InputButton::left_paddle1:   text = "LEFT PADDLE 1"; break;
         case InputButton::right_paddle2:  text = "RIGHT PADDLE 2"; break;
@@ -347,7 +353,7 @@ static void start_capture(InputWindow* window, const InputWindowContext* context
 }
 
 void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, const InputLayout* layout,
-                               const InputSource* sources, float width, const Localization* strings)
+                               const InputProfile* profile, const InputSource* sources, float width, const Localization* strings)
 {
     char names[INPUT_SOURCES_PER_ACTION][48] = {};
     uint32_t count = 0;
@@ -355,7 +361,7 @@ void input_window_draw_sources(const InputSdl* sdl, const InputDevice* device, c
     {
         if (sources[s].type != InputSourceType::none)
         {
-            input_window_source_label(sdl, device, layout, sources[s], names[count], sizeof(names[count]));
+            input_window_source_label(sdl, device, layout, profile, sources[s], names[count], sizeof(names[count]));
             count++;
         }
     }
@@ -474,7 +480,9 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
         {
             InputSource one[INPUT_SOURCES_PER_ACTION] = {};
             one[0] = r < count ? sources[r] : InputSource{};
-            input_window_draw_sources(context->sdl, device, layout, one, buttons_x - ImGui::GetCursorPosX() - spacing, strings);
+            input_window_draw_sources(context->sdl, device, layout,
+                                      input_profile(input, input_controller_profile_id(input, controller_index)), one,
+                                      buttons_x - ImGui::GetCursorPosX() - spacing, strings);
         }
         ImGui::SameLine(buttons_x > ImGui::GetCursorPosX() ? buttons_x : 0.0f);
         bool usable = !window->capturing && device != nullptr && device->connected;
@@ -706,6 +714,62 @@ static void draw_devices(InputWindow* window, const InputWindowContext* context,
     }
 }
 
+// The extra buttons this gamepad has (MISC, paddles, touchpad: what MAP
+// CONTROLLER's STEP 4 adds), each with a name of the user's own ("VOLUME
+// UP"), kept in its profile and shown wherever its buttons are listed.
+static void extra_button_names(InputWindow* window, const InputWindowContext* context, const InputDevice* device,
+                               uint32_t controller, float label_width)
+{
+    static const InputButton EXTRAS[] = {
+        InputButton::misc1, InputButton::misc2, InputButton::misc3, InputButton::misc4, InputButton::misc5,
+        InputButton::misc6, InputButton::right_paddle1, InputButton::left_paddle1, InputButton::right_paddle2,
+        InputButton::left_paddle2, InputButton::touchpad,
+    };
+    InputSystem* input = context->input;
+    SDL_Gamepad* gamepad = input_sdl_gamepad(context->sdl, device->id);
+    if (gamepad == nullptr)
+    {
+        return;
+    }
+    std::string id = input_controller_profile_id(input, controller);
+    const InputLayout* layout = input_window_layout(input, context->layouts, device);
+    bool any = false;
+    for (size_t e = 0; e < sizeof(EXTRAS) / sizeof(EXTRAS[0]); e++)
+    {
+        if (!SDL_GamepadHasButton(gamepad, static_cast<SDL_GamepadButton>(EXTRAS[e])))
+        {
+            continue;
+        }
+        if (!any)
+        {
+            ImGui::TextUnformatted(piccolo_text(context->strings, Str::input_extra_names));
+            retro_ui_item_tooltip(piccolo_text(context->strings, Str::input_extra_names_help));
+            any = true;
+        }
+        InputSource source = {};
+        source.type = InputSourceType::button;
+        source.code = static_cast<uint16_t>(EXTRAS[e]);
+        char own[48] = {};
+        input_window_source_label(context->sdl, device, layout, nullptr, source, own, sizeof(own));   // its own name
+        ImGui::PushID(static_cast<int>(EXTRAS[e]));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(own);
+        ImGui::SameLine(label_width);
+        const InputProfile* profile = input_profile(input, id);
+        char buffer[48] = {};
+        std::snprintf(buffer, sizeof(buffer), "%s", profile != nullptr ? profile->button_labels[source.code].c_str() : "");
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        retro_ui_push_field_text();
+        if (ImGui::InputText("##label", buffer, sizeof(buffer)))
+        {
+            input_profile_for(input, id)->button_labels[source.code] = buffer;
+            window->dirty = true;
+        }
+        retro_ui_pop_field_text();
+        ImGui::PopID();
+    }
+}
+
 static void draw_device(InputWindow* window, const InputWindowContext* context, InputDevice* device, float label_width,
                         bool open_by_default)
 {
@@ -778,6 +842,7 @@ static void draw_device(InputWindow* window, const InputWindowContext* context, 
                 }
                 ImGui::EndCombo();
             }
+            extra_button_names(window, context, device, static_cast<uint32_t>(first), label_width);
         }
 
         if (device->kind == InputDeviceKind::keyboard)
