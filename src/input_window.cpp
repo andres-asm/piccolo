@@ -389,9 +389,7 @@ void input_window_draw_waiting(bool keyboard, uint64_t seconds_left, float hold_
     if (spinner[0] != '\0')
     {
         ImGui::SameLine();
-        retro_ui_push_section_text();
-        ImGui::TextUnformatted(spinner);
-        retro_ui_pop_section_text();
+        ImGui::TextColored(ImVec4(1.0f, 220.0f / 255.0f, 80.0f / 255.0f, 1.0f), "%s", spinner);   // yellow, like the lit pad
     }
 }
 

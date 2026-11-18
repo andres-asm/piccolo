@@ -536,7 +536,7 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
     if (spinner[0] != '\0')
     {
         ImGui::SameLine();
-        section(spinner);
+        ImGui::TextColored(ImVec4(1.0f, 220.0f / 255.0f, 80.0f / 255.0f, 1.0f), "%s", spinner);   // yellow, like the lit pad
     }
     wrapped(piccolo_text(strings, Str::map_hold_hint));
     uint32_t left = input_sdl_mapper_seconds_left(&window->mapper, context->now_ms);
