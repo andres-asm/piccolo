@@ -1647,16 +1647,24 @@ msgid "What the core emulates on this port (its own list: joypad, mouse, multita
 msgstr "Lo que el core emula en este puerto (su propia lista: joypad, mouse, multitap...)."
 
 msgctxt "quick_menu_device"
-msgid "DEVICE"
-msgstr "DISPOSITIVO"
+msgid "CORE DEVICE"
+msgstr "DISPOSITIVO DEL CORE"
+
+msgctxt "quick_menu_ports"
+msgid "PORTS"
+msgstr "PUERTOS"
+
+msgctxt "quick_menu_core_devices"
+msgid "CORE DEVICES"
+msgstr "DISPOSITIVOS DEL CORE"
 
 msgctxt "quick_menu_remap"
 msgid "REMAP"
 msgstr "REMAPEAR"
 
 msgctxt "remap_title"
-msgid "%s: %s ON PORT %d"
-msgstr "%s: %s EN EL PUERTO %d"
+msgid "%s -> %s MAPPING"
+msgstr "ASIGNACIÓN %s -> %s"
 
 msgctxt "remap_use_retropad"
 msgid "USE RETROPAD"
@@ -1688,8 +1696,8 @@ msgstr "MAPEAR CONTROL"
 
 
 msgctxt "map_offer_text"
-msgid "Follow this wizard to map it for the user interface and for the default RetroPad. If you don't map it now, you can map its user interface controls in the INPUT settings and its RetroPad buttons in the quick menu."
-msgstr "Sigue este asistente para mapearlo para la interfaz y para el RetroPad por defecto. Si no lo mapeas ahora, puedes mapear sus controles de la interfaz en los ajustes de INPUT y sus botones del RetroPad en el menú rápido."
+msgid "Follow this wizard to map its buttons, so piccolo recognizes them, and then the user interface. If you don't map it now, you can map its user interface controls in the INPUT settings and its RetroPad buttons in the quick menu."
+msgstr "Sigue este asistente para mapear sus botones, para que piccolo los reconozca, y después la interfaz. Si no lo mapeas ahora, puedes mapear sus controles de la interfaz en los ajustes de INPUT y sus botones del RetroPad en el menú rápido."
 
 msgctxt "map_offer_needed"
 msgid "It isn't known as a gamepad: it can't be used until it is mapped."
@@ -1876,8 +1884,8 @@ msgid "HOTKEY ENABLE"
 msgstr "HABILITAR HOTKEYS"
 
 msgctxt "map_role_menu"
-msgid "MAIN MENU (A HOTKEY)"
-msgstr "MENÚ PRINCIPAL (UN HOTKEY)"
+msgid "MAIN MENU"
+msgstr "MENÚ PRINCIPAL"
 
 msgctxt "map_role_quick_menu"
 msgid "QUICK MENU (A HOTKEY)"
@@ -1887,21 +1895,21 @@ msgctxt "map_detected"
 msgid "NEW CONTROLLER DETECTED"
 msgstr "NUEVO CONTROL DETECTADO"
 
+msgctxt "map_step_buttons"
+msgid "STEP 1: CONTROLLER BUTTONS"
+msgstr "PASO 1: BOTONES DEL CONTROL"
+
+msgctxt "map_step_buttons_text"
+msgid "Press each button as it lights up, so piccolo knows where each one is on this controller. Then it works in games and in the next step."
+msgstr "Presiona cada botón cuando se ilumine, para que piccolo sepa dónde está cada uno en este control. Así funciona en los juegos y en el paso siguiente."
+
 msgctxt "map_step_interface"
-msgid "STEP 1: USER INTERFACE"
-msgstr "PASO 1: INTERFAZ"
+msgid "STEP 2: USER INTERFACE"
+msgstr "PASO 2: INTERFAZ"
 
 msgctxt "map_step_interface_text"
-msgid "Press the button you want for each control of the menus and windows, wherever it is on the controller."
-msgstr "Presiona el botón que quieras para cada control de los menús y ventanas, esté donde esté en el control."
-
-msgctxt "map_step_game"
-msgid "STEP 2: GAME"
-msgstr "PASO 2: JUEGO"
-
-msgctxt "map_step_game_text"
-msgid "Press each button as it lights up: they are the RetroPad games get by default."
-msgstr "Presiona cada botón cuando se ilumine: son el RetroPad que reciben los juegos por defecto."
+msgid "Press the button you want for each control of the menus and windows. The drawing lights up the one you press."
+msgstr "Presiona el botón que quieras para cada control de los menús y ventanas. El dibujo ilumina el que presionas."
 
 msgctxt "map_start"
 msgid "START (%d)"

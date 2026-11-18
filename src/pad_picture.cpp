@@ -1,7 +1,6 @@
 #include "pad_picture.h"
 
 #include "imgui.h"
-#include "retro_ui.h"
 
 struct PadPart
 {
@@ -38,7 +37,7 @@ void pad_picture_draw(const InputLayout* layout, InputMapControl lit, bool minus
     origin.x += static_cast<float>(static_cast<int>((width - 100.0f * unit) * 0.5f));
     ImU32 body = ImGui::GetColorU32(ImGuiCol_Button);
     ImU32 part = ImGui::GetColorU32(ImGuiCol_FrameBg);
-    ImU32 light = retro_ui_attention_color();
+    ImU32 light = IM_COL32(255, 220, 80, 255);   // the same yellow in every theme (and in Test libretro)
     // The body, and the d-pad's middle.
     draw_list->AddRectFilled(ImVec2(origin.x + 8.0f * unit, origin.y + 10.0f * unit),
                              ImVec2(origin.x + 92.0f * unit, origin.y + 44.0f * unit), body);

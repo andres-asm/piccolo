@@ -11,7 +11,7 @@
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
-constexpr uint64_t OFFER_MS = 30000;   // NOT NOW by itself after this long
+constexpr uint64_t OFFER_MS = 15000;   // NOT NOW by itself after this long
 constexpr uint64_t INTRO_MS = 10000;   // a step's page STARTs by itself after this long
 
 // The names of the controls a layout doesn't name: the d-pad and the
@@ -28,22 +28,24 @@ struct MapRole
 {
     Str         label;
     InputAction action;
+    InputAction also;       // the same button goes here too (count = nothing more)
     bool        optional;   // a pad may not have it (shoulders for the pages)
     bool        navigate;   // keeps the default's sources of the other kind (d-pad role: the stick stays)
 };
 
 static const MapRole ROLES[] = {
-    {Str::map_role_up, InputAction::ui_up, false, true},
-    {Str::map_role_down, InputAction::ui_down, false, true},
-    {Str::map_role_left, InputAction::ui_left, false, true},
-    {Str::map_role_right, InputAction::ui_right, false, true},
-    {Str::map_role_page_left, InputAction::ui_page_left, true, false},
-    {Str::map_role_page_right, InputAction::ui_page_right, true, false},
-    {Str::map_role_accept, InputAction::ui_accept, false, false},
-    {Str::map_role_back, InputAction::ui_back, false, false},
-    {Str::map_role_modifier, InputAction::hotkey_enable, false, false},
-    {Str::map_role_menu, InputAction::hotkey_menu, false, false},
-    {Str::map_role_quick_menu, InputAction::hotkey_quick_menu, false, false},
+    {Str::map_role_up, InputAction::ui_up, InputAction::count, false, true},
+    {Str::map_role_down, InputAction::ui_down, InputAction::count, false, true},
+    {Str::map_role_left, InputAction::ui_left, InputAction::count, false, true},
+    {Str::map_role_right, InputAction::ui_right, InputAction::count, false, true},
+    {Str::map_role_page_left, InputAction::ui_page_left, InputAction::count, true, false},
+    {Str::map_role_page_right, InputAction::ui_page_right, InputAction::count, true, false},
+    {Str::map_role_accept, InputAction::ui_accept, InputAction::count, false, false},
+    {Str::map_role_back, InputAction::ui_back, InputAction::count, false, false},
+    // The main menu: opens it in the interface, and with HOTKEY ENABLE in a game.
+    {Str::map_role_menu, InputAction::ui_open_menu, InputAction::hotkey_menu, false, false},
+    {Str::map_role_modifier, InputAction::hotkey_enable, InputAction::count, false, false},
+    {Str::map_role_quick_menu, InputAction::hotkey_quick_menu, InputAction::count, false, false},
 };
 constexpr uint32_t ROLE_COUNT = sizeof(ROLES) / sizeof(ROLES[0]);
 
@@ -142,29 +144,34 @@ static void apply_roles(MapWindow* window, const MapWindowContext* context)
                 change.sources[count++] = kept;
             }
         }
-        bool found = false;
-        for (size_t o = 0; o < profile->overrides.size() && !found; o++)
+        InputAction targets[2] = {action, ROLES[r].also};
+        for (uint32_t t = 0; t < 2 && targets[t] != InputAction::count; t++)
         {
-            if (profile->overrides[o].action == action)
+            change.action = targets[t];
+            bool found = false;
+            for (size_t o = 0; o < profile->overrides.size() && !found; o++)
             {
-                profile->overrides[o] = change;
-                found = true;
+                if (profile->overrides[o].action == targets[t])
+                {
+                    profile->overrides[o] = change;
+                    found = true;
+                }
             }
-        }
-        if (!found)
-        {
-            profile->overrides.push_back(change);
-        }
-        for (size_t c = 0; c < input->controllers.size(); c++)
-        {
-            if (input_controller_profile_id(input, static_cast<uint32_t>(c)) != window->guid)
+            if (!found)
             {
-                continue;
+                profile->overrides.push_back(change);
             }
-            input_unbind_all(&input->controllers[c].bindings, action);
-            for (uint32_t s = 0; s < count; s++)
+            for (size_t c = 0; c < input->controllers.size(); c++)
             {
-                input_bind(&input->controllers[c].bindings, action, change.sources[s]);
+                if (input_controller_profile_id(input, static_cast<uint32_t>(c)) != window->guid)
+                {
+                    continue;
+                }
+                input_unbind_all(&input->controllers[c].bindings, targets[t]);
+                for (uint32_t s = 0; s < count; s++)
+                {
+                    input_bind(&input->controllers[c].bindings, targets[t], change.sources[s]);
+                }
             }
         }
     }
@@ -263,10 +270,12 @@ static void draw_offer(MapWindow* window, const MapWindowContext* context)
     {
         ImGui::Spacing();
         wrapped(piccolo_text(strings, Str::map_offer_needed));
-        wrapped(piccolo_text(strings, Str::map_any_button));
     }
+    ImGui::Spacing();
+    wrapped(piccolo_text(strings, Str::map_any_button));
     footer();
-    bool pressed = window->needed && raw_press(window);
+    // Any button on the new controller is MAP, whether SDL knows it or not.
+    bool pressed = raw_press(window);
     if (retro_ui_button(piccolo_text(strings, Str::map_map)) || pressed)
     {
         window->stage = MapStage::appearance;
@@ -368,7 +377,7 @@ static void draw_appearance(MapWindow* window, const MapWindowContext* context, 
     bool pressed = window->needed && raw_press(window);
     if (retro_ui_button(piccolo_text(strings, Str::map_begin)) || pressed)
     {
-        window->stage = MapStage::intro_interface;
+        window->stage = MapStage::intro_buttons;
         window->intro_started_ms = context->now_ms;
     }
     ImGui::SameLine();
@@ -378,24 +387,22 @@ static void draw_appearance(MapWindow* window, const MapWindowContext* context, 
     }
 }
 
-// STEP 1's page: START begins the mapper (the router is suspended from then on).
-static void draw_intro_interface(MapWindow* window, const MapWindowContext* context)
+// STEP 1's page (CONTROLLER BUTTONS): START begins the mapper on its
+// position steps (the router is suspended from then on).
+static void draw_intro_buttons(MapWindow* window, const MapWindowContext* context, float block)
 {
     const Localization* strings = context->strings;
     char text[200] = {};
     retro_ui_separator_text(window->name.c_str());
-    section(piccolo_text(strings, Str::map_step_interface));
-    wrapped(piccolo_text(strings, Str::map_step_interface_text));
-    if (window->needed)
-    {
-        ImGui::Spacing();
-        wrapped(piccolo_text(strings, Str::map_any_button));
-    }
+    section(piccolo_text(strings, Str::map_step_buttons));
+    wrapped(piccolo_text(strings, Str::map_step_buttons_text));
+    ImGui::Spacing();
+    pad_picture_draw(picked_layout(window, context), InputMapControl::count, false, block * 1.5f);
+    wrapped(piccolo_text(strings, Str::map_any_button));
     footer();
     std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_start),
                   seconds_left(context->now_ms, window->intro_started_ms, INTRO_MS));
-    bool pressed = window->needed && raw_press(window);
-    if (retro_ui_button(text) || pressed || context->now_ms - window->intro_started_ms >= INTRO_MS)
+    if (retro_ui_button(text) || raw_press(window) || context->now_ms - window->intro_started_ms >= INTRO_MS)
     {
         const InputLayout* layout = picked_layout(window, context);
         bool wanted[INPUT_MAP_CONTROL_COUNT] = {};
@@ -411,7 +418,7 @@ static void draw_intro_interface(MapWindow* window, const MapWindowContext* cont
         if (input_sdl_mapper_begin(&window->mapper, window->joystick_id, ROLE_COUNT, optional, wanted, context->now_ms))
         {
             window->stage = MapStage::mapping;
-            window->game_intro_done = false;
+            window->interface_intro_done = false;
             context->input->suspended = true;   // its presses are the mapping's alone
         }
         else
@@ -433,14 +440,14 @@ static void draw_intro_interface(MapWindow* window, const MapWindowContext* cont
     }
 }
 
-// STEP 2's page (the mapper waits on the first position step).
-static void draw_intro_game(MapWindow* window, const MapWindowContext* context, float block)
+// STEP 2's page (USER INTERFACE); the mapper waits on the first role.
+static void draw_intro_interface(MapWindow* window, const MapWindowContext* context, float block)
 {
     const Localization* strings = context->strings;
     char text[200] = {};
     retro_ui_separator_text(window->name.c_str());
-    section(piccolo_text(strings, Str::map_step_game));
-    wrapped(piccolo_text(strings, Str::map_step_game_text));
+    section(piccolo_text(strings, Str::map_step_interface));
+    wrapped(piccolo_text(strings, Str::map_step_interface_text));
     ImGui::Spacing();
     pad_picture_draw(picked_layout(window, context), InputMapControl::count, false, block * 1.5f);
     wrapped(piccolo_text(strings, Str::map_any_button));   // the router is suspended: no controller drives the page
@@ -450,14 +457,14 @@ static void draw_intro_game(MapWindow* window, const MapWindowContext* context, 
     if (retro_ui_button(text) || raw_press(window) || context->now_ms - window->intro_started_ms >= INTRO_MS)
     {
         window->stage = MapStage::mapping;
-        window->game_intro_done = true;
+        window->interface_intro_done = true;
         input_sdl_mapper_restart_step(&window->mapper, context->now_ms);
         return;
     }
     ImGui::SameLine();
     if (retro_ui_button(piccolo_text(strings, Str::map_back)))
     {
-        input_sdl_mapper_back(&window->mapper, context->now_ms);   // STEP 1's last control again
+        input_sdl_mapper_back(&window->mapper, context->now_ms);   // STEP 1's last button again
         window->stage = MapStage::mapping;
         return;
     }
@@ -482,28 +489,31 @@ static void draw_mapping(MapWindow* window, const MapWindowContext* context, flo
         return;
     }
     int32_t role = input_sdl_mapper_role(&window->mapper);
-    if (role < 0 && !window->game_intro_done)
+    if (role >= 0 && !window->interface_intro_done)
     {
-        window->stage = MapStage::intro_game;   // STEP 1 is done
+        window->stage = MapStage::intro_interface;   // STEP 1 is done
         window->intro_started_ms = context->now_ms;
         return;
     }
-    if (role >= 0)
+    if (role < 0)
     {
-        window->game_intro_done = false;   // back in STEP 1: STEP 2's page comes again
+        window->interface_intro_done = false;   // back in STEP 1: STEP 2's page comes again
     }
     InputMapControl control = input_sdl_mapper_control(&window->mapper);
     char text[300] = {};
     retro_ui_separator_text(window->name.c_str());
-    section(piccolo_text(strings, role >= 0 ? Str::map_step_interface : Str::map_step_game));
+    section(piccolo_text(strings, role >= 0 ? Str::map_step_interface : Str::map_step_buttons));
     const InputLayout* layout = picked_layout(window, context);
     if (role >= 0)
     {
+        // The pad lights the button held now, as the positions mapped it.
+        InputSource held = input_sdl_mapper_held_source(&window->mapper);
+        pad_picture_draw(layout, input_map_control_for_source(held), held.type == InputSourceType::axis_minus, block * 1.5f);
         std::snprintf(text, sizeof(text), piccolo_text(strings, Str::map_press_for), piccolo_text(strings, ROLES[role].label));
     }
     else
     {
-        pad_picture_draw(layout, control, false, block * 1.5f);   // STEP 1 has no pad: it can't light up what's asked
+        pad_picture_draw(layout, control, false, block * 1.5f);   // the button to press, lit
         const char* label = control_label(layout, strings, control);
         if (input_map_control_is_stick(control))
         {
@@ -576,14 +586,14 @@ void map_window_draw(MapWindow* window, const MapWindowContext* context, ImFont*
         case MapStage::appearance:
             draw_appearance(window, context, block);
             break;
-        case MapStage::intro_interface:
-            draw_intro_interface(window, context);
+        case MapStage::intro_buttons:
+            draw_intro_buttons(window, context, block);
             break;
         case MapStage::mapping:
             draw_mapping(window, context, block);
             break;
-        case MapStage::intro_game:
-            draw_intro_game(window, context, block);
+        case MapStage::intro_interface:
+            draw_intro_interface(window, context, block);
             break;
         case MapStage::closed:
             break;

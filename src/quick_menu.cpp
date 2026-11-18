@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include <SDL3/SDL.h>
 
@@ -286,36 +287,70 @@ static const Str PAD_LABELS[INPUT_PAD_BUTTON_COUNT] = {
     Str::input_action_pad_l2, Str::input_action_pad_r2, Str::input_action_pad_l3, Str::input_action_pad_r3,
 };
 
+// The RetroPad's stick directions, from pad_left_x_plus on.
+static const Str STICK_LABELS[8] = {
+    Str::input_action_left_x_plus,  Str::input_action_left_x_minus,  Str::input_action_left_y_plus,
+    Str::input_action_left_y_minus, Str::input_action_right_x_plus, Str::input_action_right_x_minus,
+    Str::input_action_right_y_plus, Str::input_action_right_y_minus,
+};
+
 struct RemapControl
 {
     InputAction action;
-    const char* label;   // the game's name for it, or the RetroPad's
+    std::string label;   // the game's name for it (a stick's with the direction), or the RetroPad's
 };
 
 // The controls of the port's device, by the game's names: its joypad
-// descriptors (each button once), or the whole RetroPad if it sends none.
+// descriptors (each button once) and analog ones (each stick axis as its two
+// directions: libretro's +Y is down), or the whole RetroPad if it sends none.
 static void remap_controls(const QuickMenuContext* context, uint32_t port, std::vector<RemapControl>* controls)
 {
     controls->clear();
     const LibretroHost* host = context->host;
+    const Localization* strings = context->strings;
     bool seen[INPUT_PAD_BUTTON_COUNT] = {};
+    bool seen_axis[2][2] = {};   // [left / right stick][x / y]
+    uint32_t first_stick = static_cast<uint32_t>(InputAction::pad_left_x_plus);
     for (uint32_t d = 0; host != nullptr && d < host->input_info.descriptor_count; d++)
     {
         const LibretroInputDescriptor* descriptor = &host->input_info.descriptors[d];
-        if (descriptor->port != port || (descriptor->device & RETRO_DEVICE_MASK) != RETRO_DEVICE_JOYPAD ||
-            descriptor->id >= INPUT_PAD_BUTTON_COUNT || seen[descriptor->id])
+        if (descriptor->port != port)
         {
             continue;
         }
-        seen[descriptor->id] = true;
-        RemapControl control = {static_cast<InputAction>(descriptor->id), descriptor->description};
-        controls->push_back(control);
+        unsigned device = descriptor->device & RETRO_DEVICE_MASK;
+        if (device == RETRO_DEVICE_JOYPAD && descriptor->id < INPUT_PAD_BUTTON_COUNT && !seen[descriptor->id])
+        {
+            seen[descriptor->id] = true;
+            RemapControl control = {static_cast<InputAction>(descriptor->id), descriptor->description};
+            controls->push_back(control);
+        }
+        else if (device == RETRO_DEVICE_ANALOG && descriptor->index <= RETRO_DEVICE_INDEX_ANALOG_RIGHT &&
+                 descriptor->id <= RETRO_DEVICE_ID_ANALOG_Y && !seen_axis[descriptor->index][descriptor->id])
+        {
+            seen_axis[descriptor->index][descriptor->id] = true;
+            bool x = descriptor->id == RETRO_DEVICE_ID_ANALOG_X;
+            uint32_t plus = first_stick + descriptor->index * 4 + descriptor->id * 2;
+            RemapControl positive = {static_cast<InputAction>(plus),
+                                     std::string(descriptor->description) + " " +
+                                         piccolo_text(strings, x ? Str::input_action_pad_right : Str::input_action_pad_down)};
+            RemapControl negative = {static_cast<InputAction>(plus + 1),
+                                     std::string(descriptor->description) + " " +
+                                         piccolo_text(strings, x ? Str::input_action_pad_left : Str::input_action_pad_up)};
+            controls->push_back(positive);
+            controls->push_back(negative);
+        }
     }
     if (controls->empty())
     {
         for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
         {
-            RemapControl control = {static_cast<InputAction>(b), piccolo_text(context->strings, PAD_LABELS[b])};
+            RemapControl control = {static_cast<InputAction>(b), piccolo_text(strings, PAD_LABELS[b])};
+            controls->push_back(control);
+        }
+        for (uint32_t s = 0; s < 8; s++)
+        {
+            RemapControl control = {static_cast<InputAction>(first_stick + s), piccolo_text(strings, STICK_LABELS[s])};
             controls->push_back(control);
         }
     }
@@ -410,7 +445,7 @@ static void remap_run_capture(QuickMenu* menu, const QuickMenuContext* context, 
     }
 }
 
-// DEVICE n [ SNES Joypad v ]: what the core emulates on the port, from its
+// CORE DEVICE n [ SNES Joypad v ]: what the core has on the port, from its
 // own list (only shown when it lists more than one). Applied at once and
 // kept per core.
 static void draw_device_combo(const QuickMenuContext* context, uint32_t p, float label_width)
@@ -428,8 +463,12 @@ static void draw_device_combo(const QuickMenuContext* context, uint32_t p, float
     }
     ImGui::PushID(static_cast<int>(100 + p));
     ImGui::AlignTextToFramePadding();
-    ImGui::Text("%s %u", piccolo_text(strings, Str::quick_menu_device), static_cast<unsigned>(p + 1));
-    ImGui::SameLine(label_width);
+    char label[96] = {};
+    std::snprintf(label, sizeof(label), "%s %u", piccolo_text(strings, Str::quick_menu_device), static_cast<unsigned>(p + 1));
+    ImGui::TextUnformatted(label);
+    // At least `label_width`, wider if the label (in this language) needs it.
+    float needed = ImGui::CalcTextSize(label).x + ImGui::GetStyle().ItemSpacing.x * 2.0f + ImGui::GetStyle().WindowPadding.x;
+    ImGui::SameLine(needed > label_width ? needed : label_width);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
     const char* current = libretro_input_controller_name(&host->input_info, p, host->port_devices[p]);
     if (retro_ui_begin_combo("##device", current != nullptr ? current : "?"))
@@ -468,12 +507,11 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     remap_controls(context, menu->remap_port, &controls);
     remap_run_capture(menu, context, controls);
 
-    // <controller>: <device> ON PORT n
+    // <controller> -> <core device> MAPPING: what the controller is mapped to, not what it is.
     const char* device = libretro_input_controller_name(&host->input_info, menu->remap_port, host->port_devices[menu->remap_port]);
     char title[300] = {};
     std::snprintf(title, sizeof(title), piccolo_text(strings, Str::remap_title),
-                  input->controllers[menu->remap_controller].name.c_str(), device != nullptr ? device : "RETROPAD",
-                  static_cast<int>(menu->remap_port + 1));
+                  input->controllers[menu->remap_controller].name.c_str(), device != nullptr ? device : "RETROPAD");
     ImGui::BeginDisabled(menu->capturing);
     bool back = retro_ui_button(piccolo_text(strings, Str::map_back));
     ImGui::EndDisabled();
@@ -484,7 +522,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     }
     retro_ui_separator_text(title);
     ImGui::BeginDisabled(menu->capturing);
-    draw_device_combo(context, menu->remap_port, 80.0f * block);
+    draw_device_combo(context, menu->remap_port, 100.0f * block);
     ImGui::EndDisabled();
 
     ImGui::BeginDisabled(menu->capturing);
@@ -517,25 +555,25 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     InputBindingSet effective = {};
     input_effective_bindings(input, menu->remap_controller, menu->remap_port, &effective);
     const InputDevice* pad = input_devices_find_const(&input->devices, input->controllers[menu->remap_controller].device_id);
-    if (pad != nullptr && pad->kind == InputDeviceKind::gamepad)
+    // A gamepad's pad, on the right of the rows, with where the control being
+    // bound (or the row in focus) is now.
+    bool show_pad = pad != nullptr && pad->kind == InputDeviceKind::gamepad;
+    InputAction shown = menu->capturing ? menu->capture_action : menu->pad_action;
+    InputMapControl lit = InputMapControl::count;
+    bool minus = false;
+    uint32_t shown_index = static_cast<uint32_t>(shown);
+    for (uint32_t s = 0; shown_index < INPUT_ACTION_COUNT && s < INPUT_SOURCES_PER_ACTION && lit == InputMapControl::count; s++)
     {
-        // The pad, with where the control being bound (or the row in focus) is now.
-        InputAction shown = menu->capturing ? menu->capture_action : menu->pad_action;
-        InputMapControl lit = InputMapControl::count;
-        bool minus = false;
-        uint32_t shown_index = static_cast<uint32_t>(shown);
-        for (uint32_t s = 0; shown_index < INPUT_ACTION_COUNT && s < INPUT_SOURCES_PER_ACTION && lit == InputMapControl::count; s++)
-        {
-            InputSource source = effective.sources[shown_index][s];
-            lit = input_map_control_for_source(source);
-            minus = source.type == InputSourceType::axis_minus;
-        }
-        pad_picture_draw(input_window_layout(input, context->layouts, pad), lit, minus, block);
+        InputSource source = effective.sources[shown_index][s];
+        lit = input_map_control_for_source(source);
+        minus = source.type == InputSourceType::axis_minus;
     }
     menu->pad_action = InputAction::count;
+    float pad_unit = 0.8f * block;
+    float pad_width = show_pad ? 100.0f * pad_unit + ImGui::GetStyle().ItemSpacing.x : 0.0f;
     float label_width = 110.0f * block;
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-    ImGui::BeginChild("remap_rows", ImVec2(0.0f, 0.0f));
+    ImGui::BeginChild("remap_rows", ImVec2(show_pad ? -pad_width : 0.0f, 0.0f));
     for (size_t i = 0; i < controls.size(); i++)
     {
         uint32_t index = static_cast<uint32_t>(controls[i].action);
@@ -546,7 +584,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         {
             retro_ui_push_section_text();   // the one being bound stands out
         }
-        ImGui::TextUnformatted(controls[i].label);
+        ImGui::TextUnformatted(controls[i].label.c_str());
         if (waiting)
         {
             retro_ui_pop_section_text();
@@ -574,7 +612,10 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
             menu->bind_all = false;
             remap_start_capture(menu, context, controls[i].action);
         }
-        if (ImGui::IsItemFocused() || ImGui::IsItemHovered())
+        // The pad shows the row under the mouse, or the one in focus while
+        // navigating with a gamepad or keys (a click also focuses, but that
+        // focus shouldn't keep the row lit once its SET is over).
+        if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
         {
             menu->pad_action = controls[i].action;   // the pad shows it on the next frame
         }
@@ -583,6 +624,13 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
+    if (show_pad)
+    {
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        pad_picture_draw(input_window_layout(input, context->layouts, pad), lit, minus, pad_unit);
+        ImGui::EndGroup();
+    }
 }
 
 // CONTROLS: the ports, who is on each (the keyboard too, when it shares
@@ -598,6 +646,8 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     const Localization* strings = context->strings;
     float label_width = 60.0f * block;
     bool anybody = false;
+    // PORTS: who plays where (the physical controllers).
+    retro_ui_separator_text(piccolo_text(strings, Str::quick_menu_ports));
     for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
     {
         ImGui::PushID(static_cast<int>(p));
@@ -681,10 +731,21 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         }
         ImGui::PopID();
     }
-    // DEVICE per port: what the core emulates there (only ports it describes).
-    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    // CORE DEVICES: what the core has on each port (only ports where it offers a choice).
+    const LibretroHost* host = context->host;
+    bool any_choice = false;
+    for (uint32_t p = 0; host != nullptr && host->game_loaded && p < host->input_info.port_count && p < INPUT_PORT_COUNT; p++)
     {
-        draw_device_combo(context, p, label_width + 20.0f * block);
+        any_choice = any_choice || host->input_info.ports[p].count >= 2;
+    }
+    if (any_choice)
+    {
+        ImGui::Spacing();
+        retro_ui_separator_text(piccolo_text(strings, Str::quick_menu_core_devices));
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            draw_device_combo(context, p, label_width + 40.0f * block);
+        }
     }
 
     if (!anybody && !input->settings.keyboard_shares_port1)

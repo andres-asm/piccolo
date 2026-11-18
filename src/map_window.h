@@ -6,23 +6,27 @@
 // a small wizard (its buttons always at the bottom):
 //
 //   OFFER        NEW CONTROLLER DETECTED the first time one is used (or
-//                when SDL doesn't know it): MAP / NOT NOW (30 s, then NOT NOW).
+//                when SDL doesn't know it): MAP (or any button on it) / NOT NOW
+//                (15 s, then NOT NOW).
 //   APPEARANCE   SELECT CONTROLLER TYPE: LABELS and LAYOUT, two linked lists
 //                of the layouts (layouts/<Labels>/<layout>.cfg), preselected
 //                from SDL's type: they give the names of the buttons and which
 //                ones it has. Also its HOTKEY MODE (HOLD by default).
-//   STEP 1       USER INTERFACE: what comes, then START (by itself after
-//                10 s); the button for each of its controls (navigate, pages,
-//                accept, back, HOTKEY ENABLE, main menu, quick menu),
-//                wherever it is. No pad drawn: it can't light up the button.
-//   STEP 2       GAME: the same, with the pad; then the drawn pad with the
-//                button to press lit; PRESS <its name>; the optional ones
-//                skip after 5 s; BACK / SKIP / CANCEL.
+//   STEP 1       CONTROLLER BUTTONS: what comes, with the pad, then START
+//                (by itself after 10 s, or any button on it); then the drawn
+//                pad with the button to press lit; PRESS <its name>; the
+//                optional ones skip after 5 s; BACK / SKIP / CANCEL. This is
+//                the SDL mapping: where each button is.
+//   STEP 2       USER INTERFACE: what comes, then START (the same way); the
+//                button for each of its controls (navigate, pages, accept,
+//                back, main menu, HOTKEY ENABLE, quick menu), wherever it is,
+//                but only one STEP 1 mapped; the drawn pad lights the one
+//                held. MAIN MENU also becomes HOTKEY ENABLE + that button.
 //
-// A controller SDL doesn't know can't drive the interface: on its pages
-// (OFFER, the type, STEP 1's) any button on it is the main button. On
-// STEP 2's page any button on it is START for every controller (the router
-// is suspended by then).
+// A controller SDL doesn't know can't drive the interface: on the type's page
+// any button on it is the main button; on OFFER and both steps' pages any
+// button on the controller being mapped is the main button, for every
+// controller.
 //
 // The result is an SDL mapping for the controller's GUID and its appearance,
 // both in its profile (input.cfg), with the interface's buttons as changes to its bindings
@@ -45,9 +49,9 @@ enum class MapStage
     closed,
     offer,
     appearance,
-    intro_interface,   // STEP 1's page, before its presses
+    intro_buttons,     // STEP 1's page, before its presses
     mapping,           // STEP 1's presses, then STEP 2's
-    intro_game,        // STEP 2's page (the mapper waits meanwhile)
+    intro_interface,   // STEP 2's page (the mapper waits meanwhile)
 };
 
 struct MapWindow
@@ -62,7 +66,7 @@ struct MapWindow
     uint64_t       offer_started_ms = 0;
     uint64_t       intro_started_ms = 0;
     bool           offered = false;          // came as NEW CONTROLLER DETECTED (else MAP CONTROLLER, from DEVICES)
-    bool           game_intro_done = false;  // STEP 2's page was shown
+    bool           interface_intro_done = false;  // STEP 2's page was shown
     InputSdlMapper mapper;
     InputSdlPress  press;                    // any button on it: the page's main button (it can't drive the interface)
     MapStage       press_stage = MapStage::closed;   // the page `press` last looked from (a new page waits for a release)
