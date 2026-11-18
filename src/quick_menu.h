@@ -72,6 +72,20 @@ struct QuickMenu
     std::string   combo_edit_id;        // "" = a new one
     char          combo_edit_name[64] = {};
     uint16_t      combo_edit_buttons = 0;
+    // MACROS: the same, in their own modal, and its recorder.
+    bool          macro_editing = false;
+    std::string   macro_edit_id;        // "" = a new one
+    char          macro_edit_name[64] = {};
+    std::vector<InputMacroStep> macro_edit_steps;
+    bool          macro_edit_repeat = false;
+    int32_t       macro_edit_selected = -1;   // the step whose buttons are shown (-1 none)
+    int32_t       macro_change_steps = 3;     // CHANGE STEPS TO
+    int32_t       macro_change_pauses = 3;    // CHANGE PAUSES TO
+    int32_t       macro_record = 0;           // 0 off, 1 getting ready, 2 recording (the router suspended)
+    uint64_t      macro_record_ms = 0;        // when getting ready began, then the last change
+    bool          macro_record_seen = false;  // the modal looked at the recording this frame (else it's dropped)
+    std::vector<uint64_t> macro_record_times;   // a change of the RetroPad buttons: when...
+    std::vector<uint16_t> macro_record_buttons; // ...and to what
     bool          input_dirty = false;
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]

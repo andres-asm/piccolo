@@ -1762,6 +1762,82 @@ msgctxt "remap_combo_delete_help"
 msgid "Deletes the combo from this core, and from every remap that binds it."
 msgstr "Borra el combo de este core y de todos los remapeos que lo usan."
 
+msgctxt "remap_macros"
+msgid "MACROS"
+msgstr "MACROS"
+
+msgctxt "remap_macros_help"
+msgid "Button sequences played by one input (a special move). Kept per core: every game of this core can bind them."
+msgstr "Secuencias de botones que se reproducen con una sola entrada (un movimiento especial). Se guardan por core: todos los juegos de este core pueden asignarlas."
+
+msgctxt "remap_macro_new"
+msgid "+ NEW MACRO"
+msgstr "+ NUEVA MACRO"
+
+msgctxt "remap_macro_repeat"
+msgid "REPEAT WHILE HELD"
+msgstr "REPETIR MIENTRAS SE SOSTIENE"
+
+msgctxt "remap_macro_repeat_help"
+msgid "On: it plays again and again while its input is held, each time to the end. Off: once per press."
+msgstr "Activado: se repite mientras se sostiene su entrada, cada vez hasta el final. Apagado: una vez por pulsación."
+
+msgctxt "remap_macro_steps"
+msgid "STEPS"
+msgstr "PASOS"
+
+msgctxt "remap_macro_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
+msgctxt "remap_macro_frames_help"
+msgid "How long this step lasts, in frames (60 is about a second in most games)."
+msgstr "Cuánto dura este paso, en frames (60 es alrededor de un segundo en la mayoría de los juegos)."
+
+msgctxt "remap_macro_add_step"
+msgid "+ STEP"
+msgstr "+ PASO"
+
+msgctxt "remap_macro_add_pause"
+msgid "+ PAUSE"
+msgstr "+ PAUSA"
+
+msgctxt "remap_macro_record"
+msgid "RECORD"
+msgstr "GRABAR"
+
+msgctxt "remap_macro_record_help"
+msgid "Play the sequence on the controller after GET READY: it is recorded as steps (it ends a second after you let go). It replaces the steps."
+msgstr "Toca la secuencia en el control después de PREPÁRATE: se graba como pasos (termina un segundo después de soltar). Reemplaza los pasos."
+
+msgctxt "remap_macro_get_ready"
+msgid "GET READY"
+msgstr "PREPÁRATE"
+
+msgctxt "remap_macro_recording"
+msgid "RECORDING: PLAY THE SEQUENCE"
+msgstr "GRABANDO: TOCA LA SECUENCIA"
+
+msgctxt "remap_macro_stop"
+msgid "STOP"
+msgstr "PARAR"
+
+msgctxt "remap_macro_change_steps"
+msgid "CHANGE STEPS TO"
+msgstr "CAMBIAR PASOS A"
+
+msgctxt "remap_macro_change_pauses"
+msgid "CHANGE PAUSES TO"
+msgstr "CAMBIAR PAUSAS A"
+
+msgctxt "remap_macro_apply"
+msgid "APPLY"
+msgstr "APLICAR"
+
+msgctxt "remap_macro_delete_help"
+msgid "Deletes the macro from this core, and from every remap that binds it."
+msgstr "Borra la macro de este core y de todos los remapeos que la usan."
+
 msgctxt "remap_prompt"
 msgid "%s ON PORT %d (%s): HOLD START TO REMAP (%d)"
 msgstr "%s EN EL PUERTO %d (%s): MANTÉN START PARA REMAPEAR (%d)"

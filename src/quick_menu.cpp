@@ -51,6 +51,7 @@ void quick_menu_open(QuickMenu* menu, uint32_t slot)
     menu->bind_all = false;
     menu->pad_action = InputAction::count;
     menu->combo_editing = false;
+    menu->macro_editing = false;
     menu->open = true;
     menu->slot = slot >= LIBRETRO_STATE_SLOT_FIRST && slot <= LIBRETRO_STATE_SLOT_LAST ? slot : LIBRETRO_STATE_SLOT_FIRST;
     menu->refresh = true;
@@ -800,17 +801,455 @@ static void draw_combo_modal(QuickMenu* menu, const QuickMenuContext* context, c
     }
 }
 
-// COMBOS: the core's combos, each bound to inputs in this remap like a
-// control (+ / SET / CLEAR), EDIT to change it; + NEW COMBO.
-static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+// A macro as shown: its name, else its steps ("DOWN, DOWN + RIGHT, RIGHT + A").
+static std::string macro_label(const InputMacro* macro, const Localization* strings)
+{
+    if (!macro->name.empty())
+    {
+        return macro->name;
+    }
+    std::string text;
+    for (size_t s = 0; s < macro->steps.size(); s++)
+    {
+        if (macro->steps[s].buttons == 0)
+        {
+            continue;
+        }
+        std::string step;
+        for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
+        {
+            if ((macro->steps[s].buttons & (1u << b)) != 0)
+            {
+                step += step.empty() ? "" : " + ";
+                step += piccolo_text(strings, PAD_LABELS[b]);
+            }
+        }
+        text += text.empty() ? "" : ", ";
+        text += step;
+    }
+    return text;
+}
+
+static void open_macro_editor(QuickMenu* menu, const InputMacro* macro)
+{
+    menu->macro_editing = true;
+    menu->macro_edit_id = macro != nullptr ? macro->id : std::string();
+    std::snprintf(menu->macro_edit_name, sizeof(menu->macro_edit_name), "%s", macro != nullptr ? macro->name.c_str() : "");
+    menu->macro_edit_steps = macro != nullptr ? macro->steps : std::vector<InputMacroStep>();
+    menu->macro_edit_repeat = macro != nullptr && macro->repeat;
+    menu->macro_edit_selected = -1;
+}
+
+constexpr uint64_t MACRO_GET_READY_MS = 3000;
+constexpr uint64_t MACRO_IDLE_STOP_MS = 1000;   // nothing held this long after a press: done
+constexpr uint64_t MACRO_RECORD_MAX_MS = 10000;
+constexpr uint16_t MACRO_FRAMES_MAX = 9999;
+
+// The recording as steps (frames at the core's rate), replacing the macro's.
+static void macro_record_finish(QuickMenu* menu, const QuickMenuContext* context, uint64_t now_ms)
+{
+    menu->macro_record = 0;
+    context->input->suspended = false;
+    std::vector<uint64_t>* times = &menu->macro_record_times;
+    std::vector<uint16_t>* buttons = &menu->macro_record_buttons;
+    if (times->empty())
+    {
+        return;   // nothing was pressed
+    }
+    times->push_back(now_ms);   // the end of the last change
+    buttons->push_back(0);
+    double fps = context->host != nullptr && context->host->av_info.timing.fps > 1.0 ? context->host->av_info.timing.fps : 60.0;
+    std::vector<InputMacroStep> steps;
+    for (size_t i = 0; i + 1 < times->size(); i++)
+    {
+        uint64_t from = static_cast<uint64_t>(static_cast<double>((*times)[i] - (*times)[0]) * fps / 1000.0 + 0.5);
+        uint64_t to = static_cast<uint64_t>(static_cast<double>((*times)[i + 1] - (*times)[0]) * fps / 1000.0 + 0.5);
+        if (to <= from)
+        {
+            continue;   // shorter than a frame
+        }
+        uint64_t frames = to - from;
+        if (!steps.empty() && steps.back().buttons == (*buttons)[i])
+        {
+            frames += steps.back().frames;
+            steps.pop_back();
+        }
+        InputMacroStep step = {};
+        step.buttons = (*buttons)[i];
+        step.frames = static_cast<uint16_t>(frames < MACRO_FRAMES_MAX ? frames : MACRO_FRAMES_MAX);
+        steps.push_back(step);
+    }
+    while (!steps.empty() && steps.back().buttons == 0)
+    {
+        steps.pop_back();   // the wait at the end
+    }
+    menu->macro_edit_steps = steps;
+    menu->macro_edit_selected = -1;
+}
+
+static void macro_record_cancel(QuickMenu* menu, const QuickMenuContext* context)
+{
+    if (menu->macro_record != 0)
+    {
+        menu->macro_record = 0;
+        context->input->suspended = false;
+    }
+}
+
+// The recorder, a frame: GET READY (the router suspended, so the presses
+// only go here), then the controller's RetroPad changes until it rests.
+static void macro_record_run(QuickMenu* menu, const QuickMenuContext* context)
+{
+    if (menu->macro_record == 0)
+    {
+        return;
+    }
+    menu->macro_record_seen = true;
+    uint64_t now = context->now_ms;
+    if (menu->macro_record == 1)
+    {
+        if (now - menu->macro_record_ms >= MACRO_GET_READY_MS)
+        {
+            menu->macro_record = 2;
+            menu->macro_record_ms = now;
+        }
+        return;
+    }
+    uint16_t held = input_controller_pad_buttons(context->input, menu->remap_controller, menu->remap_port);
+    uint16_t last = menu->macro_record_buttons.empty() ? 0 : menu->macro_record_buttons.back();
+    if (held != last)
+    {
+        menu->macro_record_times.push_back(now);   // (the first press starts it)
+        menu->macro_record_buttons.push_back(held);
+        menu->macro_record_ms = now;
+    }
+    bool started = !menu->macro_record_times.empty();
+    if ((started && held == 0 && now - menu->macro_record_ms >= MACRO_IDLE_STOP_MS) ||
+        (started && now - menu->macro_record_times[0] >= MACRO_RECORD_MAX_MS) ||
+        (!started && now - menu->macro_record_ms >= MACRO_RECORD_MAX_MS))
+    {
+        macro_record_finish(menu, context, held == 0 ? menu->macro_record_ms : now);
+    }
+}
+
+// A frame count field (1 .. 9999).
+static bool frames_field(const char* id, int32_t* value, float width)
+{
+    ImGui::SetNextItemWidth(width);
+    retro_ui_push_field_text();
+    bool changed = ImGui::InputInt(id, value, 1, 10);
+    retro_ui_pop_field_text();
+    *value = *value < 1 ? 1 : (*value > MACRO_FRAMES_MAX ? MACRO_FRAMES_MAX : *value);
+    return changed;
+}
+
+// Making or changing a macro (in its modal): NAME, REPEAT WHILE HELD, its
+// steps (frames, EDIT for its buttons, move, remove), + STEP, + PAUSE,
+// RECORD, CHANGE STEPS / PAUSES TO.
+static void draw_macro_editor(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+                              float label_width)
+{
+    InputSystem* input = context->input;
+    const Localization* strings = context->strings;
+    std::vector<InputMacroStep>* steps = &menu->macro_edit_steps;
+    float frames_width = ImGui::CalcTextSize("9999").x + ImGui::GetFrameHeight() * 2.0f + ImGui::GetStyle().FramePadding.x * 4.0f;
+    macro_record_run(menu, context);
+    if (menu->macro_record != 0)
+    {
+        // Recording: only what it's doing, and STOP.
+        char text[160] = {};
+        if (menu->macro_record == 1)
+        {
+            uint64_t left = (MACRO_GET_READY_MS - (context->now_ms - menu->macro_record_ms) + 999) / 1000;
+            std::snprintf(text, sizeof(text), "%s %u", piccolo_text(strings, Str::remap_macro_get_ready), static_cast<unsigned>(left));
+        }
+        else
+        {
+            std::snprintf(text, sizeof(text), "%s (%s)", piccolo_text(strings, Str::remap_macro_recording),
+                          input->controllers[menu->remap_controller].name.c_str());
+        }
+        retro_ui_push_section_text();
+        ImGui::TextUnformatted(text);
+        retro_ui_pop_section_text();
+        if (retro_ui_button(piccolo_text(strings, Str::remap_macro_stop)))
+        {
+            if (menu->macro_record == 2)
+            {
+                macro_record_finish(menu, context, context->now_ms);
+            }
+            else
+            {
+                macro_record_cancel(menu, context);
+            }
+        }
+        return;
+    }
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::remap_combo_name));
+    ImGui::SameLine(label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##macro_name", piccolo_text(strings, Str::remap_combo_name_hint), menu->macro_edit_name,
+                             sizeof(menu->macro_edit_name));
+    retro_ui_pop_field_text();
+    retro_ui_checkbox(piccolo_text(strings, Str::remap_macro_repeat), &menu->macro_edit_repeat);
+    retro_ui_item_tooltip(piccolo_text(strings, Str::remap_macro_repeat_help));
+
+    retro_ui_separator_text(piccolo_text(strings, Str::remap_macro_steps));
+    const char* edit = piccolo_text(strings, Str::remap_combo_edit);
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float row_buttons = frames_width + ImGui::CalcTextSize(edit).x + ImGui::CalcTextSize("X").x + padding * 2.0f +
+                        ImGui::GetFrameHeight() * 2.0f + spacing * 4.0f;
+    int32_t remove = -1;
+    int32_t move_from = -1;
+    int32_t move_to = -1;
+    for (size_t i = 0; i < steps->size(); i++)
+    {
+        InputMacroStep* step = &(*steps)[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::AlignTextToFramePadding();
+        std::string text;
+        for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
+        {
+            if ((step->buttons & (1u << b)) != 0)
+            {
+                text += text.empty() ? "" : " + ";
+                text += piccolo_text(strings, PAD_LABELS[b]);
+            }
+        }
+        bool selected = menu->macro_edit_selected == static_cast<int32_t>(i);
+        if (selected)
+        {
+            retro_ui_push_section_text();
+        }
+        ImGui::Text("%u  %s", static_cast<unsigned>(i + 1), text.empty() ? piccolo_text(strings, Str::remap_macro_pause) : text.c_str());
+        if (selected)
+        {
+            retro_ui_pop_section_text();
+        }
+        float x = ImGui::GetWindowContentRegionMax().x - row_buttons;
+        ImGui::SameLine(x > ImGui::GetCursorPosX() ? x : 0.0f);
+        int32_t frames = step->frames;
+        frames_field("##frames", &frames, frames_width);
+        retro_ui_item_tooltip(piccolo_text(strings, Str::remap_macro_frames_help));
+        step->frames = static_cast<uint16_t>(frames);
+        ImGui::SameLine();
+        if (retro_ui_button(edit))
+        {
+            menu->macro_edit_selected = selected ? -1 : static_cast<int32_t>(i);
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(i == 0);
+        if (ImGui::ArrowButton("##up", ImGuiDir_Up))
+        {
+            move_from = static_cast<int32_t>(i);
+            move_to = static_cast<int32_t>(i) - 1;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(i + 1 >= steps->size());
+        if (ImGui::ArrowButton("##down", ImGuiDir_Down))
+        {
+            move_from = static_cast<int32_t>(i);
+            move_to = static_cast<int32_t>(i) + 1;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (retro_ui_button("X"))
+        {
+            remove = static_cast<int32_t>(i);
+        }
+        if (selected)
+        {
+            // Its buttons (the game's names), indented under it.
+            ImGui::Indent(label_width * 0.5f);
+            for (uint32_t b = 0; b < INPUT_PAD_BUTTON_COUNT; b++)
+            {
+                ImGui::PushID(static_cast<int>(100 + b));
+                bool on = (step->buttons & (1u << b)) != 0;
+                if (retro_ui_checkbox(button_label(b, controls, strings).c_str(), &on))
+                {
+                    step->buttons = static_cast<uint16_t>(on ? (step->buttons | (1u << b)) : (step->buttons & ~(1u << b)));
+                }
+                ImGui::PopID();
+            }
+            ImGui::Unindent(label_width * 0.5f);
+        }
+        ImGui::PopID();
+    }
+    if (move_from >= 0)
+    {
+        InputMacroStep moved = (*steps)[static_cast<size_t>(move_from)];
+        (*steps)[static_cast<size_t>(move_from)] = (*steps)[static_cast<size_t>(move_to)];
+        (*steps)[static_cast<size_t>(move_to)] = moved;
+        if (menu->macro_edit_selected == move_from)
+        {
+            menu->macro_edit_selected = move_to;
+        }
+        else if (menu->macro_edit_selected == move_to)
+        {
+            menu->macro_edit_selected = move_from;
+        }
+    }
+    if (remove >= 0)
+    {
+        steps->erase(steps->begin() + remove);
+        menu->macro_edit_selected = menu->macro_edit_selected == remove ? -1
+                                    : menu->macro_edit_selected > remove ? menu->macro_edit_selected - 1
+                                                                          : menu->macro_edit_selected;
+    }
+    if (retro_ui_button(piccolo_text(strings, Str::remap_macro_add_step)))
+    {
+        InputMacroStep step = {};
+        step.frames = static_cast<uint16_t>(menu->macro_change_steps);
+        steps->push_back(step);
+        menu->macro_edit_selected = static_cast<int32_t>(steps->size() - 1);   // its buttons next
+    }
+    ImGui::SameLine();
+    if (retro_ui_button(piccolo_text(strings, Str::remap_macro_add_pause)))
+    {
+        InputMacroStep pause = {};
+        pause.frames = static_cast<uint16_t>(menu->macro_change_pauses);
+        steps->push_back(pause);
+    }
+    ImGui::SameLine();
+    if (retro_ui_button(piccolo_text(strings, Str::remap_macro_record)))
+    {
+        menu->macro_record = 1;
+        menu->macro_record_ms = context->now_ms;
+        menu->macro_record_seen = true;
+        menu->macro_record_times.clear();
+        menu->macro_record_buttons.clear();
+        input->suspended = true;
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, Str::remap_macro_record_help));
+
+    // Every step, or every pause, to one length.
+    const char* apply = piccolo_text(strings, Str::remap_macro_apply);
+    for (int kind = 0; kind < 2; kind++)
+    {
+        ImGui::PushID(200 + kind);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(piccolo_text(strings, kind == 0 ? Str::remap_macro_change_steps : Str::remap_macro_change_pauses));
+        ImGui::SameLine(label_width * 1.6f);
+        int32_t* value = kind == 0 ? &menu->macro_change_steps : &menu->macro_change_pauses;
+        frames_field("##to", value, frames_width);
+        ImGui::SameLine();
+        if (retro_ui_button(apply))
+        {
+            for (size_t i = 0; i < steps->size(); i++)
+            {
+                bool pause = (*steps)[i].buttons == 0;
+                if (pause == (kind == 1))
+                {
+                    (*steps)[i].frames = static_cast<uint16_t>(*value);
+                }
+            }
+        }
+        ImGui::PopID();
+    }
+
+    ImGui::Spacing();
+    bool playable = false;
+    for (size_t i = 0; i < steps->size(); i++)
+    {
+        playable = playable || (*steps)[i].buttons != 0;
+    }
+    ImGui::BeginDisabled(!playable);
+    if (retro_ui_button(piccolo_text(strings, Str::remap_combo_save)))
+    {
+        std::string name = menu->macro_edit_name;
+        size_t first = name.find_first_not_of(' ');
+        size_t last = name.find_last_not_of(' ');
+        name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
+        InputMacro* macro = nullptr;
+        for (size_t m = 0; m < input->macros.size() && !menu->macro_edit_id.empty(); m++)
+        {
+            if (input->macros[m].core == input->core_name && input->macros[m].id == menu->macro_edit_id)
+            {
+                macro = &input->macros[m];
+            }
+        }
+        if (macro == nullptr)
+        {
+            macro = input_macro_add(input, input->core_name.c_str(), name);
+        }
+        macro->name = name;
+        macro->steps = *steps;
+        macro->repeat = menu->macro_edit_repeat;
+        menu->macro_editing = false;
+        menu->input_dirty = true;
+    }
+    ImGui::EndDisabled();
+    if (!menu->macro_edit_id.empty())
+    {
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::remap_combo_delete)))
+        {
+            input_macro_remove(input, input->core_name.c_str(), menu->macro_edit_id);
+            menu->macro_editing = false;
+            menu->input_dirty = true;
+        }
+        retro_ui_item_tooltip(piccolo_text(strings, Str::remap_macro_delete_help));
+    }
+    ImGui::SameLine();
+    if (retro_ui_button(piccolo_text(strings, Str::map_cancel)))
+    {
+        menu->macro_editing = false;
+    }
+}
+
+// The macro editor as a modal (B / Escape = CANCEL; while recording, it stops that only).
+static void draw_macro_modal(QuickMenu* menu, const QuickMenuContext* context, const std::vector<RemapControl>& controls,
+                             float label_width)
+{
+    char title[128] = {};
+    std::snprintf(title, sizeof(title), "%s###macro_editor", piccolo_text(context->strings, Str::remap_macros));
+    if (menu->macro_editing && !ImGui::IsPopupOpen(title))
+    {
+        ImGui::OpenPopup(title);
+    }
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.55f)), 0.0f), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+    {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+        {
+            if (menu->macro_record != 0)
+            {
+                macro_record_cancel(menu, context);
+            }
+            else
+            {
+                menu->macro_editing = false;
+            }
+        }
+        else
+        {
+            draw_macro_editor(menu, context, controls, label_width);
+        }
+        if (!menu->macro_editing)
+        {
+            macro_record_cancel(menu, context);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+}
+
+// COMBOS / MACROS (`macros`): the core's, each bound to inputs in this
+// remap like a control (+ / SET / CLEAR), EDIT to change it; + NEW.
+static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, bool macros, const std::vector<RemapControl>& controls,
                             const InputDevice* pad, const InputLayout* pad_layout, const InputProfile* pad_profile,
                             float label_width)
 {
     InputSystem* input = context->input;
     const Localization* strings = context->strings;
     ImGui::Spacing();
-    retro_ui_separator_text(piccolo_text(strings, Str::remap_combos));
-    retro_ui_item_tooltip(piccolo_text(strings, Str::remap_combos_help));
+    retro_ui_separator_text(piccolo_text(strings, macros ? Str::remap_macros : Str::remap_combos));
+    retro_ui_item_tooltip(piccolo_text(strings, macros ? Str::remap_macros_help : Str::remap_combos_help));
     const InputCoreProfile* active = input_active_core_profile(input, menu->remap_controller, menu->remap_port);
     const char* set = piccolo_text(strings, Str::input_set);
     const char* clear = piccolo_text(strings, Str::input_clear);
@@ -822,32 +1261,41 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
     float first_buttons = row_buttons + ImGui::CalcTextSize(add).x + ImGui::CalcTextSize(edit).x + padding * 2.0f + spacing * 2.0f;
     // (A copy of the ids: EDIT > DELETE changes the list.)
     std::vector<std::string> ids;
-    for (size_t c = 0; c < input->combos.size(); c++)
+    for (size_t c = 0; !macros && c < input->combos.size(); c++)
     {
         if (input->combos[c].core == input->core_name)
         {
             ids.push_back(input->combos[c].id);
         }
     }
+    for (size_t m = 0; macros && m < input->macros.size(); m++)
+    {
+        if (input->macros[m].core == input->core_name)
+        {
+            ids.push_back(input->macros[m].id);
+        }
+    }
     for (size_t c = 0; c < ids.size(); c++)
     {
         const InputCombo* combo = input_combo(input, input->core_name.c_str(), ids[c]);
-        if (combo == nullptr)
+        const InputMacro* macro = input_macro(input, input->core_name.c_str(), ids[c]);
+        if (combo == nullptr && macro == nullptr)
         {
             continue;
         }
-        const InputComboBinding* binding = combo_binding_of(active, combo->id);
+        const std::string id = ids[c];
+        const InputComboBinding* binding = combo_binding_of(active, id);
         InputSource none[INPUT_SOURCES_PER_ACTION] = {};
         const InputSource* sources = binding != nullptr ? binding->sources : none;
-        bool waiting = menu->capturing && menu->capture_combo == combo->id;
+        bool waiting = menu->capturing && menu->capture_combo == id;
         uint32_t count = input_sources_count(sources);
         uint32_t rows = count > 0 ? count : 1;
         if (waiting && menu->capture_row >= rows)
         {
             rows = menu->capture_row + 1;
         }
-        std::string label = combo_label(combo, controls, strings);
-        ImGui::PushID(("combo/" + combo->id).c_str());
+        std::string label = combo != nullptr ? combo_label(combo, controls, strings) : macro_label(macro, strings);
+        ImGui::PushID(("combo/" + id).c_str());
         for (uint32_t r = 0; r < rows; r++)
         {
             ImGui::PushID(static_cast<int>(r));
@@ -885,13 +1333,20 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
             {
                 if (retro_ui_button(edit))
                 {
-                    open_combo_editor(menu, combo);
+                    if (combo != nullptr)
+                    {
+                        open_combo_editor(menu, combo);
+                    }
+                    else
+                    {
+                        open_macro_editor(menu, macro);
+                    }
                 }
                 ImGui::SameLine();
                 ImGui::BeginDisabled(count == 0 || count >= INPUT_SOURCES_PER_ACTION);
                 if (retro_ui_button(add))
                 {
-                    remap_start_combo_capture(menu, context, combo->id, count);
+                    remap_start_combo_capture(menu, context, id, count);
                 }
                 retro_ui_item_tooltip(piccolo_text(strings, Str::input_add_help));
                 ImGui::EndDisabled();
@@ -899,18 +1354,18 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
             }
             if (retro_ui_button(set))
             {
-                remap_start_combo_capture(menu, context, combo->id, r < count ? r : count);
+                remap_start_combo_capture(menu, context, id, r < count ? r : count);
             }
             if (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible))
             {
-                menu->pad_combo = combo->id;
+                menu->pad_combo = id;
                 menu->pad_row = r;
             }
             ImGui::SameLine();
             ImGui::BeginDisabled(r >= count);
             if (retro_ui_button(clear))
             {
-                InputComboBinding* changed = remap_combo_binding(menu, context, combo->id);
+                InputComboBinding* changed = remap_combo_binding(menu, context, id);
                 input_sources_remove(changed->sources, r);
                 if (input_sources_count(changed->sources) == 0)
                 {
@@ -918,7 +1373,7 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
                     InputCoreProfile* profile = remap_profile(menu, context);
                     for (size_t k = 0; k < profile->combos.size(); k++)
                     {
-                        if (profile->combos[k].combo == combo->id)
+                        if (profile->combos[k].combo == id)
                         {
                             profile->combos.erase(profile->combos.begin() + static_cast<long>(k));
                             break;
@@ -933,9 +1388,16 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, co
         ImGui::PopID();
     }
     ImGui::BeginDisabled(menu->capturing);
-    if (retro_ui_button(piccolo_text(strings, Str::remap_combo_new)))
+    if (retro_ui_button(piccolo_text(strings, macros ? Str::remap_macro_new : Str::remap_combo_new)))
     {
-        open_combo_editor(menu, nullptr);
+        if (macros)
+        {
+            open_macro_editor(menu, nullptr);
+        }
+        else
+        {
+            open_combo_editor(menu, nullptr);
+        }
     }
     ImGui::EndDisabled();
 }
@@ -967,6 +1429,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     {
         menu->remap = false;   // back to the ports (B on a gamepad does the same)
         menu->combo_editing = false;
+        menu->macro_editing = false;
         return;
     }
     retro_ui_separator_text(title);
@@ -1187,10 +1650,12 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         }
         ImGui::PopID();
     }
-    draw_combo_rows(menu, context, controls, pad, pad_layout, pad_profile, label_width);
+    draw_combo_rows(menu, context, false, controls, pad, pad_layout, pad_profile, label_width);
+    draw_combo_rows(menu, context, true, controls, pad, pad_layout, pad_profile, label_width);
     ImGui::EndChild();
     ImGui::PopStyleColor();
     draw_combo_modal(menu, context, controls, 60.0f * block);
+    draw_macro_modal(menu, context, controls, 60.0f * block);
     if (show_pad)
     {
         pad_picture_draw_floating(input_window_layout(input, context->layouts, pad), lit, minus, 1.25f * block);
@@ -1348,6 +1813,11 @@ static void drop_unseen_capture(QuickMenu* menu, const QuickMenuContext* context
         input_capture_cancel(context->input);
     }
     menu->capture_seen = false;
+    if (menu->macro_record != 0 && !menu->macro_record_seen)
+    {
+        macro_record_cancel(menu, context);   // (a recording keeps the router suspended)
+    }
+    menu->macro_record_seen = false;
 }
 
 QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context, ImFont* pixel_font, int32_t scale)
