@@ -16,10 +16,13 @@
 // can load (its own extension list, from the core catalog). Double-click a
 // file or press LOAD to start it; click a folder to open it.
 //
-// Zip and 7z archives are folders (content_archive.h): opening one lists
-// what's inside, and a file picked there is "a.7z#dir/Game.sfc", which the
-// core session extracts. Cores that take archives whole (arcade cores,
-// block_extract) see them as files instead.
+// Zip and 7z archives are always in the file list (never filtered: what's
+// inside isn't known until one is opened). Selecting one peeks at its index
+// and the line under the lists says what LOAD will do (content_archive.h):
+//   - the core takes archives whole (arcade cores, block_extract): the archive;
+//   - else, exactly one file inside the core can load: that file
+//     ("a.7z#dir/Game.sfc", extracted by the core session);
+//   - else: opens it as a folder, like BROWSE, which always does that.
 // Esc or the window's close button closes the picker.
 
 #include <cstdint>
@@ -52,10 +55,15 @@ struct FilePicker
     int32_t selected_file = -1;
     bool    listing_stale = true;
 
-    // Inside an archive (`directory` is "a.7z#" or "a.7z#dir"): its listing,
-    // read once per archive rather than on every folder change.
+    // An archive's listing: the one browsed (`directory` is "a.7z#" or
+    // "a.7z#dir") or peeked at, read once rather than on every change.
     std::string               archive_path;
     std::vector<ArchiveEntry> archive_entries;
+    bool                      archive_readable = false;
+
+    // The archive selected in the file list, from its listing.
+    int32_t     peek_loadable = 0;   // files inside the chosen core can load
+    std::string peek_single;         // the one file, when peek_loadable == 1
 };
 
 // What the user chose.

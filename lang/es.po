@@ -110,6 +110,30 @@ msgctxt "picker_load"
 msgid "LOAD"
 msgstr "CARGAR"
 
+msgctxt "picker_browse"
+msgid "BROWSE"
+msgstr "EXPLORAR"
+
+msgctxt "picker_peek_whole"
+msgid "THIS CORE LOADS THE WHOLE ARCHIVE"
+msgstr "ESTE CORE CARGA EL ARCHIVO COMPLETO"
+
+msgctxt "picker_peek_loads"
+msgid "LOAD STARTS"
+msgstr "CARGAR INICIA"
+
+msgctxt "picker_peek_folder"
+msgid "LOAD OPENS IT AS A FOLDER, FILES THIS CORE LOADS:"
+msgstr "CARGAR LO ABRE COMO CARPETA, ARCHIVOS QUE ESTE CORE CARGA:"
+
+msgctxt "picker_peek_none"
+msgid "NOTHING INSIDE THAT THIS CORE LOADS"
+msgstr "NO HAY NADA ADENTRO QUE ESTE CORE CARGUE"
+
+msgctxt "picker_peek_unreadable"
+msgid "CAN'T READ THIS ARCHIVE (SEE THE LOG)"
+msgstr "NO SE PUEDE LEER ESTE ARCHIVO (VER EL LOG)"
+
 msgctxt "settings_title"
 msgid "SETTINGS"
 msgstr "AJUSTES"

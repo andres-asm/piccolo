@@ -44,6 +44,12 @@ picker_nothing_here = NOTHING THIS CORE LOADS HERE
 picker_show_all = SHOW ALL FILES
 picker_start_without_game = START WITHOUT GAME
 picker_load = LOAD
+picker_browse = BROWSE
+picker_peek_whole = THIS CORE LOADS THE WHOLE ARCHIVE
+picker_peek_loads = LOAD STARTS
+picker_peek_folder = LOAD OPENS IT AS A FOLDER, FILES THIS CORE LOADS:
+picker_peek_none = NOTHING INSIDE THAT THIS CORE LOADS
+picker_peek_unreadable = CAN'T READ THIS ARCHIVE (SEE THE LOG)
 
 # SETTINGS window
 settings_title = SETTINGS

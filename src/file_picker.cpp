@@ -142,22 +142,24 @@ static void add_folder_once(FilePicker* picker, const char* name)
     add_folder(picker, name);
 }
 
-// Hidden entries, and the resource folder macOS adds to zips it makes.
-static bool hidden_name(const char* name)
+
+// The archive's listing, unless it's the one already read.
+static void read_archive(FilePicker* picker, const std::string* archive)
 {
-    return name[0] == '.' || std::strcmp(name, "__MACOSX") == 0;
+    if (picker->archive_path != *archive)
+    {
+        picker->archive_readable = archive_list(archive->c_str(), &picker->archive_entries);   // failure: logged
+        picker->archive_path = *archive;
+    }
 }
+
 
 // The folder `folder` ("" = the top) inside the archive: its subfolders and
 // the files the core can load.
 static void list_archive(FilePicker* picker, const LibretroCoreInfo* core, const std::string* archive,
                          const std::string* folder)
 {
-    if (picker->archive_path != *archive)
-    {
-        archive_list(archive->c_str(), &picker->archive_entries);   // a failure leaves it empty (logged)
-        picker->archive_path = *archive;
-    }
+    read_archive(picker, archive);
     std::string prefix = folder->empty() ? std::string() : *folder + "/";
     for (size_t i = 0; i < picker->archive_entries.size(); i++)
     {
@@ -169,7 +171,7 @@ static void list_archive(FilePicker* picker, const LibretroCoreInfo* core, const
         std::string rest = entry->name.substr(prefix.size());
         size_t slash = rest.find('/');
         std::string first = slash == std::string::npos ? rest : rest.substr(0, slash);
-        if (hidden_name(first.c_str()))
+        if (content_archive_hidden_name(first.c_str()))
         {
             continue;
         }
@@ -217,16 +219,16 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
         {
             continue;
         }
-        bool archive_folder = info.type == SDL_PATHTYPE_FILE && archive_format(name) != ArchiveFormat::none &&
-                              !content_archive_core_takes_whole(core, name);
-        if (info.type == SDL_PATHTYPE_DIRECTORY || archive_folder)
+        if (info.type == SDL_PATHTYPE_DIRECTORY)
         {
             add_folder(picker, name);
         }
         else if (info.type == SDL_PATHTYPE_FILE)
         {
-            // Only what the chosen core says it loads (its own extension list).
-            if (picker->show_all || core == nullptr || libretro_core_info_accepts(core, name))
+            // Only what the chosen core says it loads (its own extension
+            // list), and every archive: what's inside is only known later.
+            if (picker->show_all || core == nullptr || libretro_core_info_accepts(core, name) ||
+                archive_format(name) != ArchiveFormat::none)
             {
                 add_file(picker, name);
             }
@@ -293,6 +295,49 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
     }
 }
 
+// The selected file, if it's an archive in a real folder (archives inside
+// archives are plain files: they aren't browsed).
+static bool selected_archive(const FilePicker* picker)
+{
+    std::string archive;
+    std::string folder;
+    return picker->selected_file >= 0 && !archive_split_path(picker->directory, &archive, &folder) &&
+           archive_format(picker->files[picker->selected_file]) != ArchiveFormat::none;
+}
+
+// What's in the selected archive for the chosen core (see file_picker.h).
+static void peek_selected(FilePicker* picker, const CoreCatalog* catalog)
+{
+    picker->peek_loadable = 0;
+    picker->peek_single.clear();
+    if (!selected_archive(picker))
+    {
+        return;
+    }
+    char path[LIBRETRO_PATH_MAX] = {};
+    if (!join_path(picker->directory, picker->files[picker->selected_file], path, sizeof(path)))
+    {
+        return;
+    }
+    std::string archive = path;
+    read_archive(picker, &archive);
+    picker->peek_loadable = content_archive_loadable(selected_core(picker, catalog), &picker->archive_entries,
+                                                     &picker->peek_single);
+}
+
+// Opens the selected archive as a folder ("a.7z#").
+static void browse_selected(FilePicker* picker)
+{
+    char next[LIBRETRO_PATH_MAX] = {};
+    if (join_path(picker->directory, picker->files[picker->selected_file], next, sizeof(next)) &&
+        std::strlen(next) + 1 < sizeof(next))
+    {
+        std::strcat(next, "#");
+        std::snprintf(picker->directory, sizeof(picker->directory), "%s", next);
+        picker->listing_stale = true;
+    }
+}
+
 // Fills `choice` with the selected core and `file_name` (nullptr = no content).
 static bool choose(FilePicker* picker, const CoreCatalog* catalog, const char* file_name, FilePickerChoice* choice)
 {
@@ -308,6 +353,24 @@ static bool choose(FilePicker* picker, const CoreCatalog* catalog, const char* f
     }
     picker->open = false;
     return true;
+}
+
+// LOAD (or a double click) on the selected file: an archive follows the
+// rules in file_picker.h. True if something was picked.
+static bool load_selected(FilePicker* picker, const CoreCatalog* catalog, FilePickerChoice* choice)
+{
+    const char* name = picker->files[picker->selected_file];
+    if (!selected_archive(picker) || content_archive_core_takes_whole(selected_core(picker, catalog), name))
+    {
+        return choose(picker, catalog, name, choice);
+    }
+    if (picker->peek_loadable == 1)
+    {
+        std::string inner = std::string(name) + "#" + picker->peek_single;
+        return choose(picker, catalog, inner.c_str(), choice);
+    }
+    browse_selected(picker);
+    return false;
 }
 
 bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pixel_font, int32_t scale,
@@ -386,10 +449,14 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             ImGui::PushID(i);
             if (ImGui::Selectable(picker->files[i], i == picker->selected_file, ImGuiSelectableFlags_AllowDoubleClick))
             {
-                picker->selected_file = i;
+                if (picker->selected_file != i)
+                {
+                    picker->selected_file = i;
+                    peek_selected(picker, catalog);
+                }
                 if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                 {
-                    picked = choose(picker, catalog, picker->files[i], choice);
+                    picked = load_selected(picker, catalog, choice);
                 }
             }
             ImGui::PopID();
@@ -420,26 +487,45 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         retro_ui_end_list();
         if (open_folder != nullptr)
         {
-            // An archive in a real folder opens as its top folder ("a.7z#").
-            std::string archive;
-            std::string folder;
-            bool into_archive = !archive_split_path(picker->directory, &archive, &folder) &&
-                                archive_format(open_folder) != ArchiveFormat::none;
             char next[LIBRETRO_PATH_MAX] = {};
-            if (join_path(picker->directory, open_folder, next, sizeof(next)) &&
-                (!into_archive || std::strlen(next) + 1 < sizeof(next)))
+            if (join_path(picker->directory, open_folder, next, sizeof(next)))
             {
-                if (into_archive)
-                {
-                    std::strcat(next, "#");
-                }
                 std::snprintf(picker->directory, sizeof(picker->directory), "%s", next);
                 picker->listing_stale = true;
             }
         }
 
-        // Where we are.
-        ImGui::TextDisabled("%s", picker->directory);
+        // Where we are, or what LOAD does with the selected archive.
+        if (selected_archive(picker))
+        {
+            const char* name = picker->files[picker->selected_file];
+            if (content_archive_core_takes_whole(core, name))
+            {
+                ImGui::TextDisabled("%s: %s", name, piccolo_text(strings, Str::picker_peek_whole));
+            }
+            else if (!picker->archive_readable)
+            {
+                ImGui::TextDisabled("%s: %s", name, piccolo_text(strings, Str::picker_peek_unreadable));
+            }
+            else if (picker->peek_loadable == 1)
+            {
+                ImGui::TextDisabled("%s: %s %s", name, piccolo_text(strings, Str::picker_peek_loads),
+                                    picker->peek_single.c_str());
+            }
+            else if (picker->peek_loadable == 0)
+            {
+                ImGui::TextDisabled("%s: %s", name, piccolo_text(strings, Str::picker_peek_none));
+            }
+            else
+            {
+                ImGui::TextDisabled("%s: %s %d", name, piccolo_text(strings, Str::picker_peek_folder),
+                                    static_cast<int>(picker->peek_loadable));
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("%s", picker->directory);
+        }
 
         // Bottom row.
         char show_all[200] = {};
@@ -450,10 +536,14 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         }
         bool can_run_alone = core != nullptr && core->supports_no_game;
         const char* load = piccolo_text(strings, Str::picker_load);
+        const char* browse = piccolo_text(strings, Str::picker_browse);
         const char* alone = piccolo_text(strings, Str::picker_start_without_game);
-        float load_width = ImGui::CalcTextSize(load).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        float alone_width = ImGui::CalcTextSize(alone).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-        float right = load_width + (can_run_alone ? alone_width + ImGui::GetStyle().ItemSpacing.x : 0.0f);
+        float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float load_width = ImGui::CalcTextSize(load).x + padding;
+        float browse_width = ImGui::CalcTextSize(browse).x + padding;
+        float alone_width = ImGui::CalcTextSize(alone).x + padding;
+        float right = load_width + browse_width + spacing + (can_run_alone ? alone_width + spacing : 0.0f);
         ImGui::SameLine(ImGui::GetContentRegionMax().x - right);
         ImGui::PushID("alone");
         bool start_alone = can_run_alone && retro_ui_button(alone);
@@ -466,13 +556,24 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         {
             ImGui::SameLine();
         }
+        // BROWSE: the selected archive as a folder, whatever the core.
+        ImGui::BeginDisabled(!selected_archive(picker));
+        ImGui::PushID("browse");
+        bool browse_clicked = retro_ui_button(browse);
+        ImGui::PopID();
+        ImGui::EndDisabled();
+        if (browse_clicked && selected_archive(picker))
+        {
+            browse_selected(picker);
+        }
+        ImGui::SameLine();
         ImGui::BeginDisabled(picker->selected_file < 0);
         ImGui::PushID("load");
         bool load_clicked = retro_ui_button(load);
         ImGui::PopID();
         if (load_clicked && picker->selected_file >= 0)
         {
-            picked = choose(picker, catalog, picker->files[picker->selected_file], choice);
+            picked = load_selected(picker, catalog, choice);
         }
         ImGui::EndDisabled();
 
