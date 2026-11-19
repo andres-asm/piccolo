@@ -1,6 +1,7 @@
 # Builds piccolo for Windows (x86_64) natively with MSYS2's UCRT64 toolchain
 # (GCC + libstdc++ + the Universal CRT), the same one used to build it by hand
-# on Windows, runs the tests, and uploads the piccolo folder (GitHub serves it as a zip).
+# on Windows, runs the tests, and uploads the piccolo folder (GitHub serves it
+# as a zip).
 # The C/C++ runtimes are linked statically, so piccolo.exe only needs Windows'
 # own DLLs and vulkan-1.dll (installed with the GPU driver).
 name: Windows
