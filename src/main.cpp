@@ -1570,6 +1570,10 @@ static void draw_settings(App* app)
         {
             set_status(app, piccolo_text(&app->strings, Str::ui_theme_save_failed));
         }
+        else
+        {
+            app->settings_window.theme_choice = name;   // THEME shows the saved theme
+        }
     }
 
     // Closed (by its button or Esc): apply the folders and save.

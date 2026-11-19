@@ -223,7 +223,8 @@ static bool theme_choice_before(const ThemeChoice& a, const ThemeChoice& b)
 // theme the colors match, or CUSTOM. The built-in themes and the ones from
 // themes/*.cfg, sorted by their names in the current language. The
 // interface is global only.
-static void draw_theme_preset(const SettingsUiContext* ui, const std::vector<PiccoloThemeFile>* files)
+static void draw_theme_preset(SettingsWindow* window, const SettingsUiContext* ui,
+                              const std::vector<PiccoloThemeFile>* files)
 {
     std::vector<ThemeChoice> choices;
     for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
@@ -243,8 +244,17 @@ static void draw_theme_preset(const SettingsUiContext* ui, const std::vector<Pic
     }
     std::stable_sort(choices.begin(), choices.end(), theme_choice_before);
 
-    // The one the colors match (a built-in theme first, then the files), or CUSTOM.
+    // The one the colors match, or CUSTOM: the theme last picked or saved
+    // when it matches (two themes may have the same colors), else a built-in
+    // theme, else one from a file.
     int32_t current = -1;
+    for (size_t i = 0; current < 0 && i < choices.size(); i++)
+    {
+        if (choices[i].label == window->theme_choice && piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
+        {
+            current = static_cast<int32_t>(i);
+        }
+    }
     for (size_t i = 0; current < 0 && i < choices.size(); i++)
     {
         if (choices[i].builtin != RetroUiTheme::count && piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
@@ -283,6 +293,7 @@ static void draw_theme_preset(const SettingsUiContext* ui, const std::vector<Pic
             if (picked)
             {
                 piccolo_settings_apply_ui_palette(ui->settings, choices[i].palette);
+                window->theme_choice = choices[i].label;
             }
         }
         ImGui::EndCombo();
@@ -400,7 +411,7 @@ static void draw_interface(SettingsWindow* window, const SettingsUiContext* cont
     SettingsUiContext global = *context;
     global.scope = SettingLayer::global;
     const SettingsUiContext* ui = &global;
-    draw_theme_preset(ui, window_context->themes);
+    draw_theme_preset(window, ui, window_context->themes);
     draw_save_theme(window, ui, window_context->themes);
     settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
     settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);
