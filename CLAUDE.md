@@ -34,7 +34,7 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
-  `deps/speexdsp`, `deps/gamemode`, `deps/librashader`
+  `deps/gamemode`, `deps/librashader`
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
