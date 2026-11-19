@@ -114,6 +114,9 @@ struct App
     bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
     uint32_t   net_load_peer = NET_NO_PEER;
     uint32_t   net_load_id = 0;
+    // What the devices were last told runs (game_state): sent again when it changes.
+    std::string net_sent_core;           // "" = nothing runs
+    std::string net_sent_content;
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -1795,6 +1798,38 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
+// game_state (what runs now) to one authorized peer, or to all of them
+// (NET_NO_PEER).
+static void net_send_game_state(App* app, uint32_t peer)
+{
+    size_t size = net_games_write_state(&app->net_games, &app->catalog, app->net_sent_core.c_str(),
+                                        app->net_sent_content.c_str());
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if ((peer == NET_NO_PEER || peer == i) && app->net.peers[i].state == NetAccessPeerState::authorized)
+        {
+            net_access_send(&app->net, i, NetChannel::control, app->net_games.reply.data(), size);
+        }
+    }
+}
+
+// Tells every device when what runs changed, however it changed (LOAD GAME,
+// the network, CLOSE GAME, a core that quit). Compared every loop, copied
+// only on a change.
+static void net_follow_game_state(App* app)
+{
+    bool running = game_running(app);
+    const char* core = running ? app->marker_core_path.c_str() : "";
+    const char* content = running ? app->marker_content_path.c_str() : "";
+    if (app->net_sent_core == core && app->net_sent_content == content)
+    {
+        return;
+    }
+    app->net_sent_core = core;
+    app->net_sent_content = content;
+    net_send_game_state(app, NET_NO_PEER);
+}
+
 // The load_result for the load_request waiting in pending_start.
 static void net_answer_load(App* app, NetContentStatus status)
 {
@@ -1968,12 +2003,14 @@ static void net_update(App* app)
         {
         case NetAccessEventType::authorized:
             SDL_Log("Network: \"%s\" connected from %s", device, address);
+            net_send_game_state(app, event.peer);   // what runs, from the start
             break;
         case NetAccessEventType::paired:
         {
             char status[256];
             std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_paired), device);
             set_status(app, status);
+            net_send_game_state(app, event.peer);
             break;
         }
         case NetAccessEventType::closed:
@@ -2006,6 +2043,7 @@ static void net_update(App* app)
             break;
         }
     }
+    net_follow_game_state(app);
 }
 
 int main(int argc, char** argv)
@@ -2149,7 +2187,9 @@ int main(int argc, char** argv)
         {
             app->has_pending_start = false;
             bool started = start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
-            if (app->net_load_waiting)
+            // SAFE START asking: answered once it's decided (below, or the
+            // start that follows its answer).
+            if (app->net_load_waiting && !app->safe_start_open)
             {
                 net_answer_load(app, started ? NetContentStatus::ok : NetContentStatus::failed);
             }
@@ -2356,6 +2396,10 @@ int main(int argc, char** argv)
                 if (answer != SafeStartChoice::none)
                 {
                     app->safe_start_open = false;
+                    if (app->net_load_waiting && !app->has_pending_start)
+                    {
+                        net_answer_load(app, NetContentStatus::failed);   // not started after all
+                    }
                 }
             }
             if (app->show_debug_window)

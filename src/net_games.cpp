@@ -130,3 +130,31 @@ bool net_games_load(const NetGames* games, const CoreCatalog* catalog, const uin
     }
     return true;
 }
+
+size_t net_games_write_state(NetGames* games, const CoreCatalog* catalog, const char* core_path,
+                             const char* content_path)
+{
+    NetGameState state;
+    state.running = core_path[0] != '\0';
+    if (state.running)
+    {
+        // The core's file name, and its name and version from the catalog.
+        const char* slash = std::strrchr(core_path, '/');
+        state.core_file = slash != nullptr ? slash + 1 : core_path;
+        for (int32_t i = 0; i < catalog->count; i++)
+        {
+            if (state.core_file == catalog->entries[i].file_name)
+            {
+                state.core_name = catalog->entries[i].info.name;
+                state.core_version = catalog->entries[i].info.version;
+                break;
+            }
+        }
+        char game[256] = {};
+        if (content_path[0] != '\0' && content_archive_game_name(content_path, game, sizeof(game)))
+        {
+            state.game = game;
+        }
+    }
+    return net_content_write_game_state(games->reply.data(), games->reply.size(), &state);
+}

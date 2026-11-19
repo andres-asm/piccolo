@@ -78,7 +78,8 @@ of the branches and what's left.
 - 16-63 need gamepad, 64-127 stream, 128-255 full: `net_access` drops what a
   device's level doesn't cover. Give new application messages a type in the
   range of the level they need. Input channel: type 1 = pad states.
-- 128-133: net_content (cores / list / load requests and results).
+- 16: game_state (host -> client). 128-133: net_content (cores / list / load
+  requests and results).
 
 ## Pending, in order
 
@@ -98,9 +99,11 @@ of the branches and what's left.
    - net_probe: `--cores`, `--list PATH`, `--load CORE PATH`. Tried against a
      running piccolo (scratch XDG_DATA_HOME, pre-paired key at full): listing,
      archives, escapes refused, cores, loading with a game and without.
-   - Known limits: when SAFE START asks, the device gets `failed` even if the
-     user then starts it; no "game started / stopped" push to the device yet;
-     a game folder that appears after the first request counts only once the
+   - Wrap-up (2026-11-19): `game_state` (type 16, to every authorized device:
+     at connection and whenever what runs changes, compared each loop); the
+     load_result waits for SAFE START's answer (not tried: needs a crash
+     marker and a click).
+   - Known limits: a game folder that appears after the first request counts only once the
      setting changes or the network restarts. Not over loopback in ctest (the
      access layer's range check is tested generically in `frontend_net`).
 2. **Configuring piccolo from the app (access full)**, later (Andrés): its own

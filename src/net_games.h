@@ -42,3 +42,9 @@ size_t net_games_answer(NetGames* games, const CoreCatalog* catalog, const uint8
 // for the load_result. False if `data` isn't a load_request.
 bool net_games_load(const NetGames* games, const CoreCatalog* catalog, const uint8_t* data, size_t size, uint32_t* id,
                     NetContentStatus* status, FilePickerChoice* choice);
+
+// The game_state message for what runs (`core_path` "" = nothing; the
+// content path as LOAD GAME gave it, archive paths too), into `reply`.
+// Returns its size.
+size_t net_games_write_state(NetGames* games, const CoreCatalog* catalog, const char* core_path,
+                             const char* content_path);
