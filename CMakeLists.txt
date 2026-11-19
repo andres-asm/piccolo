@@ -2,7 +2,7 @@
 # frontends of the 90s). Self-contained: every dependency is a submodule in
 # deps/ (third-party ones, and multitap's libraries in deps/common and
 # deps/libretro). Build:
-#   git clone --recursive https://github.com/andres-asm/piccolo.git
+#   git clone --recursive https://github.com/multitap-org/piccolo.git
 #   cmake -S piccolo -B piccolo/build -G Ninja && cmake --build piccolo/build
 
 cmake_minimum_required(VERSION 3.25)

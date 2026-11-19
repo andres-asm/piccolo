@@ -23,17 +23,17 @@
 	shallow = true
 [submodule "deps/common/hosts-common"]
 	path = deps/common/hosts-common
-	url = https://github.com/andres-asm/hosts-common.git
+	url = https://github.com/multitap-org/hosts-common.git
 [submodule "deps/common/frontends-common"]
 	path = deps/common/frontends-common
-	url = https://github.com/andres-asm/frontends-common.git
+	url = https://github.com/multitap-org/frontends-common.git
 [submodule "deps/libretro/host-libretro"]
 	path = deps/libretro/host-libretro
-	url = https://github.com/andres-asm/host-libretro.git
+	url = https://github.com/multitap-org/host-libretro.git
 [submodule "deps/libretro/frontend-libretro"]
 	path = deps/libretro/frontend-libretro
-	url = https://github.com/andres-asm/frontend-libretro.git
+	url = https://github.com/multitap-org/frontend-libretro.git
 [submodule "deps/test-libretro"]
 	path = deps/test-libretro
-	url = https://github.com/andres-asm/test-libretro.git
+	url = https://github.com/multitap-org/test-libretro.git
 	update = none

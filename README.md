@@ -4,7 +4,7 @@ A small libretro frontend for **playing games**, with a retro-style UI in the
 spirit of classic emulator GUIs: a menu bar, a LOAD GAME window, and a 5x5
 pixel font drawn from scratch for piccolo.
 
-piccolo is part of the [Multitap](https://github.com/andres-asm/multitap)
+piccolo is part of the [Multitap](https://github.com/multitap-org/multitap)
 project and builds on its own: Multitap's libraries come in as submodules,
 with every other dependency, in `deps/`:
 
@@ -196,7 +196,7 @@ old `~/.host-libretro/` folder if there is one. The old folder is left as it is.
 Clone piccolo with its submodules and build it:
 
 ```sh
-git clone --recursive https://github.com/andres-asm/piccolo.git
+git clone --recursive https://github.com/multitap-org/piccolo.git
 cd piccolo
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
