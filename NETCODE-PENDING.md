@@ -106,8 +106,10 @@ of the branches and what's left.
 2. **Configuring piccolo from the app (access full)**, later (Andrés): its own
    control messages (settings, load, quick menu actions), never pad input.
 3. **Milestone 6: streaming (access stream) and headless (access full)**, with
-   piccoletto. The core's frame at native size, near-lossless; shaders on the
-   client (design-notes, piccoletto section).
+   piccoletto. Postponed (Andrés, 2026-11-19): the other milestones first. The
+   discussion (two codecs: lossless delta at native size / H.264 by hardware;
+   audio, sync, latency estimates) is in docs/design-notes.md, "Remote play:
+   video, audio, latency". Resumes by measuring on the RK3588.
 4. **Milestone 7: internet.** STUN on the ENet socket (through `intercept`);
    rendezvous over HTTPS (curl) with one code for finding and pairing, Magic
    Wormhole style (e.g. 8 digits: 2 for the rendezvous slot, 6 for CPace);
