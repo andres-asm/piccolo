@@ -7,6 +7,8 @@
 // they become string IDs with localization (plan-settings step 9).
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "input_bindings.h"
 #include "audio_output.h"
@@ -137,6 +139,25 @@ void piccolo_settings_palette(const Settings* settings, RetroUiPalette* palette)
 Str piccolo_settings_ui_theme_name(RetroUiTheme theme);
 RetroUiTheme piccolo_settings_ui_theme(const Settings* settings);
 bool piccolo_settings_apply_ui_theme(Settings* settings, RetroUiTheme theme);
+
+// A theme from a file: themes/<file>.cfg, next to the program or in piccolo's
+// folder. The same ui_ keys as piccolo.cfg's interface settings, plus "name"
+// (what THEME shows; without it, the file's name in capitals). Keys the file
+// doesn't set come from BLUE. See themes/example.cfg.
+struct PiccoloThemeFile
+{
+    std::string    name;
+    RetroUiPalette palette = {};
+};
+
+// Adds every *.cfg in `directory` (a missing folder adds nothing). A theme
+// with the same name as one already in the list replaces it, so the folder
+// loaded last wins.
+void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const char* directory);
+
+// Whether the interface settings are exactly `palette`, and setting them all to it.
+bool piccolo_settings_ui_palette_is(const Settings* settings, const RetroUiPalette* palette);
+bool piccolo_settings_apply_ui_palette(Settings* settings, const RetroUiPalette* palette);
 
 // After loading: when the global settings set some interface colors but not
 // others (a settings file from before those were added), the missing ones

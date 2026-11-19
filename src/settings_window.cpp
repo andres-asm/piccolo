@@ -1,8 +1,10 @@
 #include "settings_window.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include <SDL3/SDL.h>
 
@@ -204,11 +206,62 @@ static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext*
     settings_ui_row(ui, PICCOLO_AUDIO_QUALITY, nullptr);
 }
 
-// THEME: sets every interface color. Not a setting itself: it shows the
-// theme the colors match, or CUSTOM. The interface is global only.
-static void draw_theme_preset(const SettingsUiContext* ui)
+// One entry of THEME's list: a built-in theme or one from a file.
+struct ThemeChoice
 {
-    RetroUiTheme current = piccolo_settings_ui_theme(ui->settings);
+    std::string           label;
+    RetroUiTheme          builtin = RetroUiTheme::count;   // count = from a file
+    const RetroUiPalette* palette = nullptr;
+};
+
+static bool theme_choice_before(const ThemeChoice& a, const ThemeChoice& b)
+{
+    return a.label < b.label;
+}
+
+// THEME: sets every interface color. Not a setting itself: it shows the
+// theme the colors match, or CUSTOM. The built-in themes and the ones from
+// themes/*.cfg, sorted by their names in the current language. The
+// interface is global only.
+static void draw_theme_preset(const SettingsUiContext* ui, const std::vector<PiccoloThemeFile>* files)
+{
+    std::vector<ThemeChoice> choices;
+    for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
+    {
+        ThemeChoice choice = {};
+        choice.builtin = static_cast<RetroUiTheme>(i);
+        choice.label = piccolo_text(ui->strings, piccolo_settings_ui_theme_name(choice.builtin));
+        choice.palette = retro_ui_theme_palette(choice.builtin);
+        choices.push_back(choice);
+    }
+    for (size_t i = 0; files != nullptr && i < files->size(); i++)
+    {
+        ThemeChoice choice = {};
+        choice.label = (*files)[i].name;
+        choice.palette = &(*files)[i].palette;
+        choices.push_back(choice);
+    }
+    std::stable_sort(choices.begin(), choices.end(), theme_choice_before);
+
+    // The one the colors match (a built-in theme first, then the files), or CUSTOM.
+    int32_t current = -1;
+    for (size_t i = 0; current < 0 && i < choices.size(); i++)
+    {
+        if (choices[i].builtin != RetroUiTheme::count && piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
+        {
+            current = static_cast<int32_t>(i);
+        }
+    }
+    for (size_t i = 0; current < 0 && i < choices.size(); i++)
+    {
+        if (piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
+        {
+            current = static_cast<int32_t>(i);
+        }
+    }
+    const char* current_label = current >= 0 ? choices[static_cast<size_t>(current)].label.c_str()
+                                             : piccolo_text(ui->strings, Str::preset_custom);
+
     bool global = ui->scope == SettingLayer::global;
     ImGui::PushID("ui_theme");
     ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
@@ -220,17 +273,16 @@ static void draw_theme_preset(const SettingsUiContext* ui)
     retro_ui_item_tooltip(piccolo_text(ui->strings, Str::ui_theme_help));
     ImGui::SameLine(start + ui->label_width);
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    if (retro_ui_begin_combo("##theme", piccolo_text(ui->strings, piccolo_settings_ui_theme_name(current))))
+    if (retro_ui_begin_combo("##theme", current_label))
     {
-        for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
+        for (size_t i = 0; i < choices.size(); i++)
         {
-            RetroUiTheme theme = static_cast<RetroUiTheme>(i);
             ImGui::PushID(static_cast<int>(i));
-            bool picked = ImGui::Selectable(piccolo_text(ui->strings, piccolo_settings_ui_theme_name(theme)), theme == current);
+            bool picked = ImGui::Selectable(choices[i].label.c_str(), static_cast<int32_t>(i) == current);
             ImGui::PopID();
             if (picked)
             {
-                piccolo_settings_apply_ui_theme(ui->settings, theme);
+                piccolo_settings_apply_ui_palette(ui->settings, choices[i].palette);
             }
         }
         ImGui::EndCombo();
@@ -246,12 +298,12 @@ static void draw_theme_preset(const SettingsUiContext* ui)
 // The interface settings are global only, so this tab edits the global
 // layer whatever the scope (on a core or game scope everything here would
 // be disabled).
-static void draw_interface(const SettingsUiContext* context)
+static void draw_interface(const SettingsUiContext* context, const SettingsWindowContext* window_context)
 {
     SettingsUiContext global = *context;
     global.scope = SettingLayer::global;
     const SettingsUiContext* ui = &global;
-    draw_theme_preset(ui);
+    draw_theme_preset(ui, window_context->themes);
     settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
     settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);
     settings_ui_row(ui, PICCOLO_UI_THEME_CURSOR, nullptr);
@@ -314,7 +366,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     {
         window->tab = SettingsTab::interface;
         begin_tab_content();
-        draw_interface(ui);
+        draw_interface(ui, context);
         end_tab_content();
         ImGui::EndTabItem();
     }

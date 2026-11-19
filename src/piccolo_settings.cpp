@@ -2,6 +2,8 @@
 
 #include "piccolo_text.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <cstring>
 
@@ -646,25 +648,43 @@ Str piccolo_settings_ui_theme_name(RetroUiTheme theme)
     return Str::preset_custom;
 }
 
-RetroUiTheme piccolo_settings_ui_theme(const Settings* settings)
+bool piccolo_settings_ui_palette_is(const Settings* settings, const RetroUiPalette* palette)
 {
+    RetroUiPalette wanted = *palette;   // palette_color() takes a non-const palette
     RetroUiPalette current = {};
     piccolo_settings_palette(settings, &current);
+    bool same = palette->menu_boxes == current.menu_boxes && palette->shadows == current.shadows &&
+                palette->theme_cursor == current.theme_cursor;
+    for (uint32_t i = 0; same && i < UI_COLOR_COUNT; i++)
+    {
+        same = (*palette_color(&wanted, i) | 0xFF000000u) == (*palette_color(&current, i) | 0xFF000000u);
+    }
+    return same;
+}
+
+RetroUiTheme piccolo_settings_ui_theme(const Settings* settings)
+{
     for (uint32_t t = 0; t < static_cast<uint32_t>(RetroUiTheme::count); t++)
     {
-        RetroUiPalette theme = *retro_ui_theme_palette(static_cast<RetroUiTheme>(t));
-        bool same = theme.menu_boxes == current.menu_boxes && theme.shadows == current.shadows &&
-                    theme.theme_cursor == current.theme_cursor;
-        for (uint32_t i = 0; same && i < UI_COLOR_COUNT; i++)
-        {
-            same = *palette_color(&theme, i) == *palette_color(&current, i);
-        }
-        if (same)
+        if (piccolo_settings_ui_palette_is(settings, retro_ui_theme_palette(static_cast<RetroUiTheme>(t))))
         {
             return static_cast<RetroUiTheme>(t);
         }
     }
     return RetroUiTheme::count;
+}
+
+bool piccolo_settings_apply_ui_palette(Settings* settings, const RetroUiPalette* palette)
+{
+    RetroUiPalette colors = *palette;   // palette_color() takes a non-const palette
+    bool ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_MENU_BOXES, palette->menu_boxes);
+    ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_SHADOWS, palette->shadows) && ok;
+    ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_THEME_CURSOR, palette->theme_cursor) && ok;
+    for (uint32_t i = 0; i < UI_COLOR_COUNT; i++)
+    {
+        ok = settings_set_color(settings, SettingLayer::global, UI_COLOR_KEYS[i], *palette_color(&colors, i)) && ok;
+    }
+    return ok;
 }
 
 bool piccolo_settings_apply_ui_theme(Settings* settings, RetroUiTheme theme)
@@ -673,15 +693,99 @@ bool piccolo_settings_apply_ui_theme(Settings* settings, RetroUiTheme theme)
     {
         return false;
     }
-    RetroUiPalette palette = *retro_ui_theme_palette(theme);
-    bool ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_MENU_BOXES, palette.menu_boxes);
-    ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_SHADOWS, palette.shadows) && ok;
-    ok = settings_set_bool(settings, SettingLayer::global, PICCOLO_UI_THEME_CURSOR, palette.theme_cursor) && ok;
-    for (uint32_t i = 0; i < UI_COLOR_COUNT; i++)
+    return piccolo_settings_apply_ui_palette(settings, retro_ui_theme_palette(theme));
+}
+
+// A theme file's true/false value; anything else keeps `fallback`.
+static bool theme_file_bool(const SettingsFile* file, const char* key, bool fallback)
+{
+    const char* value = settings_file_get(file, "", key);
+    if (value == nullptr)
     {
-        ok = settings_set_color(settings, SettingLayer::global, UI_COLOR_KEYS[i], *palette_color(&palette, i)) && ok;
+        return fallback;
     }
-    return ok;
+    if (std::strcmp(value, "true") == 0)
+    {
+        return true;
+    }
+    if (std::strcmp(value, "false") == 0)
+    {
+        return false;
+    }
+    SDL_Log("Theme: %s = %s is not true or false", key, value);
+    return fallback;
+}
+
+static bool theme_name_before(const PiccoloThemeFile& a, const PiccoloThemeFile& b)
+{
+    return a.name < b.name;
+}
+
+void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const char* directory)
+{
+    int count = 0;
+    char** files = SDL_GlobDirectory(directory, "*.cfg", 0, &count);
+    for (int f = 0; files != nullptr && f < count; f++)
+    {
+        std::string file_name = files[f];
+        std::string path = std::string(directory) + "/" + file_name;
+        SettingsFile file = {};
+        if (!settings_file_load(&file, path.c_str()) || file.sections.empty())
+        {
+            continue;
+        }
+
+        PiccoloThemeFile theme = {};
+        theme.palette = *retro_ui_theme_palette(RetroUiTheme::blue);
+        const char* name = settings_file_get(&file, "", "name");
+        if (name != nullptr && name[0] != '\0')
+        {
+            theme.name = name;
+        }
+        else
+        {
+            theme.name = file_name.substr(0, file_name.size() - 4);   // without ".cfg"
+            for (size_t i = 0; i < theme.name.size(); i++)
+            {
+                theme.name[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(theme.name[i])));
+            }
+        }
+        theme.palette.menu_boxes = theme_file_bool(&file, PICCOLO_UI_MENU_BOXES, theme.palette.menu_boxes);
+        theme.palette.shadows = theme_file_bool(&file, PICCOLO_UI_SHADOWS, theme.palette.shadows);
+        theme.palette.theme_cursor = theme_file_bool(&file, PICCOLO_UI_THEME_CURSOR, theme.palette.theme_cursor);
+        for (uint32_t i = 0; i < UI_COLOR_COUNT; i++)
+        {
+            const char* value = settings_file_get(&file, "", UI_COLOR_KEYS[i]);
+            uint32_t color = 0;
+            if (value == nullptr)
+            {
+                continue;
+            }
+            if (!settings_color_from_text(value, &color))
+            {
+                SDL_Log("Theme %s: %s = %s is not a #RRGGBB color", path.c_str(), UI_COLOR_KEYS[i], value);
+                continue;
+            }
+            *palette_color(&theme.palette, i) = color | 0xFF000000u;
+        }
+
+        bool replaced = false;
+        for (size_t t = 0; t < themes->size(); t++)
+        {
+            if ((*themes)[t].name == theme.name)
+            {
+                (*themes)[t] = theme;
+                replaced = true;
+            }
+        }
+        if (!replaced)
+        {
+            themes->push_back(theme);
+        }
+        SDL_Log("Theme %s from %s", theme.name.c_str(), path.c_str());
+    }
+    SDL_free(files);
+    std::sort(themes->begin(), themes->end(), theme_name_before);
 }
 
 // The interface switches, as the palette has them.

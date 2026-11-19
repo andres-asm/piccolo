@@ -139,6 +139,11 @@ CONFIG > INTERFACE sets the look. THEME sets everything at once:
 | ZSNES | a purple background, a blue gradient menu bar with a box behind each menu title, grey menus with a magenta highlight, blue windows with gradient title bars and black fields, raised buttons and check boxes, sunken lists, drop shadows under windows and text, an orange arrow cursor |
 | BLACK | flat and dark, never a shadow; the menus are the bar's color |
 
+More themes can be added as files: `themes/<name>.cfg`, next to the program or
+in piccolo's folder, with the same `ui_` keys as `settings/piccolo.cfg`. THEME
+lists every theme, built-in or from a file, sorted by name.
+`themes/example.cfg` (EXAMPLE, gray) comes with piccolo and explains each key.
+
 Every color can also be changed on its own (THEME then shows CUSTOM), as
 can MENU TITLE BOXES, DROP SHADOWS and THEME CURSOR (piccolo draws its own
 pixel arrow instead of the system's, while the menu or a window is up).

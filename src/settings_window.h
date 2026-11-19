@@ -19,10 +19,12 @@
 // with its own on THIS CORE, else GLOBAL. Changes keep going to the override.
 
 #include <cstdint>
+#include <vector>
 
 #include "app_paths.h"
 #include "image_window.h"
 #include "localization.h"
+#include "piccolo_settings.h"
 #include "settings.h"
 
 struct ImFont;
@@ -63,6 +65,7 @@ struct SettingsWindowContext
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
     const char*              game_mode = "";      // GameMode's state, for the General tab
+    const std::vector<PiccoloThemeFile>* themes = nullptr;   // themes/*.cfg, for THEME
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

@@ -66,6 +66,7 @@ struct App
     InputWindow input_window = {};   // CONFIG > INPUT
     MapWindow   map_window = {};     // MAP CONTROLLER
     InputLayouts layouts = {};       // controller layouts (layouts/*.cfg)
+    std::vector<PiccoloThemeFile> themes;   // interface themes from files (themes/*.cfg)
     std::vector<uint32_t> map_offered;   // joysticks offered MAP CONTROLLER this session
 
     // HOLD START TO REMAP: a controller plays a core's device it hasn't
@@ -1467,6 +1468,7 @@ static void draw_settings(App* app)
     context.game_name = app->game_name;
     context.image = &image;
     context.strings = &app->strings;
+    context.themes = &app->themes;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
     char window_size[200] = {};
@@ -1729,6 +1731,15 @@ int main(int argc, char** argv)
         input_layouts_load_directory(&app->layouts, (app->paths.root + "/layouts").c_str());
     }
     input_layouts_ensure_generic(&app->layouts);
+    // Interface themes from files: the ones next to the program, then piccolo's
+    // folder's (the same name there wins). The built-in ones are in retro_ui.cpp.
+    std::string bundled_themes = std::string(program_folder != nullptr ? program_folder : "") + "themes";
+    host_fs_forward_slashes(bundled_themes.data());
+    piccolo_themes_load_directory(&app->themes, bundled_themes.c_str());
+    if (!app->paths.root.empty())
+    {
+        piccolo_themes_load_directory(&app->themes, (app->paths.root + "/themes").c_str());
+    }
     // settings/input.cfg first: controllers are made from its profiles as their devices appear.
     app->input_config_path = app->paths.settings.empty() ? "" : app->paths.settings + "/input.cfg";
     if (!app->input_config_path.empty())

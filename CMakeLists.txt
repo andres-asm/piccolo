@@ -218,6 +218,19 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
+# Interface themes (themes/<name>.cfg) next to the program and in piccolo's
+# folder, like the layouts: anyone can add one (see themes/example.cfg).
+add_custom_command(TARGET piccolo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/themes" "$<TARGET_FILE_DIR:piccolo>/themes"
+    VERBATIM)
+if(MULTITAP_PICCOLO_DIR)
+    add_custom_target(copy_piccolo_themes ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/themes" "${MULTITAP_PICCOLO_DIR}/themes"
+        DEPENDS piccolo
+        COMMENT "Copying piccolo's interface themes to ${MULTITAP_PICCOLO_DIR}/themes"
+        VERBATIM)
+endif()
+
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
