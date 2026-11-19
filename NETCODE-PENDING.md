@@ -78,8 +78,8 @@ of the branches and what's left.
 - 16-63 need gamepad, 64-127 stream, 128-255 full: `net_access` drops what a
   device's level doesn't cover. Give new application messages a type in the
   range of the level they need. Input channel: type 1 = pad states.
-- 16: game_state (host -> client). 128-133: net_content (cores / list / load
-  requests and results).
+- 16: game_state (host -> client). 17-19: actions (net_settings). 128-133:
+  net_content (cores / list / load). 136-140: settings (net_settings).
 
 ## Pending, in order
 
@@ -106,8 +106,22 @@ of the branches and what's left.
    - Known limits: a game folder that appears after the first request counts only once the
      setting changes or the network restarts. Not over loopback in ctest (the
      access layer's range check is tested generically in `frontend_net`).
-2. **Configuring piccolo from the app (access full)**, later (Andrés): its own
-   control messages (settings, load, quick menu actions), never pad input.
+2. **Settings, actions and remote input from the app (Andrés's option 3, 2026-11-19).**
+   - Done: `net_settings` (frontends-common: messages 17-19 actions at
+     GAMEPAD level, 136-140 settings at FULL; the host describes its settings,
+     labels in the device's language, values per layer; `Settings::revision`
+     for change pushes) and `src/net_remote.*` (SETTINGS' pages; NETWORK and
+     folders not offered; actions SAVE / LOAD STATE, NEXT / PREVIOUS SLOT,
+     FAST FORWARD held, PAUSE toggle at GAMEPAD, RESET / CLOSE GAME at FULL;
+     a device's PAUSE ends when it leaves or the game changes). net_probe:
+     `--settings`, `--set LAYER KEY VALUE`, `--actions`, `--action KEY`,
+     `--lang`. Tried against a scratch piccolo.
+   - **Next: remote input as RetroPad (Andrés: "Phone maps, sends RetroPad").**
+     The phone decides which touch button is which RetroPad button (per core /
+     game, kept on the phone) and sends RetroPad states; piccolo doesn't remap
+     remote pads (host remaps / turbo / combos don't apply to them). A new input
+     message type (per-port RetroPad frames, the format rollback netplay will
+     use too), the remote device placed in a port; changes piccoletto.
 3. **Milestone 6: streaming (access stream) and headless (access full)**, with
    piccoletto. Postponed (Andrés, 2026-11-19): the other milestones first. The
    discussion (two codecs: lossless delta at native size / H.264 by hardware;

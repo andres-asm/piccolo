@@ -2581,3 +2581,27 @@ msgstr "STREAM"
 msgctxt "net_access_full"
 msgid "FULL"
 msgstr "COMPLETO"
+
+msgctxt "action_slot_next"
+msgid "NEXT SLOT"
+msgstr "SLOT SIGUIENTE"
+
+msgctxt "action_slot_previous"
+msgid "PREVIOUS SLOT"
+msgstr "SLOT ANTERIOR"
+
+msgctxt "action_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
+msgctxt "action_reset"
+msgid "RESET"
+msgstr "REINICIAR"
+
+msgctxt "status_paused_remotely"
+msgid "PAUSED FROM"
+msgstr "EN PAUSA DESDE"
+
+msgctxt "status_resumed"
+msgid "RESUMED"
+msgstr "REANUDADO"

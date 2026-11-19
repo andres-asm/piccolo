@@ -49,6 +49,7 @@
 #include "input_net.h"
 #include "net_access.h"
 #include "net_games.h"
+#include "net_remote.h"
 #include "net_trust.h"
 #include "net_window.h"
 #include "file_picker.h"
@@ -114,6 +115,13 @@ struct App
     bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
     uint32_t   net_load_peer = NET_NO_PEER;
     uint32_t   net_load_id = 0;
+    NetRemote  net_remote = {};          // settings and actions from devices (net_remote.h)
+    bool       net_remote_ready = false;
+    bool       net_paused = false;       // PAUSE from a device
+    uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
+    char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
+    bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
+    NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
     // What the devices were last told runs (game_state): sent again when it changes.
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
@@ -418,7 +426,7 @@ static void update_pause(App* app)
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
-    bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
+    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused);
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
@@ -908,22 +916,7 @@ static void update_language(App* app)
     app->language_setting = setting;
     uint32_t language = piccolo_settings_language(&app->settings);
     app->session.language = piccolo_language_retro(language);
-    if (language == 0)
-    {
-        localization_use_english(&app->strings);
-        refresh_recent_labels(app);
-        return;
-    }
-
-    // lang/<code>.po: the user's copy in piccolo's folder wins over the one
-    // that comes with piccolo (next to the program).
-    std::string file = std::string("lang/") + piccolo_language_code(language) + ".po";
-    std::string user_copy = app->paths.root.empty() ? std::string() : app->paths.root + "/" + file;
-    const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
-    std::string bundled = base != nullptr ? std::string(base) + file : file;
-    host_fs_forward_slashes(bundled.data());
-    const std::string* path = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? &user_copy : &bundled;
-    localization_load_po(&app->strings, path->c_str(), piccolo_language_code(language));
+    piccolo_text_load_language(&app->strings, language, app->paths.root.c_str());
     refresh_recent_labels(app);
 }
 
@@ -1392,8 +1385,13 @@ static void app_update_input(App* app)
     }
     retro_ui_set_page_request(page);
     core_session_set_pads(&app->session, frame.pad_buttons, frame.analog);
+    bool net_fast_forward = false;
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        net_fast_forward = net_fast_forward || app->net_fast_forward[i];
+    }
     app->session.fast_forward_held =
-        game_running(app) && frame.held[static_cast<uint32_t>(InputAction::hotkey_fast_forward)];
+        game_running(app) && (frame.held[static_cast<uint32_t>(InputAction::hotkey_fast_forward)] || net_fast_forward);
     if (app->session.host != nullptr)
     {
         input_sdl_rumble(&app->input_sdl, &app->input, app->session.host->rumble, LIBRETRO_MAX_PORTS);
@@ -1830,6 +1828,200 @@ static void net_follow_game_state(App* app)
     net_send_game_state(app, NET_NO_PEER);
 }
 
+static NetRemoteGame net_remote_game(const App* app)
+{
+    NetRemoteGame game;
+    game.running = game_running(app);
+    game.slot = app->session.state_slot;
+    game.paused = app->net_paused;
+    return game;
+}
+
+static NetAccessLevel net_peer_access(const App* app, uint32_t peer)
+{
+    int32_t device = app->net.peers[peer].device;
+    if (device < 0 || static_cast<size_t>(device) >= app->net.trust.devices.size())
+    {
+        return NetAccessLevel::gamepad;
+    }
+    return app->net.trust.devices[static_cast<size_t>(device)].access;
+}
+
+// The actions one authorized peer may trigger (`id` 0: sent unasked), or
+// to all of them (NET_NO_PEER), each with its own level.
+static void net_send_actions(App* app, uint32_t peer, uint32_t id)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    NetRemoteGame game = net_remote_game(app);
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if ((peer == NET_NO_PEER || peer == i) && app->net.peers[i].state == NetAccessPeerState::authorized)
+        {
+            size_t size = net_remote_write_actions(&app->net_remote, id, app->net_peer_language[i],
+                                                   app->paths.root.c_str(), net_peer_access(app, i), &game);
+            net_access_send(&app->net, i, NetChannel::control, app->net_remote.reply.data(), size);
+        }
+    }
+}
+
+// Every loop: settings that changed (from anywhere) go to the FULL devices,
+// and the action lists again when what they show changed.
+static void net_follow_remote(App* app)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    size_t size = net_remote_next_change(&app->net_remote, &app->settings);
+    while (size > 0)
+    {
+        for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+        {
+            if (app->net.peers[i].state == NetAccessPeerState::authorized &&
+                net_peer_access(app, i) == NetAccessLevel::full)
+            {
+                net_access_send(&app->net, i, NetChannel::control, app->net_remote.reply.data(), size);
+            }
+        }
+        size = net_remote_next_change(&app->net_remote, &app->settings);
+    }
+    // A PAUSE from a device ends with another game (or none).
+    if (app->net_paused && game_running(app) != app->net_actions_sent.running)
+    {
+        app->net_paused = false;
+    }
+    NetRemoteGame game = net_remote_game(app);
+    if (game.running != app->net_actions_sent.running || game.slot != app->net_actions_sent.slot ||
+        game.paused != app->net_actions_sent.paused)
+    {
+        app->net_actions_sent = game;
+        net_send_actions(app, NET_NO_PEER, 0);
+    }
+}
+
+// An action from a device, with the same effect as its hotkey or quick
+// menu item.
+static void net_do_action(App* app, uint32_t peer, const std::string* key, bool pressed, const char* device)
+{
+    NetRemoteGame game = net_remote_game(app);
+    if (!net_remote_action_allowed(key->c_str(), net_peer_access(app, peer), &game))
+    {
+        return;
+    }
+    if (*key == "fast_forward")
+    {
+        app->net_fast_forward[peer] = pressed;   // held until released (or the device leaves)
+        return;
+    }
+    if (!pressed)
+    {
+        return;   // the others act on the press
+    }
+    if (*key == "save_state")
+    {
+        handle_menu_action(app, MenuAction::save_state);
+    }
+    else if (*key == "load_state")
+    {
+        handle_menu_action(app, MenuAction::load_state);
+    }
+    else if (*key == "slot_next" || *key == "slot_previous")
+    {
+        uint32_t slot = app->session.state_slot;
+        if (*key == "slot_next")
+        {
+            slot = slot >= LIBRETRO_STATE_SLOT_LAST ? LIBRETRO_STATE_SLOT_FIRST : slot + 1;
+        }
+        else
+        {
+            slot = slot <= LIBRETRO_STATE_SLOT_FIRST ? LIBRETRO_STATE_SLOT_LAST : slot - 1;
+        }
+        app->session.state_slot = slot;
+        app->quick_menu.slot = slot;
+        char status[64];
+        std::snprintf(status, sizeof(status), "%s %u", piccolo_text(&app->strings, Str::quick_menu_slot), slot);
+        set_status(app, status);
+    }
+    else if (*key == "pause")
+    {
+        app->net_paused = !app->net_paused;
+        app->net_paused_by = peer;
+        char status[256];
+        if (app->net_paused)
+        {
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_paused_remotely),
+                          device);
+        }
+        else
+        {
+            std::snprintf(status, sizeof(status), "%s", piccolo_text(&app->strings, Str::status_resumed));
+        }
+        set_status(app, status);
+    }
+    else if (*key == "reset")
+    {
+        handle_menu_action(app, MenuAction::reset);
+    }
+    else if (*key == "close_game")
+    {
+        app->pending_close_game = true;   // at the top of the next loop, like the quick menu's
+    }
+}
+
+// Settings and actions messages from a device (net_remote.h).
+static void net_remote_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    size_t size = net_remote_answer_settings(&app->net_remote, &app->settings, app->paths.root.c_str(),
+                                             &app->audio_devices, event->data, event->size);
+    if (size > 0)
+    {
+        net_access_send(&app->net, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        uint32_t request_id = 0;
+        uint32_t start = 0;
+        std::string language;
+        if (event->peer < NET_MAX_PEERS &&
+            net_settings_read_request(event->data, event->size, &request_id, &start, &language))
+        {
+            std::snprintf(app->net_peer_language[event->peer], sizeof(app->net_peer_language[event->peer]), "%s",
+                          language.c_str());
+        }
+        bool changed = event->data[0] == static_cast<uint8_t>(NetSettingsMessage::setting_set);
+        if (changed && !app->settings_window.open)
+        {
+            save_settings(app);   // nobody will close SETTINGS to save it
+        }
+        return;
+    }
+    uint32_t id = 0;
+    std::string language;
+    if (net_settings_read_actions_request(event->data, event->size, &id, &language))
+    {
+        if (event->peer < NET_MAX_PEERS)
+        {
+            std::snprintf(app->net_peer_language[event->peer], sizeof(app->net_peer_language[event->peer]), "%s",
+                          language.c_str());
+        }
+        NetRemoteGame game = net_remote_game(app);
+        size = net_remote_write_actions(&app->net_remote, id, language.c_str(), app->paths.root.c_str(),
+                                        net_peer_access(app, event->peer), &game);
+        net_access_send(&app->net, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        return;
+    }
+    std::string key;
+    bool pressed = false;
+    if (net_settings_read_action(event->data, event->size, &key, &pressed))
+    {
+        net_do_action(app, event->peer, &key, pressed, device);
+    }
+}
+
 // The load_result for the load_request waiting in pending_start.
 static void net_answer_load(App* app, NetContentStatus status)
 {
@@ -1923,6 +2115,10 @@ static void net_start(App* app)
     }
     app->net = NetAccess{};
     net_games_init(&app->net_games);
+    if (!app->net_remote_ready)
+    {
+        app->net_remote_ready = net_remote_init(&app->net_remote, &app->settings);
+    }
     std::string devices_path = app->paths.settings + "/net_devices.cfg";
     if (!net_access_create(&app->net, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
                            &app->net_identity, devices_path.c_str()))
@@ -2004,6 +2200,7 @@ static void net_update(App* app)
         case NetAccessEventType::authorized:
             SDL_Log("Network: \"%s\" connected from %s", device, address);
             net_send_game_state(app, event.peer);   // what runs, from the start
+            net_send_actions(app, event.peer, 0);
             break;
         case NetAccessEventType::paired:
         {
@@ -2011,9 +2208,20 @@ static void net_update(App* app)
             std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_paired), device);
             set_status(app, status);
             net_send_game_state(app, event.peer);
+            net_send_actions(app, event.peer, 0);
             break;
         }
         case NetAccessEventType::closed:
+            if (event.peer < NET_MAX_PEERS)
+            {
+                app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
+                app->net_peer_language[event.peer][0] = '\0';
+                if (app->net_paused && app->net_paused_by == event.peer)
+                {
+                    app->net_paused = false;   // nobody here could resume it
+                    set_status(app, piccolo_text(&app->strings, Str::status_resumed));
+                }
+            }
             if (app->net_load_waiting && app->net_load_peer == event.peer)
             {
                 app->net_load_waiting = false;   // the game still starts; nobody to tell
@@ -2037,6 +2245,7 @@ static void net_update(App* app)
             else if (event.channel == NetChannel::control)
             {
                 net_games_message(app, &event, device);   // net_access let through only what its level covers
+                net_remote_message(app, &event, device);
             }
             break;
         case NetAccessEventType::none:
@@ -2044,6 +2253,7 @@ static void net_update(App* app)
         }
     }
     net_follow_game_state(app);
+    net_follow_remote(app);
 }
 
 int main(int argc, char** argv)

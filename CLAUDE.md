@@ -123,6 +123,7 @@ src/
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
+  net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
@@ -141,7 +142,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
-                              net_content_folders (host: game folders as virtual paths, never left);
+                              net_content_folders (host: game folders as virtual paths, never left),
+                              net_settings (settings and actions described by the host), net_wire (fields);
                               tools/strings_generator, net_probe; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
                               tools/core_info.cpp (libretro_core_info); tests/ (test core, unit tests, Test libretro runs)
@@ -182,7 +184,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-61 tests with test-libretro (42 without). Before calling a larger change done:
+62 tests with test-libretro (43 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless

@@ -25,3 +25,12 @@ const char* piccolo_text_id(const Localization* strings, uint32_t id);
 constexpr uint32_t PICCOLO_LANGUAGE_COUNT = 2;
 const char* piccolo_language_code(uint32_t language);   // "en", "es"
 uint32_t piccolo_language_retro(uint32_t language);     // RETRO_LANGUAGE_* for cores
+
+// The language with `code` ("es"), or PICCOLO_LANGUAGE_COUNT if piccolo
+// doesn't have it.
+uint32_t piccolo_language_from_code(const char* code);
+
+// Loads `language` into `strings` (0 = English only): lang/<code>.po, the
+// user's copy in piccolo's folder (`root`, may be "") winning over the one
+// that comes with piccolo, next to the program.
+void piccolo_text_load_language(Localization* strings, uint32_t language, const char* root);

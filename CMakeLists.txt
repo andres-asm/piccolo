@@ -180,6 +180,7 @@ add_executable(piccolo
     src/input_window.cpp
     src/net_window.cpp
     src/net_games.cpp
+    src/net_remote.cpp
     src/map_window.cpp
     src/pad_picture.cpp
     src/image_window.cpp
