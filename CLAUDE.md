@@ -35,7 +35,8 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder, no PPMd)
+  (only its C 7z decoder, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/)
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
@@ -131,7 +132,12 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
-                              content_cache (extracted files, LRU); tools/strings_generator; tests/
+                              content_cache (extracted files, LRU); frontend_net (optional, with deps/enet):
+                              net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
+                              net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
+                              net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              access levels gamepad / stream / full), net_input + input_net (remote pads
+                              in the router, game-only); tools/strings_generator, net_probe; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
                               tools/core_info.cpp (libretro_core_info); tests/ (test core, unit tests, Test libretro runs)
 deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, core_options_store / cache,
@@ -171,7 +177,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-55 tests with test-libretro (36 without). Before calling a larger change done:
+60 tests with test-libretro (41 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
