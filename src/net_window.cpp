@@ -76,7 +76,21 @@ static void draw_access(NetAccess* access, uint32_t device, const Localization* 
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
 }
 
-//   ANA'S PHONE  9c77-3332-311c-4017  CONNECTED
+// The ping of a connected device's first connection, or false.
+static bool device_ping(const NetAccess* access, uint32_t device, NetLinkStats* stats)
+{
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        if (access->peers[peer].state == NetAccessPeerState::authorized &&
+            access->peers[peer].device == static_cast<int32_t>(device))
+        {
+            return net_access_peer_stats(access, peer, stats);
+        }
+    }
+    return false;
+}
+
+//   ANA'S PHONE  9c77-3332-311c-4017  CONNECTED 4 MS
 //   [GAMEPAD][STREAM][FULL]  [FORGET]
 static void draw_devices(const NetWindowContext* context)
 {
@@ -108,6 +122,14 @@ static void draw_devices(const NetWindowContext* context)
             retro_ui_push_section_text();
             ImGui::TextUnformatted(piccolo_text(strings, Str::net_device_connected));
             retro_ui_pop_section_text();
+            NetLinkStats stats;
+            if (device_ping(access, static_cast<uint32_t>(i), &stats))
+            {
+                // The round trip in milliseconds, as ENet measures it.
+                ImGui::SameLine();
+                ImGui::TextDisabled("%u MS", stats.round_trip_ms);
+                retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_ping_help));
+            }
         }
         draw_access(access, static_cast<uint32_t>(i), strings);
         ImGui::SameLine();

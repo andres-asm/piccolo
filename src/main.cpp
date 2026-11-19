@@ -50,6 +50,7 @@
 #include "net_access.h"
 #include "net_games.h"
 #include "net_remote.h"
+#include "net_speed.h"
 #include "net_trust.h"
 #include "net_window.h"
 #include "file_picker.h"
@@ -123,6 +124,9 @@ struct App
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
     NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
     uint64_t   net_controllers_sent[NET_MAX_PEERS] = {};   // a summary of the controllers each device was last sent
+    NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
+    NetSpeedReceiver net_speed_receiver;   // a speed test, up
+    bool             net_speed_reporting = false;   // the sender finished: its report goes out
     // What the devices were last told runs (game_state): sent again when it changes.
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
@@ -2192,6 +2196,72 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
     }
 }
 
+// A speed test request (net_speed.h; net_access let it through only for
+// STREAM devices). One at a time: a request during another is ignored.
+static void net_speed_request(App* app, const NetAccessEvent* event)
+{
+    uint32_t id = 0;
+    NetSpeedDirection direction = NetSpeedDirection::down;
+    uint32_t rate = 0;
+    uint32_t duration = 0;
+    if (!net_speed_read_request(event->data, event->size, &id, &direction, &rate, &duration) ||
+        app->net_speed_sender.active || app->net_speed_reporting || app->net_speed_receiver.active)
+    {
+        return;
+    }
+    double now = net_seconds();
+    if (direction == NetSpeedDirection::down)
+    {
+        net_speed_sender_start(&app->net_speed_sender, id, event->peer, rate, duration, now);
+    }
+    else
+    {
+        net_speed_receiver_start(&app->net_speed_receiver, id, event->peer,
+                                 now + static_cast<double>(duration) / 1000.0 + NET_SPEED_GRACE_SECONDS);
+    }
+}
+
+// Every loop: the down test's packets that are due, and the reports.
+static void net_speed_update(App* app)
+{
+    double now = net_seconds();
+    NetSpeedSender* sender = &app->net_speed_sender;
+    if (sender->active)
+    {
+        uint8_t packet[NET_SPEED_PACKET_SIZE];
+        uint32_t due = net_speed_sender_due(sender, now);
+        for (uint32_t i = 0; i < due; i++)
+        {
+            size_t size = net_speed_write_data(packet, sizeof(packet), sender->id, sender->sent);
+            net_access_send(&app->net, sender->peer, NetChannel::input, packet, size);
+            net_speed_sender_sent(sender, size);   // counted as sent even if ENet dropped it here: that's loss too
+        }
+        app->net_speed_reporting = !sender->active;
+    }
+    uint8_t out[64];
+    if (app->net_speed_reporting)
+    {
+        NetSpeedReport report;
+        report.id = sender->id;
+        report.direction = NetSpeedDirection::down;
+        report.packets = sender->sent;
+        report.bytes = sender->sent_bytes;
+        report.seconds = sender->duration;
+        size_t size = net_speed_write_report(out, sizeof(out), &report);
+        net_access_send(&app->net, sender->peer, NetChannel::control, out, size);
+        app->net_speed_reporting = false;
+    }
+    NetSpeedReceiver* receiver = &app->net_speed_receiver;
+    if (receiver->active && now >= receiver->until)
+    {
+        NetSpeedReport report;
+        net_speed_receiver_report(receiver, NetSpeedDirection::up, &report);
+        size_t size = net_speed_write_report(out, sizeof(out), &report);
+        net_access_send(&app->net, receiver->peer, NetChannel::control, out, size);
+        receiver->active = false;
+    }
+}
+
 // The load_result for the load_request waiting in pending_start.
 static void net_answer_load(App* app, NetContentStatus status)
 {
@@ -2384,6 +2454,15 @@ static void net_update(App* app)
             break;
         }
         case NetAccessEventType::closed:
+            if (event.peer < NET_MAX_PEERS && app->net_speed_sender.peer == event.peer)
+            {
+                app->net_speed_sender.active = false;   // its test ends with it
+                app->net_speed_reporting = false;
+            }
+            if (event.peer < NET_MAX_PEERS && app->net_speed_receiver.peer == event.peer)
+            {
+                app->net_speed_receiver.active = false;
+            }
             if (event.peer < NET_MAX_PEERS)
             {
                 app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
@@ -2418,7 +2497,16 @@ static void net_update(App* app)
             break;
         }
         case NetAccessEventType::message:
-            if (event.channel == NetChannel::input && event.device >= 0)
+            if (event.channel == NetChannel::input && event.size > 0 && event.data[0] == NET_INPUT_TYPE_SPEED)
+            {
+                // A speed test's packet (up): counted for STREAM devices only.
+                if (net_access_allows(event.access, NetAccessLevel::stream) &&
+                    event.peer == app->net_speed_receiver.peer)
+                {
+                    net_speed_receive(&app->net_speed_receiver, event.data, event.size, net_seconds());
+                }
+            }
+            else if (event.channel == NetChannel::input && event.device >= 0)
             {
                 const NetTrustedDevice* paired = &app->net.trust.devices[static_cast<size_t>(event.device)];
                 input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
@@ -2426,6 +2514,10 @@ static void net_update(App* app)
             }
             else if (event.channel == NetChannel::control)
             {
+                if (event.size > 0 && event.data[0] == NET_SPEED_REQUEST)
+                {
+                    net_speed_request(app, &event);
+                }
                 net_games_message(app, &event, device);   // net_access let through only what its level covers
                 net_remote_message(app, &event, device);
             }
@@ -2436,6 +2528,7 @@ static void net_update(App* app)
     }
     net_follow_game_state(app);
     net_follow_remote(app);
+    net_speed_update(app);
 }
 
 int main(int argc, char** argv)

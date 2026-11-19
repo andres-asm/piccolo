@@ -673,6 +673,7 @@ net_access_gamepad = GAMEPAD
 net_access_stream = STREAM
 net_access_full = FULL
 net_device_connected = CONNECTED
+net_device_ping_help = The round trip to this device and back, as the connection measures it.
 net_device_forget = FORGET
 net_device_forget_help = Unpairs this device: if it's connected now it forgets this piccolo too; either way it has to pair again to connect.
 status_net_paired = PAIRED WITH

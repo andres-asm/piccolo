@@ -2609,3 +2609,7 @@ msgstr "REANUDADO"
 msgctxt "status_net_unpaired"
 msgid "UNPAIRED:"
 msgstr "DESEMPAREJADO:"
+
+msgctxt "net_device_ping_help"
+msgid "The round trip to this device and back, as the connection measures it."
+msgstr "El viaje de ida y vuelta hasta este dispositivo, como lo mide la conexión."
