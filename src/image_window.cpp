@@ -89,14 +89,22 @@ static void draw_controls(const SettingsUiContext* context, const ImageWindowSou
         }
     }
 
-    std::snprintf(header, sizeof(header), "%s###controls", piccolo_text(context->strings, Str::image_section_controls));
+    std::snprintf(header, sizeof(header), "%s###profile", piccolo_text(context->strings, Str::image_section_profile));
     if (retro_ui_collapsing_header(header, ImGuiTreeNodeFlags_DefaultOpen))
     {
         if (!source->controls_available)
         {
-            // Without librashader there's no pass 0: the values are kept, not used.
+            // Without librashader there's no pass 0: the values (here and in
+            // PICTURE CONTROLS) are kept, not used.
             ImGui::TextDisabled("%s", piccolo_text(context->strings, Str::image_controls_unavailable));
         }
+        settings_ui_row(context, PICCOLO_IMAGE_COLOR_PROFILE, nullptr);
+        settings_ui_row(context, PICCOLO_IMAGE_PROFILE_STRENGTH, nullptr);
+    }
+
+    std::snprintf(header, sizeof(header), "%s###controls", piccolo_text(context->strings, Str::image_section_controls));
+    if (retro_ui_collapsing_header(header, ImGuiTreeNodeFlags_DefaultOpen))
+    {
         for (uint32_t i = 0; i < PICCOLO_PASS0_CONTROL_COUNT; i++)
         {
             settings_ui_row(context, PICCOLO_PASS0_CONTROLS[i].key, nullptr);
@@ -122,7 +130,7 @@ void image_window_draw(bool* open, const SettingsUiContext* context, const Image
     float controls_width = 190.0f * block;
     // Both sections' rows and headers (and the note); taller than the window
     // allows, the column scrolls.
-    float controls_height = static_cast<float>(CROP_KEY_COUNT + static_cast<int32_t>(PICCOLO_PASS0_CONTROL_COUNT) + 3) *
+    float controls_height = static_cast<float>(CROP_KEY_COUNT + static_cast<int32_t>(PICCOLO_PASS0_CONTROL_COUNT) + 6) *
                             ImGui::GetFrameHeightWithSpacing();
     float chrome_x = style.WindowPadding.x * 2.0f + style.ItemSpacing.x;
     float chrome_y = style.WindowPadding.y * 2.0f + ImGui::GetFrameHeight() +   // title bar

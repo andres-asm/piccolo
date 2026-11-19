@@ -43,6 +43,8 @@ constexpr const char* PICCOLO_VIDEO_FILTER = "video_filter";
 constexpr const char* PICCOLO_VIDEO_POSITION = "video_position";
 constexpr const char* PICCOLO_VIDEO_SHADER_PRESET = "video_shader_preset";   // a .slangp; empty = none
 // Pass 0 (shaders/pass0.slang): the picture controls, each one of its parameters.
+constexpr const char* PICCOLO_IMAGE_COLOR_PROFILE = "image_color_profile";       // a screen's colors (piccolo_color_profile_params)
+constexpr const char* PICCOLO_IMAGE_PROFILE_STRENGTH = "image_profile_strength";
 constexpr const char* PICCOLO_IMAGE_BRIGHTNESS = "image_brightness";
 constexpr const char* PICCOLO_IMAGE_CONTRAST = "image_contrast";
 constexpr const char* PICCOLO_IMAGE_SATURATION = "image_saturation";
@@ -126,6 +128,13 @@ struct PiccoloPass0Control
 };
 constexpr uint32_t PICCOLO_PASS0_CONTROL_COUNT = 10;
 extern const PiccoloPass0Control PICCOLO_PASS0_CONTROLS[PICCOLO_PASS0_CONTROL_COUNT];
+
+// The color profile's pass 0 parameters: the chosen profile's numbers (gamma
+// in, gamma out, curve, the 3x3 matrix with the luminance folded in) and the
+// strength. Names and values in the same order.
+constexpr uint32_t PICCOLO_PROFILE_PARAM_COUNT = 13;
+extern const char* const PICCOLO_PROFILE_PARAM_NAMES[PICCOLO_PROFILE_PARAM_COUNT];
+void piccolo_color_profile_params(const Settings* settings, float values[PICCOLO_PROFILE_PARAM_COUNT]);
 
 const SettingDescriptor* piccolo_settings_table();
 uint32_t piccolo_settings_count();

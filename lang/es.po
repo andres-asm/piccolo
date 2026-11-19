@@ -266,6 +266,10 @@ msgctxt "image_section_crop"
 msgid "OVERSCAN CROP"
 msgstr "RECORTE DE OVERSCAN"
 
+msgctxt "image_section_profile"
+msgid "COLOR PROFILE"
+msgstr "PERFIL DE COLOR"
+
 msgctxt "image_section_controls"
 msgid "PICTURE CONTROLS"
 msgstr "CONTROLES DE IMAGEN"
@@ -385,6 +389,78 @@ msgstr "SHADER"
 msgctxt "setting_shader_preset_help"
 msgid "A RetroArch shader preset (.slangp). Empty: none."
 msgstr "Un preset de shaders de RetroArch (.slangp). Vacío: ninguno."
+
+msgctxt "setting_image_color_profile"
+msgid "COLOR PROFILE"
+msgstr "PERFIL DE COLOR"
+
+msgctxt "setting_image_color_profile_help"
+msgid "The colors of a screen: a handheld's LCD, or an NTSC TV. NONE: unchanged."
+msgstr "Los colores de una pantalla: el LCD de una portátil, o un televisor NTSC. NINGUNO: sin cambio."
+
+msgctxt "setting_image_profile_strength"
+msgid "PROFILE STRENGTH"
+msgstr "INTENSIDAD DEL PERFIL"
+
+msgctxt "setting_image_profile_strength_help"
+msgid "How much of the profile: 0 none, 1 all of it."
+msgstr "Cuánto del perfil: 0 nada, 1 todo."
+
+msgctxt "value_color_profile_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "value_color_profile_gba"
+msgid "GAME BOY ADVANCE"
+msgstr "GAME BOY ADVANCE"
+
+msgctxt "value_color_profile_gba_sp101"
+msgid "GBA SP (AGS-101)"
+msgstr "GBA SP (AGS-101)"
+
+msgctxt "value_color_profile_gba_nso"
+msgid "GBA (SWITCH ONLINE)"
+msgstr "GBA (SWITCH ONLINE)"
+
+msgctxt "value_color_profile_gbc"
+msgid "GAME BOY COLOR"
+msgstr "GAME BOY COLOR"
+
+msgctxt "value_color_profile_gbc_gambatte"
+msgid "GBC (GAMBATTE)"
+msgstr "GBC (GAMBATTE)"
+
+msgctxt "value_color_profile_gb_micro"
+msgid "GAME BOY MICRO"
+msgstr "GAME BOY MICRO"
+
+msgctxt "value_color_profile_nds"
+msgid "NINTENDO DS"
+msgstr "NINTENDO DS"
+
+msgctxt "value_color_profile_nds_lite"
+msgid "DS LITE"
+msgstr "DS LITE"
+
+msgctxt "value_color_profile_psp"
+msgid "PSP"
+msgstr "PSP"
+
+msgctxt "value_color_profile_switch_oled"
+msgid "SWITCH OLED"
+msgstr "SWITCH OLED"
+
+msgctxt "value_color_profile_palm"
+msgid "PALM"
+msgstr "PALM"
+
+msgctxt "value_color_profile_vba"
+msgid "VISUALBOYADVANCE"
+msgstr "VISUALBOYADVANCE"
+
+msgctxt "value_color_profile_ntsc"
+msgid "NTSC (TV)"
+msgstr "NTSC (TV)"
 
 msgctxt "setting_image_brightness"
 msgid "BRIGHTNESS"

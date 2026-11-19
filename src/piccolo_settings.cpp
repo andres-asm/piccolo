@@ -40,6 +40,24 @@ static const SettingEnumValue FILTER_VALUES[] = {
     {"sharp_bilinear", text_id(Str::value_filter_sharp_bilinear)},
 };
 
+static const SettingEnumValue COLOR_PROFILE_VALUES[] = {
+    {"none", text_id(Str::value_color_profile_none)},
+    {"gba", text_id(Str::value_color_profile_gba)},
+    {"gba_sp101", text_id(Str::value_color_profile_gba_sp101)},
+    {"gba_nso", text_id(Str::value_color_profile_gba_nso)},
+    {"gbc", text_id(Str::value_color_profile_gbc)},
+    {"gbc_gambatte", text_id(Str::value_color_profile_gbc_gambatte)},
+    {"gb_micro", text_id(Str::value_color_profile_gb_micro)},
+    {"nds", text_id(Str::value_color_profile_nds)},
+    {"nds_lite", text_id(Str::value_color_profile_nds_lite)},
+    {"psp", text_id(Str::value_color_profile_psp)},
+    {"switch_oled", text_id(Str::value_color_profile_switch_oled)},
+    {"palm", text_id(Str::value_color_profile_palm)},
+    {"vba", text_id(Str::value_color_profile_vba)},
+    {"ntsc", text_id(Str::value_color_profile_ntsc)},
+};
+constexpr uint32_t COLOR_PROFILE_COUNT = sizeof(COLOR_PROFILE_VALUES) / sizeof(COLOR_PROFILE_VALUES[0]);
+
 static const SettingEnumValue POSITION_VALUES[] = {
     {"top_left", text_id(Str::value_position_top_left)},       {"top", text_id(Str::value_position_top)},       {"top_right", text_id(Str::value_position_top_right)},
     {"left", text_id(Str::value_position_left)},               {"center", text_id(Str::value_position_center)}, {"right", text_id(Str::value_position_right)},
@@ -186,6 +204,12 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_shader_preset), .help = text_id(Str::setting_shader_preset_help)},
 
     // Image: pass 0's picture controls (overridable per core / game)
+    {.key = PICCOLO_IMAGE_COLOR_PROFILE, .type = SettingType::enumeration, .default_value = "none", .overridable = true,
+     .values = COLOR_PROFILE_VALUES, .value_count = COLOR_PROFILE_COUNT, .label = text_id(Str::setting_image_color_profile),
+     .help = text_id(Str::setting_image_color_profile_help)},
+    {.key = PICCOLO_IMAGE_PROFILE_STRENGTH, .type = SettingType::real, .default_value = "1", .overridable = true,
+     .min_real = 0.0, .max_real = 1.0, .step_real = 0.05, .label = text_id(Str::setting_image_profile_strength),
+     .help = text_id(Str::setting_image_profile_strength_help)},
     {.key = PICCOLO_IMAGE_BRIGHTNESS, .type = SettingType::real, .default_value = "0", .overridable = true,
      .min_real = -1.0, .max_real = 1.0, .step_real = 0.01, .label = text_id(Str::setting_image_brightness),
      .help = text_id(Str::setting_image_brightness_help)},
@@ -366,6 +390,63 @@ static const SettingDescriptor SETTINGS[] = {
      .values = QUALITY_VALUES, .value_count = QUALITY_COUNT, .label = text_id(Str::setting_resampler_quality),
      .help = text_id(Str::setting_resampler_quality_help)},
 };
+
+// Color profiles: a screen's colors as numbers for pass 0. Same order as
+// COLOR_PROFILE_VALUES. The handheld ones are hunterk / Pokefan531's color
+// shaders in RetroArch's slang-shaders (handheld/shaders/color/<name>.slang,
+// public domain; their sRGB profile, "full white" where there's a choice):
+// to linear with gamma_in, the matrix times the luminance, back with
+// gamma_out. NTSC: NTSC 1953 primaries (illuminant C) to XYZ to sRGB, the
+// standard matrices multiplied here, back with the sRGB curve at 2.4 (as
+// RetroArch's ntsc-colors). Checked against those shaders with
+// librashader-cli: at most 1/255 apart.
+struct ColorProfile
+{
+    float gamma_in;
+    float gamma_out;
+    bool  srgb_curve;
+    float luminance;
+    float matrix[3][3];   // [output channel][input channel], R G B
+};
+
+static const ColorProfile COLOR_PROFILES[] = {
+    {1.0f, 1.0f, false, 1.0f, {{1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}}},   // NONE: unchanged
+    {2.2f, 2.2f, false, 0.91f, {{0.905f, 0.195f, -0.1f}, {0.1f, 0.65f, 0.25f}, {0.1575f, 0.1425f, 0.7f}}},   // gba-color
+    {2.2f, 2.2f, false, 0.935f, {{0.96f, 0.11f, -0.07f}, {0.0325f, 0.89f, 0.0775f}, {0.001f, -0.03f, 1.029f}}},   // sp101-color
+    {2.2f, 2.2f, false, 1.0f, {{0.865f, 0.1225f, 0.0125f}, {0.0575f, 0.925f, 0.0125f}, {0.0575f, 0.1225f, 0.82f}}},   // NSO-gba-color
+    {2.2f, 2.2f, false, 0.91f, {{0.905f, 0.195f, -0.1f}, {0.1f, 0.65f, 0.25f}, {0.1575f, 0.1425f, 0.7f}}},   // gbc-color
+    {1.0f, 1.0f, false, 1.0f, {{13.0f / 16.0f, 2.0f / 16.0f, 1.0f / 16.0f}, {0.0f, 12.0f / 16.0f, 4.0f / 16.0f}, {3.0f / 16.0f, 2.0f / 16.0f, 11.0f / 16.0f}}},   // gbc-gambatte-color
+    {2.2f, 2.2f, false, 0.9f, {{0.8025f, 0.31f, -0.1125f}, {0.1f, 0.6875f, 0.2125f}, {0.1225f, 0.1125f, 0.765f}}},   // gbMicro-color
+    {2.2f, 2.2f, false, 0.905f, {{0.835f, 0.27f, -0.105f}, {0.1f, 0.6375f, 0.2625f}, {0.105f, 0.175f, 0.72f}}},   // nds-color
+    {2.2f, 2.2f, false, 0.935f, {{0.93f, 0.14f, -0.07f}, {0.025f, 0.9f, 0.075f}, {0.008f, -0.03f, 1.022f}}},   // dslite-color
+    {2.2f, 2.2f, false, 0.87f, {{0.965f, 0.185f, -0.15f}, {0.0425f, 0.79f, 0.1675f}, {0.0175f, 0.01f, 0.9725f}}},   // psp-color
+    {2.2f, 2.2f, false, 1.0f, {{1.54f, -0.48f, -0.06f}, {-0.045f, 1.0625f, -0.0175f}, {-0.0225f, -0.075f, 1.1025f}}},   // SwitchOLED-color
+    {2.2f, 2.2f, false, 1.0f, {{0.525f, 0.13f, -0.07f}, {0.0525f, 0.545f, 0.1975f}, {0.09f, 0.15f, 0.76f}}},   // palm-color
+    {2.45f, 1.45f, false, 1.0f, {{0.73f, 0.27f, 0.0f}, {0.0825f, 0.6775f, 0.24f}, {0.0825f, 0.24f, 0.6775f}}},   // vba-color
+    {2.2f, 2.4f, true, 1.0f, {{1.5071f, -0.3724f, -0.0832f}, {-0.0275f, 0.935f, 0.067f}, {-0.0272f, -0.0401f, 1.1679f}}},   // ntsc-colors
+};
+static_assert(sizeof(COLOR_PROFILES) / sizeof(COLOR_PROFILES[0]) == COLOR_PROFILE_COUNT, "one profile per value");
+
+const char* const PICCOLO_PROFILE_PARAM_NAMES[PICCOLO_PROFILE_PARAM_COUNT] = {
+    "PROFILE_GAMMA_IN", "PROFILE_GAMMA_OUT", "PROFILE_CURVE", "PROFILE_STRENGTH",
+    "M00", "M01", "M02", "M10", "M11", "M12", "M20", "M21", "M22",
+};
+
+void piccolo_color_profile_params(const Settings* settings, float values[PICCOLO_PROFILE_PARAM_COUNT])
+{
+    const ColorProfile* profile = &COLOR_PROFILES[settings_get_enum(settings, PICCOLO_IMAGE_COLOR_PROFILE)];
+    values[0] = profile->gamma_in;
+    values[1] = profile->gamma_out;
+    values[2] = profile->srgb_curve ? 1.0f : 0.0f;
+    values[3] = static_cast<float>(settings_get_real(settings, PICCOLO_IMAGE_PROFILE_STRENGTH));
+    for (uint32_t row = 0; row < 3; row++)
+    {
+        for (uint32_t column = 0; column < 3; column++)
+        {
+            values[4 + row * 3 + column] = profile->matrix[row][column] * profile->luminance;
+        }
+    }
+}
 
 const PiccoloPass0Control PICCOLO_PASS0_CONTROLS[PICCOLO_PASS0_CONTROL_COUNT] = {
     {PICCOLO_IMAGE_BRIGHTNESS, "BRIGHTNESS"},

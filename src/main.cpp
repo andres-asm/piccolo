@@ -108,6 +108,7 @@ struct App
     std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
     std::string   shader_preset_seen;         // the preset setting those failures are for
     float         pass0_applied[PICCOLO_PASS0_CONTROL_COUNT] = {};   // what pass 0's parameters hold
+    float         profile_applied[PICCOLO_PROFILE_PARAM_COUNT] = {};  // the same for the color profile's
     bool          pass0_stale = true;         // set them all (pass 0 was just loaded)
     // The part of the core's frame on screen (a cursor maps from it to the
     // whole frame), and the ports' cursors for the core (mouse, pointer, lightgun).
@@ -1493,6 +1494,16 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         {
             shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
             app->pass0_applied[i] = value;
+        }
+    }
+    float profile[PICCOLO_PROFILE_PARAM_COUNT] = {};
+    piccolo_color_profile_params(&app->settings, profile);
+    for (uint32_t i = 0; i < PICCOLO_PROFILE_PARAM_COUNT; i++)
+    {
+        if (app->pass0_stale || profile[i] != app->profile_applied[i])
+        {
+            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
+            app->profile_applied[i] = profile[i];
         }
     }
     app->pass0_stale = false;
