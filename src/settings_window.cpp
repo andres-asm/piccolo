@@ -48,7 +48,13 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
 // row. Global only, like the other folders (greyed out in other scopes).
 static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
 {
-    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_game_folders));
+    char header[200] = {};
+    if (!retro_ui_collapsing_header(with_id(header, sizeof(header), piccolo_text(ui->strings, Str::section_game_folders),
+                                            "game_folders"),
+                                    ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        return;
+    }
     bool global = ui->scope == SettingLayer::global;
     if (!global)
     {
@@ -59,9 +65,8 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
     {
         set++;
     }
-    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
-    float spacing = ImGui::GetStyle().ItemSpacing.x;
-    float remove_width = ImGui::CalcTextSize("-").x + padding;
+    // The field as wide as the other folders', "-" where their RESET goes.
+    float remove_width = settings_ui_reset_width(ui);
     const char* label = piccolo_text(ui->strings, Str::setting_path_games);
     int32_t remove = -1;
     for (uint32_t i = 0; i < set; i++)
@@ -79,17 +84,17 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
         // can be scrolled), but a click opens CHOOSE FOLDER.
         char buffer[LIBRETRO_PATH_MAX] = {};
         std::snprintf(buffer, sizeof(buffer), "%s", settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]));
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - remove_width - spacing);
+        ImGui::SetNextItemWidth(settings_ui_widget_width(ui));
         retro_ui_push_field_text();
         ImGui::InputText("##value", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
         retro_ui_pop_field_text();
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         {
-            window->choose_game_folder = static_cast<int32_t>(i);
+            window->choose_folder_key = PICCOLO_PATH_GAMES[i];
         }
         retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_choose_help));
         ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
-        if (retro_ui_button("-"))
+        if (retro_ui_button_sized("-", remove_width, 0.0f))
         {
             remove = static_cast<int32_t>(i);
         }
@@ -106,7 +111,7 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
     ImGui::PushID("add_game_folder");
     if (retro_ui_button("+"))
     {
-        window->choose_game_folder = static_cast<int32_t>(set);
+        window->choose_folder_key = PICCOLO_PATH_GAMES[set];
     }
     ImGui::PopID();
     ImGui::EndDisabled();
@@ -132,12 +137,25 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
         settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
         ImGui::TextDisabled("%s", context->game_mode);
     }
-    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_folders));
-    settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_SAVES, context->paths->saves.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_STATES, context->paths->states.c_str());
-    ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+    // FOLDERS: rarely changed, closed until opened. A click on a field
+    // opens CHOOSE FOLDER (piccolo); RESET goes back to the default shown.
+    char header[200] = {};
+    if (retro_ui_collapsing_header(with_id(header, sizeof(header), piccolo_text(ui->strings, Str::section_folders),
+                                           "folders"),
+                                   0))
+    {
+        const char* keys[4] = {PICCOLO_PATH_CORES, PICCOLO_PATH_SYSTEM, PICCOLO_PATH_SAVES, PICCOLO_PATH_STATES};
+        const char* hints[4] = {context->paths->cores.c_str(), context->paths->system.c_str(),
+                                context->paths->saves.c_str(), context->paths->states.c_str()};
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            if (settings_ui_folder_row(ui, keys[i], hints[i]))
+            {
+                window->choose_folder_key = keys[i];
+            }
+        }
+        ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+    }
     draw_game_folders(window, ui);
 }
 

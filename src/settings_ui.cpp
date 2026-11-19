@@ -315,6 +315,62 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     return changed;
 }
 
+float settings_ui_widget_width(const SettingsUiContext* context)
+{
+    return widget_width(context);
+}
+
+float settings_ui_reset_width(const SettingsUiContext* context)
+{
+    return ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint)
+{
+    const SettingDescriptor* descriptor = settings_find(context->settings, key);
+    if (descriptor == nullptr)
+    {
+        return false;
+    }
+    bool global_only_here = !descriptor->overridable && context->scope != SettingLayer::global;
+    const char* value = settings_get_at(context->settings, context->scope, key, nullptr);
+    bool clicked = false;
+
+    ImGui::PushID(key);
+    settings_ui_marker(context, key);
+    if (global_only_here)
+    {
+        ImGui::BeginDisabled();
+    }
+    label_column(context, descriptor);
+    char buffer[LIBRETRO_PATH_MAX] = {};
+    std::snprintf(buffer, sizeof(buffer), "%s", value);
+    ImGui::SetNextItemWidth(widget_width(context));
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer),
+                             ImGuiInputTextFlags_ReadOnly);
+    retro_ui_pop_field_text();
+    clicked = !global_only_here && ImGui::IsItemClicked(ImGuiMouseButton_Left);
+    if (!global_only_here)
+    {
+        retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
+    }
+    if (global_only_here)
+    {
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            retro_ui_tooltip(piccolo_text(context->strings, Str::global_only_help));
+        }
+    }
+    else
+    {
+        settings_ui_reset_button(context, key);
+    }
+    ImGui::PopID();
+    return clicked;
+}
+
 bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* key, const char* const* choices,
                                  uint32_t choice_count, const char* empty_label, const char* missing_label)
 {
