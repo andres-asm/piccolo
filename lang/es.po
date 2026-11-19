@@ -1676,6 +1676,14 @@ msgctxt "setting_input_share_port1"
 msgid "GAMEPAD 1 AND KEYBOARD SHARE PORT 1"
 msgstr "GAMEPAD 1 Y TECLADO COMPARTEN EL PUERTO 1"
 
+msgctxt "setting_input_ports"
+msgid "PORTS"
+msgstr "PUERTOS"
+
+msgctxt "setting_input_ports_help"
+msgid "How many of the core's ports QUICK MENU > CONTROLS shows (1 to 4; per core: 2 for a SNES core, say). A controller on a port not shown stays there."
+msgstr "Cuántos de los puertos del core muestra MENÚ RÁPIDO > CONTROLES (1 a 4; por core: 2 para un core de SNES, por ejemplo). Un control en un puerto que no se muestra sigue ahí."
+
 msgctxt "setting_input_share_port1_help"
 msgid "The keyboard starts on port 1, and the first gamepad to press START joins it there (QUICK MENU > CONTROLS can take it off). Off: the keyboard joins its own port with START."
 msgstr "El teclado empieza en el puerto 1, y el primer gamepad que presione START se une ahí con él (MENÚ RÁPIDO > CONTROLES puede sacarlo). Apagado: el teclado se une a su propio puerto con START."

@@ -25,6 +25,7 @@ constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
 constexpr const char* PICCOLO_INPUT_PRESS_TIME = "input_press_seconds";   // binding: wait for a press this long, then go on
 constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // binding with SET / MAP CONTROLLER: hold this long
+constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
 constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "input_port2_device", "input_port3_device",

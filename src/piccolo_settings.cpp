@@ -144,6 +144,8 @@ static const SettingDescriptor SETTINGS[] = {
      .step_real = 0.5, .label = text_id(Str::setting_input_press_time), .help = text_id(Str::setting_input_press_time_help)},
     {.key = PICCOLO_INPUT_HOLD_TIME, .type = SettingType::real, .default_value = "0.5", .min_real = 0.1, .max_real = 5.0,
      .step_real = 0.1, .label = text_id(Str::setting_input_hold_time), .help = text_id(Str::setting_input_hold_time_help)},
+    {.key = PICCOLO_INPUT_PORTS, .type = SettingType::integer, .default_value = "4", .overridable = true, .min = 1, .max = 4,
+     .label = text_id(Str::setting_input_ports), .help = text_id(Str::setting_input_ports_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[1], .type = SettingType::integer, .default_value = "1", .overridable = true,

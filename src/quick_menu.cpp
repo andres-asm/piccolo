@@ -576,9 +576,10 @@ static void draw_device_combo(const QuickMenuContext* context, uint32_t p, float
     ImGui::AlignTextToFramePadding();
     char label[96] = {};
     std::snprintf(label, sizeof(label), "%s %u", piccolo_text(strings, Str::quick_menu_device), static_cast<unsigned>(p + 1));
+    float start = ImGui::GetCursorPosX();   // (indented in a section)
     ImGui::TextUnformatted(label);
     // At least `label_width`, wider if the label (in this language) needs it.
-    float needed = ImGui::CalcTextSize(label).x + ImGui::GetStyle().ItemSpacing.x * 2.0f + ImGui::GetStyle().WindowPadding.x;
+    float needed = start + ImGui::CalcTextSize(label).x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
     ImGui::SameLine(needed > label_width ? needed : label_width);
     const char* current = libretro_input_controller_name(&host->input_info, p, host->port_devices[p]);
     if (types->count < 2)
@@ -1432,10 +1433,22 @@ static void draw_combo_rows(QuickMenu* menu, const QuickMenuContext* context, bo
 // One of the remap's sections: a header that opens it, closing the one
 // open before (one at a time). True while it is open.
 static bool remap_section(QuickMenu* menu, int32_t index, const char* label, const char* summary, Str help,
-                          const Localization* strings)
+                          const Localization* strings, uint32_t label_chars)
 {
+    // The label padded to `label_chars` characters (a fixed-width font), so
+    // the counts after the labels line up.
+    std::string padded = label;
+    uint32_t chars = 0;
+    for (size_t c = 0; c < padded.size(); c++)
+    {
+        chars += (static_cast<unsigned char>(padded[c]) & 0xC0u) != 0x80u ? 1u : 0u;
+    }
+    for (; chars < label_chars; chars++)
+    {
+        padded += ' ';
+    }
     char text[256] = {};
-    std::snprintf(text, sizeof(text), summary[0] != '\0' ? "%s (%s)###section%d" : "%s%s###section%d", label, summary,
+    std::snprintf(text, sizeof(text), summary[0] != '\0' ? "%s (%s)###section%d" : "%s%s###section%d", padded.c_str(), summary,
                   static_cast<int>(index));
     ImGui::SetNextItemOpen(menu->remap_section == index, ImGuiCond_Always);
     bool open = retro_ui_collapsing_header(text, 0);
@@ -1835,14 +1848,27 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
     if (mouse_port || lightgun_port)
     {
         if (remap_section(menu, 0, piccolo_text(strings, lightgun_port ? Str::remap_lightgun : Str::remap_mouse), "",
-                          Str::remap_cursor_help, strings))
+                          Str::remap_cursor_help, strings, 0))
         {
             draw_action_rows(menu, context, controls, &rows_context);
         }
     }
     else
     {
-        if (remap_section(menu, 0, piccolo_text(strings, Str::remap_mapping), "", Str::input_bind_all_help, strings))
+        // (The sections' labels as long as the longest, so their counts line up.)
+        uint32_t section_chars = 0;
+        static const Str SECTIONS[4] = {Str::remap_mapping, Str::remap_turbo, Str::remap_combos, Str::remap_macros};
+        for (uint32_t t = 0; t < 4; t++)
+        {
+            const char* text = piccolo_text(strings, SECTIONS[t]);
+            uint32_t chars = 0;
+            for (const char* c = text; *c != '\0'; c++)
+            {
+                chars += (static_cast<unsigned char>(*c) & 0xC0u) != 0x80u ? 1u : 0u;
+            }
+            section_chars = chars > section_chars ? chars : section_chars;
+        }
+        if (remap_section(menu, 0, piccolo_text(strings, Str::remap_mapping), "", Str::input_bind_all_help, strings, section_chars))
         {
             ImGui::BeginDisabled(menu->capturing);
             if (retro_ui_button(piccolo_text(strings, Str::input_bind_all)) && !controls.empty())
@@ -1891,7 +1917,8 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         {
             std::snprintf(summary, sizeof(summary), "%u", static_cast<unsigned>(turbo_rows));
         }
-        if (remap_section(menu, 1, piccolo_text(strings, Str::remap_turbo), summary, Str::remap_turbo_button_help, strings))
+        if (remap_section(menu, 1, piccolo_text(strings, Str::remap_turbo), summary, Str::remap_turbo_button_help, strings,
+                          section_chars))
         {
             std::vector<RemapControl> turbo_button;
             RemapControl button = {InputAction::pad_turbo, piccolo_text(strings, Str::input_action_pad_turbo)};
@@ -1912,13 +1939,13 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         }
         std::snprintf(summary, sizeof(summary), "%u", static_cast<unsigned>(combos));
         if (remap_section(menu, 2, piccolo_text(strings, Str::remap_combos), combos > 0 ? summary : "", Str::remap_combos_help,
-                          strings))
+                          strings, section_chars))
         {
             draw_combo_rows(menu, context, false, controls, pad, rows_context.layout, rows_context.profile, rows_context.label_width);
         }
         std::snprintf(summary, sizeof(summary), "%u", static_cast<unsigned>(macros));
         if (remap_section(menu, 3, piccolo_text(strings, Str::remap_macros), macros > 0 ? summary : "", Str::remap_macros_help,
-                          strings))
+                          strings, section_chars))
         {
             draw_combo_rows(menu, context, true, controls, pad, rows_context.layout, rows_context.profile, rows_context.label_width);
         }
@@ -1965,26 +1992,19 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     const char* up = piccolo_text(strings, Str::input_move_up);
     const char* down = piccolo_text(strings, Str::input_move_down);
     const char* remap = piccolo_text(strings, Str::quick_menu_remap);
-    // The ports the core has, up to INPUT_PORT_COUNT (all of them without a
-    // game), but not those it has nothing plugged into (a SNES core: 2), unless
-    // a multitap is (its players come in on them). Controllers on hidden
-    // ports stay there, unseen.
+    // The core's ports, as many as SETTINGS > INPUT > PORTS says (4, or per
+    // core). Controllers on ports not shown stay there, unseen.
     uint32_t ports = INPUT_PORT_COUNT;
-    bool shown[INPUT_PORT_COUNT] = {true, true, true, true};
-    if (host != nullptr && host->game_loaded && host->input_info.port_count > 0)
+    if (context->settings != nullptr)
     {
-        ports = host->input_info.port_count < INPUT_PORT_COUNT ? host->input_info.port_count : INPUT_PORT_COUNT;
-        bool multitap = false;
-        for (uint32_t p = 0; p < ports; p++)
-        {
-            const char* name = libretro_input_controller_name(&host->input_info, p, host->port_devices[p]);
-            multitap = multitap || (name != nullptr && (std::strstr(name, "ultitap") != nullptr || std::strstr(name, "ULTITAP") != nullptr));
-        }
-        for (uint32_t p = 0; p < ports; p++)
-        {
-            shown[p] = p == 0 || multitap || host->port_devices[p] != RETRO_DEVICE_NONE;
-        }
+        int32_t wanted = settings_get_int(context->settings, PICCOLO_INPUT_PORTS);
+        ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted) : INPUT_PORT_COUNT;
     }
+    if (host != nullptr && host->game_loaded && host->input_info.port_count > 0 && host->input_info.port_count < ports)
+    {
+        ports = host->input_info.port_count;   // (no more than the core has)
+    }
+    bool shown[INPUT_PORT_COUNT] = {true, true, true, true};
     float label_width = 60.0f * block;
     bool anybody = false;
     // One port open at a time: its CORE DEVICE, its controllers, ADD, MOVE UP / DOWN.
@@ -2157,10 +2177,10 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
     float block = static_cast<float>(scale);
     const ImGuiIO& io = ImGui::GetIO();
     retro_ui_push_theme(pixel_font, scale);
-    // About 65 % of the window (never smaller than 360 x 240 retro pixels,
+    // About 60 % of the window (never smaller than 360 x 240 retro pixels,
     // never bigger than the window), the same every frame: a window that
     // resizes to its contents loses its scroll.
-    ImVec2 size(io.DisplaySize.x * 0.65f, io.DisplaySize.y * 0.65f);
+    ImVec2 size(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.6f);
     size.x = size.x > 360.0f * block ? size.x : 360.0f * block;
     size.y = size.y > 240.0f * block ? size.y : 240.0f * block;
     size = ImVec2(static_cast<float>(static_cast<int>(size.x)), static_cast<float>(static_cast<int>(size.y)));
