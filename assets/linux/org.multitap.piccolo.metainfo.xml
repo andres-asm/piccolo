@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.multitap.piccolo</id>
+  <name>piccolo</name>
+  <summary>A small retro libretro frontend</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description>
+    <p>
+      A libretro frontend, minimal in looks, inspired by classic emulator
+      frontends of the 90s.
+    </p>
+  </description>
+  <launchable type="desktop-id">org.multitap.piccolo.desktop</launchable>
+  <url type="homepage">https://github.com/multitap-org/piccolo</url>
+  <developer id="org.multitap">
+    <name>multitap</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <categories>
+    <category>Game</category>
+    <category>Emulator</category>
+  </categories>
+</component>

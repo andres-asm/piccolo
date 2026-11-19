@@ -1,0 +1,47 @@
+# Builds piccolo's Flatpak (flatpak/org.multitap.piccolo.yml) for x86_64 and
+# aarch64, and uploads each .flatpak bundle as an artifact. Install one with:
+#   flatpak install --user piccolo-<arch>.flatpak
+name: Flatpak
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  flatpak:
+    name: Flatpak (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-25.08
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only the submodules the build uses (deps/librashader isn't built yet
+      # and brings many submodules of its own; deps/test-libretro is optional).
+      - name: Submodules
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git submodule update --init --recursive --depth 1 \
+            deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
+            deps/speexdsp deps/gamemode \
+            deps/common/hosts-common deps/common/frontends-common \
+            deps/libretro/host-libretro deps/libretro/frontend-libretro
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: piccolo-${{ matrix.arch }}.flatpak
+          manifest-path: flatpak/org.multitap.piccolo.yml
+          arch: ${{ matrix.arch }}
+          cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
