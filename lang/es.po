@@ -1019,8 +1019,12 @@ msgid "NAME"
 msgstr "NOMBRE"
 
 msgctxt "ui_theme_save_replaces"
-msgid "REPLACES YOUR THEME WITH THIS NAME"
-msgstr "REEMPLAZA TU TEMA CON ESTE NOMBRE"
+msgid "REPLACES THIS THEME OF YOURS"
+msgstr "REEMPLAZA ESTE TEMA TUYO"
+
+msgctxt "ui_theme_save_new"
+msgid "NEW"
+msgstr "NUEVO"
 
 msgctxt "ui_theme_save_button"
 msgid "SAVE"

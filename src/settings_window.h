@@ -48,6 +48,7 @@ struct SettingsWindow
     bool         choose_scope = false;  // pick the scope on the next draw (just opened)
     bool         search_frame_delay = false;   // SEARCH AGAIN was pressed (piccolo acts on it, then clears it)
     bool         save_theme_open = false;      // the SAVE THEME popup (asks for the name)
+    std::string  save_theme_target;            // the custom theme SAVE replaces; "" = NEW (asks for a name)
     char         save_theme_name[48] = {};
     std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
     std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match

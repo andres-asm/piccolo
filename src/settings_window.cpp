@@ -361,14 +361,26 @@ static void draw_theme_preset(SettingsWindow* window, const SettingsUiContext* u
     ImGui::PopID();
 }
 
-// SAVE THEME...: a button under CUSTOM THEME, then a popup that asks for the
-// theme's name. SAVE leaves the name in window->save_theme_request for piccolo
-// to write the file (a custom theme: it never replaces a shipped one). One of
-// the user's themes' names replaces that theme.
+// SAVE THEME...: a button under CUSTOM THEME, then a popup: THEME picks
+// which of the user's own themes to replace, or NEW, which asks for a NAME.
+// SAVE leaves the name in window->save_theme_request for piccolo to write
+// the file (a custom theme: it never replaces a shipped one).
 static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui, const std::vector<PiccoloThemeFile>* files)
 {
     const Localization* strings = ui->strings;
     bool global = ui->scope == SettingLayer::global;
+
+    // The user's own themes, sorted by name.
+    std::vector<std::string> custom;
+    for (size_t i = 0; files != nullptr && i < files->size(); i++)
+    {
+        if ((*files)[i].custom)
+        {
+            custom.push_back((*files)[i].name);
+        }
+    }
+    std::sort(custom.begin(), custom.end());
+
     ImGui::PushID("ui_theme_save");
     ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
     ImGui::SameLine();
@@ -379,6 +391,15 @@ static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui,
     {
         window->save_theme_open = true;
         window->save_theme_name[0] = '\0';
+        // Start on the custom theme in use, else NEW.
+        window->save_theme_target.clear();
+        for (size_t i = 0; window->theme_custom && i < custom.size(); i++)
+        {
+            if (custom[i] == window->theme_choice)
+            {
+                window->save_theme_target = custom[i];
+            }
+        }
     }
     ImGui::EndDisabled();
     retro_ui_item_tooltip(piccolo_text(strings, Str::ui_theme_save_help));
@@ -390,36 +411,85 @@ static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui,
         ImGui::OpenPopup(title);
     }
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    // One size, tall enough for everything it may show: the title, THEME,
+    // NAME, the REPLACES line and the buttons.
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float width = static_cast<float>(static_cast<int>(viewport->Size.x * 0.4f));
+    float height = ImGui::GetFrameHeight() + style.WindowPadding.y * 2.0f + ImGui::GetFrameHeightWithSpacing() * 4.5f;   // half a row to spare for the edges
     ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.4f)), 0.0f), ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(ImVec2(width, static_cast<float>(static_cast<int>(height))), ImGuiCond_Appearing);
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
     {
         if (ImGui::IsKeyPressed(ImGuiKey_Escape))
         {
             window->save_theme_open = false;   // (B on a gamepad sends Escape while a popup is up)
         }
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(piccolo_text(strings, Str::ui_theme_save_name));
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (ImGui::IsWindowAppearing())
+        // A target that is gone (deleted from the folder) is NEW again.
+        bool target_found = window->save_theme_target.empty();
+        for (size_t i = 0; i < custom.size(); i++)
         {
-            ImGui::SetKeyboardFocusHere();
+            target_found = target_found || custom[i] == window->save_theme_target;
         }
-        retro_ui_push_field_text();
-        bool enter = ImGui::InputText("##name", window->save_theme_name, sizeof(window->save_theme_name),
-                                      ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_EnterReturnsTrue);
-        retro_ui_pop_field_text();
-
-        // The name without spaces around it.
-        std::string name = window->save_theme_name;
-        size_t first = name.find_first_not_of(' ');
-        size_t last = name.find_last_not_of(' ');
-        name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
-        bool replaces = false;
-        for (size_t i = 0; files != nullptr && i < files->size(); i++)
+        if (!target_found)
         {
-            replaces = replaces || ((*files)[i].custom && name == (*files)[i].name);
+            window->save_theme_target.clear();
+        }
+        bool is_new = window->save_theme_target.empty();
+        const char* new_label = piccolo_text(strings, Str::ui_theme_save_new);
+        const char* theme_label = piccolo_text(strings, Str::ui_theme);
+        const char* name_label = piccolo_text(strings, Str::ui_theme_save_name);
+        float label_width = std::max(ImGui::CalcTextSize(theme_label).x, ImGui::CalcTextSize(name_label).x) +
+                            ImGui::GetStyle().ItemSpacing.x * 2.0f;
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(theme_label);
+        ImGui::SameLine(label_width);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (retro_ui_begin_combo("##target", is_new ? new_label : window->save_theme_target.c_str()))
+        {
+            if (ImGui::Selectable(new_label, is_new))
+            {
+                window->save_theme_target.clear();
+            }
+            for (size_t i = 0; i < custom.size(); i++)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::Selectable(custom[i].c_str(), custom[i] == window->save_theme_target))
+                {
+                    window->save_theme_target = custom[i];
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndCombo();
+        }
+        is_new = window->save_theme_target.empty();
+
+        std::string name = window->save_theme_target;
+        bool enter = false;
+        if (is_new)
+        {
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(name_label);
+            ImGui::SameLine(label_width);
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            if (ImGui::IsWindowAppearing())
+            {
+                ImGui::SetKeyboardFocusHere();
+            }
+            retro_ui_push_field_text();
+            enter = ImGui::InputText("##name", window->save_theme_name, sizeof(window->save_theme_name),
+                                     ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_EnterReturnsTrue);
+            retro_ui_pop_field_text();
+            // The name without spaces around it.
+            name = window->save_theme_name;
+            size_t first = name.find_first_not_of(' ');
+            size_t last = name.find_last_not_of(' ');
+            name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
+        }
+        bool replaces = !is_new;
+        for (size_t i = 0; i < custom.size(); i++)
+        {
+            replaces = replaces || name == custom[i];
         }
         if (replaces)
         {
