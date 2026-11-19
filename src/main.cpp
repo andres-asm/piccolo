@@ -103,7 +103,7 @@ struct App
     uint32_t           view_frame[2] = {};       // the frame's width, height
     LibretroInputState cursor_input = {};
     bool               mouse_grabbed = false;
-    bool               mouse_released = false;   // GRAB / RELEASE MOUSE let it go
+    bool               mouse_released = false;   // MOUSE GRAB let it go
 
     // Settings (piccolo_settings.h) in <settings>/piccolo.cfg, and their window.
     Settings       settings = {};
@@ -1236,7 +1236,7 @@ static void offer_mapping(App* app, const InputFrame* frame)
 // The ports' cursors for the core: from the part of the frame on screen to
 // the whole frame (a crop shows less of it). And the mouse grabbed while a
 // port's core device is a mouse with a mouse on it (no UI up, not let go
-// with GRAB / RELEASE MOUSE).
+// with MOUSE GRAB).
 static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
 {
     for (uint32_t p = 0; p < INPUT_PORT_COUNT && p < LIBRETRO_MAX_PORTS; p++)

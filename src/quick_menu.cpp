@@ -1435,7 +1435,8 @@ static bool remap_section(QuickMenu* menu, int32_t index, const char* label, con
                           const Localization* strings)
 {
     char text[256] = {};
-    std::snprintf(text, sizeof(text), "%s%s%s###section%d", label, summary[0] != '\0' ? "   " : "", summary, static_cast<int>(index));
+    std::snprintf(text, sizeof(text), summary[0] != '\0' ? "%s (%s)###section%d" : "%s%s###section%d", label, summary,
+                  static_cast<int>(index));
     ImGui::SetNextItemOpen(menu->remap_section == index, ImGuiCond_Always);
     bool open = retro_ui_collapsing_header(text, 0);
     retro_ui_item_tooltip(piccolo_text(strings, help));
@@ -1888,7 +1889,7 @@ static void draw_remap(QuickMenu* menu, const QuickMenuContext* context, float b
         char summary[64] = {};
         if (turbo_rows > 0)
         {
-            std::snprintf(summary, sizeof(summary), "%u %s", static_cast<unsigned>(turbo_rows), piccolo_text(strings, Str::remap_turbo_on));
+            std::snprintf(summary, sizeof(summary), "%u", static_cast<unsigned>(turbo_rows));
         }
         if (remap_section(menu, 1, piccolo_text(strings, Str::remap_turbo), summary, Str::remap_turbo_button_help, strings))
         {
@@ -1944,11 +1945,10 @@ static float button_width(const char* text)
     return ImGui::CalcTextSize(text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 }
 
-// CONTROLS: the core's ports on the left (each with how many controllers
-// and its core device), the selected one on the right: its CORE DEVICE, its
-// controllers (N:N) with REMAP and UNASSIGN (that port only), ADD (any
-// connected controller not on it), MOVE UP / MOVE DOWN (the whole port).
-// START on a controller joins it.
+// CONTROLS: the core's ports, each a section (one open at a time; its header
+// says who is on it): its CORE DEVICE, its controllers (N:N) with REMAP and
+// UNASSIGN (that port only), ADD (any connected controller not on it), MOVE
+// UP / MOVE DOWN (the whole port). START on a controller joins it.
 static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, float block)
 {
     if (menu->remap)
@@ -1965,143 +1965,155 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     const char* up = piccolo_text(strings, Str::input_move_up);
     const char* down = piccolo_text(strings, Str::input_move_down);
     const char* remap = piccolo_text(strings, Str::quick_menu_remap);
-    // The ports the core has (a SNES core: 2), up to INPUT_PORT_COUNT; all of
-    // them without a game. (Controllers on the others stay there, unseen.)
+    // The ports the core has, up to INPUT_PORT_COUNT (all of them without a
+    // game), but not those it has nothing plugged into (a SNES core: 2), unless
+    // a multitap is (its players come in on them). Controllers on hidden
+    // ports stay there, unseen.
     uint32_t ports = INPUT_PORT_COUNT;
+    bool shown[INPUT_PORT_COUNT] = {true, true, true, true};
     if (host != nullptr && host->game_loaded && host->input_info.port_count > 0)
     {
         ports = host->input_info.port_count < INPUT_PORT_COUNT ? host->input_info.port_count : INPUT_PORT_COUNT;
+        bool multitap = false;
+        for (uint32_t p = 0; p < ports; p++)
+        {
+            const char* name = libretro_input_controller_name(&host->input_info, p, host->port_devices[p]);
+            multitap = multitap || (name != nullptr && (std::strstr(name, "ultitap") != nullptr || std::strstr(name, "ULTITAP") != nullptr));
+        }
+        for (uint32_t p = 0; p < ports; p++)
+        {
+            shown[p] = p == 0 || multitap || host->port_devices[p] != RETRO_DEVICE_NONE;
+        }
     }
-    menu->ports_selected = menu->ports_selected < ports ? menu->ports_selected : ports - 1;
-    uint32_t selected = menu->ports_selected;
-
-    // The ports on the left (who and what each has), the selected one on the right.
-    float list_width = 70.0f * block;
-    if (!ImGui::BeginTable("ports", 2, ImGuiTableFlags_BordersInnerV))
-    {
-        return;
-    }
-    ImGui::TableSetupColumn("list", ImGuiTableColumnFlags_WidthFixed, list_width);
-    ImGui::TableSetupColumn("detail", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
+    float label_width = 60.0f * block;
     bool anybody = false;
+    // One port open at a time: its CORE DEVICE, its controllers, ADD, MOVE UP / DOWN.
     for (uint32_t p = 0; p < ports; p++)
     {
-        anybody = anybody || !input->ports[p].empty();
-        char label[200] = {};
-        const char* device = host != nullptr && host->game_loaded
-                                 ? libretro_input_controller_name(&host->input_info, p, host->port_devices[p])
-                                 : nullptr;
-        char count[16] = {};
-        if (!input->ports[p].empty())
+        if (!shown[p])
         {
-            std::snprintf(count, sizeof(count), " (%u)", static_cast<unsigned>(input->ports[p].size()));
+            continue;
         }
-        std::snprintf(label, sizeof(label), "%s %u%s\n%s###port%u", piccolo_text(strings, Str::input_port),
-                      static_cast<unsigned>(p + 1), count, device != nullptr ? device : "-", static_cast<unsigned>(p));
-        if (ImGui::Selectable(label, p == selected))
+        anybody = anybody || !input->ports[p].empty();
+        // The header: PORT n and who is on it.
+        std::string who;
+        for (size_t m = 0; m < input->ports[p].size(); m++)
+        {
+            who += m == 0 ? "" : ", ";
+            who += input_controller_label(input, input->ports[p][m]);
+        }
+        char header[400] = {};
+        std::snprintf(header, sizeof(header), "%s %u   %s###port%u", piccolo_text(strings, Str::input_port), static_cast<unsigned>(p + 1),
+                      who.empty() ? piccolo_text(strings, Str::input_port_empty) : who.c_str(), static_cast<unsigned>(p));
+        ImGui::SetNextItemOpen(menu->ports_selected == p, ImGuiCond_Always);
+        bool open = retro_ui_collapsing_header(header, 0);
+        if (open && menu->ports_selected != p)
         {
             menu->ports_selected = p;
         }
-        if (ImGui::IsItemFocused() && ImGui::GetIO().NavVisible)
+        else if (!open && menu->ports_selected == p)
         {
-            menu->ports_selected = p;   // a gamepad moving through the list shows each port
+            menu->ports_selected = UINT32_MAX;
         }
+        if (!open)
+        {
+            continue;
+        }
+        ImGui::PushID(static_cast<int>(p));
+        ImGui::Indent(ImGui::GetStyle().IndentSpacing);
+        draw_device_combo(context, p, label_width);
+        // (A copy: UNASSIGN changes the list while it is drawn.)
+        std::vector<uint32_t> members = input->ports[p];
+        for (size_t m = 0; m < members.size(); m++)
+        {
+            uint32_t controller = members[m];
+            if (controller >= input->controllers.size())
+            {
+                continue;
+            }
+            ImGui::PushID(static_cast<int>(controller));
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(input_controller_label(input, controller).c_str());
+            right_align(button_width(unassign) + (can_remap ? button_width(remap) + spacing : 0.0f));
+            if (can_remap)
+            {
+                if (retro_ui_button(remap))
+                {
+                    menu->remap = true;
+                    menu->remap_port = p;
+                    menu->remap_controller = controller;
+                    menu->remap_section = 0;
+                }
+                ImGui::SameLine();
+            }
+            if (retro_ui_button(unassign))
+            {
+                input_port_remove(input, p, controller);
+            }
+            retro_ui_item_tooltip(piccolo_text(strings, Str::input_leave_help));
+            ImGui::PopID();
+        }
+        // ADD: a connected controller that isn't on this port (it may be on others).
+        std::vector<uint32_t> others;
+        for (uint32_t c = 0; c < input->controllers.size(); c++)
+        {
+            const InputDevice* device = input_devices_find_const(&input->devices, input->controllers[c].device_id);
+            if (device != nullptr && device->connected && !input_devices_ignored(device) && !input_port_has(input, p, c))
+            {
+                others.push_back(c);
+            }
+        }
+        if (!others.empty())
+        {
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            if (retro_ui_begin_combo("##add", piccolo_text(strings, Str::input_port_add)))
+            {
+                for (size_t o = 0; o < others.size(); o++)
+                {
+                    ImGui::PushID(static_cast<int>(others[o]));
+                    if (ImGui::Selectable(input_controller_label(input, others[o]).c_str(), false))
+                    {
+                        input_port_add(input, p, others[o]);
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        // MOVE UP / MOVE DOWN: the whole port (its controllers) swaps with the one shown next to it.
+        int32_t above = -1;
+        int32_t below = -1;
+        for (int32_t q = static_cast<int32_t>(p) - 1; q >= 0 && above < 0; q--)
+        {
+            above = shown[q] ? q : -1;
+        }
+        for (uint32_t q = p + 1; q < ports && below < 0; q++)
+        {
+            below = shown[q] ? static_cast<int32_t>(q) : -1;
+        }
+        ImGui::BeginDisabled(above < 0);
+        if (retro_ui_button(up))
+        {
+            input_swap_ports(input, p, static_cast<uint32_t>(above));
+            menu->ports_selected = static_cast<uint32_t>(above);
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(below < 0);
+        if (retro_ui_button(down))
+        {
+            input_swap_ports(input, p, static_cast<uint32_t>(below));
+            menu->ports_selected = static_cast<uint32_t>(below);
+        }
+        ImGui::EndDisabled();
+        ImGui::Unindent(ImGui::GetStyle().IndentSpacing);
+        ImGui::PopID();
     }
     if (!anybody)
     {
         ImGui::Spacing();
-        ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", piccolo_text(strings, Str::quick_menu_no_ports));
-        ImGui::PopTextWrapPos();
     }
-
-    ImGui::TableSetColumnIndex(1);
-    float label_width = 60.0f * block;
-    uint32_t p = selected;
-    draw_device_combo(context, p, label_width);
-    // (A copy: UNASSIGN changes the list while it is drawn.)
-    std::vector<uint32_t> members = input->ports[p];
-    if (members.empty())
-    {
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextDisabled("%s", piccolo_text(strings, Str::input_port_empty));
-    }
-    for (size_t m = 0; m < members.size(); m++)
-    {
-        uint32_t controller = members[m];
-        if (controller >= input->controllers.size())
-        {
-            continue;
-        }
-        ImGui::PushID(static_cast<int>(controller));
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(input_controller_label(input, controller).c_str());
-        right_align(button_width(unassign) + (can_remap ? button_width(remap) + spacing : 0.0f));
-        if (can_remap)
-        {
-            if (retro_ui_button(remap))
-            {
-                menu->remap = true;
-                menu->remap_port = p;
-                menu->remap_controller = controller;
-                menu->remap_section = 0;
-            }
-            ImGui::SameLine();
-        }
-        if (retro_ui_button(unassign))
-        {
-            input_port_remove(input, p, controller);
-        }
-        retro_ui_item_tooltip(piccolo_text(strings, Str::input_leave_help));
-        ImGui::PopID();
-    }
-    // ADD: a connected controller that isn't on this port (it may be on others).
-    std::vector<uint32_t> others;
-    for (uint32_t c = 0; c < input->controllers.size(); c++)
-    {
-        const InputDevice* device = input_devices_find_const(&input->devices, input->controllers[c].device_id);
-        if (device != nullptr && device->connected && !input_devices_ignored(device) && !input_port_has(input, p, c))
-        {
-            others.push_back(c);
-        }
-    }
-    if (!others.empty())
-    {
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        if (retro_ui_begin_combo("##add", piccolo_text(strings, Str::input_port_add)))
-        {
-            for (size_t o = 0; o < others.size(); o++)
-            {
-                ImGui::PushID(static_cast<int>(others[o]));
-                if (ImGui::Selectable(input_controller_label(input, others[o]).c_str(), false))
-                {
-                    input_port_add(input, p, others[o]);
-                }
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
-    }
-    // MOVE UP / MOVE DOWN: the whole port (its controllers) swaps with the next one.
-    ImGui::Spacing();
-    ImGui::BeginDisabled(p == 0);
-    if (retro_ui_button(up))
-    {
-        input_swap_ports(input, p, p - 1);
-        menu->ports_selected = p - 1;
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ImGui::BeginDisabled(p + 1 >= ports);
-    if (retro_ui_button(down))
-    {
-        input_swap_ports(input, p, p + 1);
-        menu->ports_selected = p + 1;
-    }
-    ImGui::EndDisabled();
-    ImGui::EndTable();
 }
 
 // A SET / BIND ALL nobody looks at any more (the menu closed by any of its
@@ -2145,10 +2157,10 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
     float block = static_cast<float>(scale);
     const ImGuiIO& io = ImGui::GetIO();
     retro_ui_push_theme(pixel_font, scale);
-    // About 75 % of the window (never smaller than 360 x 240 retro pixels,
+    // About 65 % of the window (never smaller than 360 x 240 retro pixels,
     // never bigger than the window), the same every frame: a window that
     // resizes to its contents loses its scroll.
-    ImVec2 size(io.DisplaySize.x * 0.75f, io.DisplaySize.y * 0.75f);
+    ImVec2 size(io.DisplaySize.x * 0.65f, io.DisplaySize.y * 0.65f);
     size.x = size.x > 360.0f * block ? size.x : 360.0f * block;
     size.y = size.y > 240.0f * block ? size.y : 240.0f * block;
     size = ImVec2(static_cast<float>(static_cast<int>(size.x)), static_cast<float>(static_cast<int>(size.y)));

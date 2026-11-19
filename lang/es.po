@@ -1563,10 +1563,6 @@ msgctxt "remap_lightgun"
 msgid "LIGHTGUN"
 msgstr "PISTOLA"
 
-msgctxt "remap_turbo_on"
-msgid "ON"
-msgstr "ACTIVOS"
-
 msgctxt "remap_back_help"
 msgid "Back to the ports. The remap is kept, and HOLD START TO REMAP won't ask about it again."
 msgstr "Vuelve a los puertos. El remapeo se guarda, y HOLD START TO REMAP no vuelve a preguntar por él."
@@ -1652,8 +1648,8 @@ msgid "FAST FORWARD"
 msgstr "AVANCE RÁPIDO"
 
 msgctxt "input_action_hotkey_grab_mouse"
-msgid "GRAB / RELEASE MOUSE"
-msgstr "ATRAPAR / SOLTAR MOUSE"
+msgid "MOUSE GRAB"
+msgstr "ATRAPAR MOUSE"
 
 
 
