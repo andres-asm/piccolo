@@ -207,6 +207,12 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
   overlay, on-screen messages redesign.
 - Untested on hardware: SN30 over USB (unknown pad), Genesis / Saturn layouts,
   Shield touchpad pointer, mouse grab, lightguns (Zapper, Super Scope).
+- Network (merged 2026-11-19; pending work in docs/netcode-pending.md): one UDP port
+  (ENet) with LAN discovery, Noise XX encryption, 6-digit pairing, access levels
+  gamepad / stream / full; remote pads (standard pads remapped here, or RetroPad mapped
+  on the phone), what runs, actions (save / load state, slot, fast forward, pause,
+  reset, close), settings, controllers per port, game folders browsed and games loaded
+  from the client. SETTINGS > NETWORK. Remote play (streaming) not started.
 - Next: shaders (milestone 6): librashader is in deps/, not wired yet.
 - Release plan (early December): piccolo + piccoletto (Android: remote input,
   streaming). Branches `android`, `big-picture` still need adapting to deps/.
