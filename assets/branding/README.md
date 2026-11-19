@@ -18,14 +18,14 @@ the font installed.
 
 ## Colors
 
-From the PICCOLO theme (`src/piccolo_settings.cpp`), plus one warm accent:
+From the BLUE theme (the default) (`src/piccolo_settings.cpp`), plus one warm accent:
 
 | Use                 | Dark page | Light page |
 |---------------------|-----------|------------|
-| Text                | `#E9DEF2` | `#2F1644`  |
-| Hard shadow (6/150) | `#1D0E2A` | `#CAB0E0`  |
-| Background          | `#4B246E` | `#EFE7F6`  |
-| Icon tile           | `#2F1644` | `#2F1644`  |
+| Text                | `#E0E6F0` | `#1A2840`  |
+| Hard shadow (6/150) | `#101828` | `#B4C2DC`  |
+| Background          | `#2A4068` | `#E8EDF5`  |
+| Icon tile           | `#1A2840` | `#1A2840`  |
 | Accent (first «o»)  | `#FFC93C` | `#FFC93C`  |
 
 ## Type

@@ -134,16 +134,17 @@ CONFIG > INTERFACE sets the look. THEME sets everything at once:
 
 | Theme | Look |
 |-------|------|
-| PICCOLO | blue and flat, no shadows |
-| CLASSIC | a purple background, a blue gradient menu bar with a box behind each menu title, grey menus with a magenta highlight, blue windows with gradient title bars and black fields, raised buttons and check boxes, sunken lists, drop shadows under windows and text, an orange arrow cursor |
-| MODERN | flat and dark, never a shadow; the menus are the bar's color |
+| BLUE | navy and flat, no shadows (the default) |
+| PURPLE | the same in atomic purple |
+| ZSNES | a purple background, a blue gradient menu bar with a box behind each menu title, grey menus with a magenta highlight, blue windows with gradient title bars and black fields, raised buttons and check boxes, sunken lists, drop shadows under windows and text, an orange arrow cursor |
+| BLACK | flat and dark, never a shadow; the menus are the bar's color |
 
 Every color can also be changed on its own (THEME then shows CUSTOM), as
 can MENU TITLE BOXES, DROP SHADOWS and THEME CURSOR (piccolo draws its own
 pixel arrow instead of the system's, while the menu or a window is up).
 Raised and sunken edges (buttons, check boxes, scroll bars, color swatches,
 lists) appear when a theme's button edges have two colors; with one color,
-as in PICCOLO and MODERN, everything stays flat. The background color shows
+as in BLUE, PURPLE and BLACK, everything stays flat. The background color shows
 only without a game: around a running game it's black. The interface
 settings are global and live in `settings/piccolo.cfg` (`ui_` keys).
 

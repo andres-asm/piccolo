@@ -15,10 +15,10 @@
 struct ImFont;
 
 // The colors of the whole UI (0xAARRGGBB; alpha is always FF). Themes are
-// palettes (decided by Andrés, 2026-11-14): PICCOLO (atomic purple, the default since
-// 2026-11-19), BLUE (the original navy colors),
-// CLASSIC (a blue gradient bar with grey boxes behind the menu titles) and
-// MODERN (flat, the dropdowns the same color as the bar); every color can
+// palettes (decided by Andrés, 2026-11-14, renamed 2026-11-19): BLUE (navy, the
+// default), PURPLE (atomic purple), ZSNES (a blue gradient bar with grey boxes
+// behind the menu titles) and BLACK (flat, the dropdowns the same color as the
+// bar); every color can
 // also be set on its own in SETTINGS > INTERFACE.
 struct RetroUiPalette
 {
@@ -60,10 +60,10 @@ struct RetroUiPalette
 
 enum class RetroUiTheme
 {
-    piccolo,
     blue,
-    classic,
-    modern,
+    purple,
+    zsnes,
+    black,
     count,
 };
 
@@ -158,7 +158,7 @@ bool retro_ui_collapsing_header(const char* label, int flags);
 bool retro_ui_begin_combo(const char* label, const char* preview);
 
 // Text that must stand out (the row being bound): the section title color
-// (yellow in CLASSIC), or the highlight color where that is the text color.
+// (yellow in ZSNES), or the highlight color where that is the text color.
 void retro_ui_push_section_text();
 void retro_ui_pop_section_text();
 uint32_t retro_ui_attention_color();   // that color as ImGui's packed color (ImU32)

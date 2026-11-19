@@ -236,75 +236,75 @@ static const SettingDescriptor SETTINGS[] = {
      .help = text_id(Str::setting_window_remember_help)},
 
     // Interface (global-only): MENU TITLE BOXES and the palette; defaults =
-    // the PICCOLO theme (retro_ui.cpp). The THEME presets set them all.
+    // the BLUE theme (retro_ui.cpp). The THEME presets set them all.
     {.key = PICCOLO_UI_MENU_BOXES, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_menu_boxes), .help = text_id(Str::setting_ui_menu_boxes_help)},
     {.key = PICCOLO_UI_SHADOWS, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_shadows), .help = text_id(Str::setting_ui_shadows_help)},
     {.key = PICCOLO_UI_COLOR_BACKGROUND, .type = SettingType::color, .default_value = "#000000",
      .label = text_id(Str::setting_ui_color_background), .help = text_id(Str::setting_ui_color_background_help)},
-    {.key = PICCOLO_UI_COLOR_BAR, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BAR, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_bar), .help = text_id(Str::setting_ui_color_bar_help)},
-    {.key = PICCOLO_UI_COLOR_BAR_CENTER, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BAR_CENTER, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_bar_center), .help = text_id(Str::setting_ui_color_bar_center_help)},
-    {.key = PICCOLO_UI_COLOR_BAR_LIGHT, .type = SettingType::color, .default_value = "#8350B0",
+    {.key = PICCOLO_UI_COLOR_BAR_LIGHT, .type = SettingType::color, .default_value = "#5878A8",
      .label = text_id(Str::setting_ui_color_bar_light), .help = text_id(Str::setting_ui_color_bar_light_help)},
-    {.key = PICCOLO_UI_COLOR_BAR_DARK, .type = SettingType::color, .default_value = "#2F1644",
+    {.key = PICCOLO_UI_COLOR_BAR_DARK, .type = SettingType::color, .default_value = "#1A2840",
      .label = text_id(Str::setting_ui_color_bar_dark), .help = text_id(Str::setting_ui_color_bar_dark_help)},
-    {.key = PICCOLO_UI_COLOR_MENU_BOX, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_MENU_BOX, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_menu_box), .help = text_id(Str::setting_ui_color_menu_box_help)},
-    {.key = PICCOLO_UI_COLOR_MENU_BOX_LIGHT, .type = SettingType::color, .default_value = "#8350B0",
+    {.key = PICCOLO_UI_COLOR_MENU_BOX_LIGHT, .type = SettingType::color, .default_value = "#5878A8",
      .label = text_id(Str::setting_ui_color_menu_box_light), .help = text_id(Str::setting_ui_color_menu_box_light_help)},
-    {.key = PICCOLO_UI_COLOR_MENU_BOX_DARK, .type = SettingType::color, .default_value = "#8350B0",
+    {.key = PICCOLO_UI_COLOR_MENU_BOX_DARK, .type = SettingType::color, .default_value = "#5878A8",
      .label = text_id(Str::setting_ui_color_menu_box_dark), .help = text_id(Str::setting_ui_color_menu_box_dark_help)},
-    {.key = PICCOLO_UI_COLOR_MENU, .type = SettingType::color, .default_value = "#4B246E",
+    {.key = PICCOLO_UI_COLOR_MENU, .type = SettingType::color, .default_value = "#2A4068",
      .label = text_id(Str::setting_ui_color_menu), .help = text_id(Str::setting_ui_color_menu_help)},
-    {.key = PICCOLO_UI_COLOR_WINDOW, .type = SettingType::color, .default_value = "#4B246E",
+    {.key = PICCOLO_UI_COLOR_WINDOW, .type = SettingType::color, .default_value = "#2A4068",
      .label = text_id(Str::setting_ui_color_window), .help = text_id(Str::setting_ui_color_window_help)},
-    {.key = PICCOLO_UI_COLOR_WINDOW_LIGHT, .type = SettingType::color, .default_value = "#8350B0",
+    {.key = PICCOLO_UI_COLOR_WINDOW_LIGHT, .type = SettingType::color, .default_value = "#5878A8",
      .label = text_id(Str::setting_ui_color_window_light), .help = text_id(Str::setting_ui_color_window_light_help)},
-    {.key = PICCOLO_UI_COLOR_WINDOW_DARK, .type = SettingType::color, .default_value = "#1D0E2A",
+    {.key = PICCOLO_UI_COLOR_WINDOW_DARK, .type = SettingType::color, .default_value = "#101828",
      .label = text_id(Str::setting_ui_color_window_dark), .help = text_id(Str::setting_ui_color_window_dark_help)},
-    {.key = PICCOLO_UI_COLOR_FIELD, .type = SettingType::color, .default_value = "#371951",
+    {.key = PICCOLO_UI_COLOR_FIELD, .type = SettingType::color, .default_value = "#1E2E4C",
      .label = text_id(Str::setting_ui_color_field), .help = text_id(Str::setting_ui_color_field_help)},
-    {.key = PICCOLO_UI_COLOR_FIELD_HOVER, .type = SettingType::color, .default_value = "#432161",
+    {.key = PICCOLO_UI_COLOR_FIELD_HOVER, .type = SettingType::color, .default_value = "#26385C",
      .label = text_id(Str::setting_ui_color_field_hover), .help = text_id(Str::setting_ui_color_field_hover_help)},
-    {.key = PICCOLO_UI_COLOR_HIGHLIGHT, .type = SettingType::color, .default_value = "#A067D1",
+    {.key = PICCOLO_UI_COLOR_HIGHLIGHT, .type = SettingType::color, .default_value = "#7090C8",
      .label = text_id(Str::setting_ui_color_highlight), .help = text_id(Str::setting_ui_color_highlight_help)},
-    {.key = PICCOLO_UI_COLOR_TEXT, .type = SettingType::color, .default_value = "#E9DEF2",
+    {.key = PICCOLO_UI_COLOR_TEXT, .type = SettingType::color, .default_value = "#E0E6F0",
      .label = text_id(Str::setting_ui_color_text), .help = text_id(Str::setting_ui_color_text_help)},
     {.key = PICCOLO_UI_COLOR_TEXT_HIGHLIGHT, .type = SettingType::color, .default_value = "#FFFFFF",
      .label = text_id(Str::setting_ui_color_text_highlight), .help = text_id(Str::setting_ui_color_text_highlight_help)},
-    {.key = PICCOLO_UI_COLOR_TEXT_DISABLED, .type = SettingType::color, .default_value = "#9A7BB5",
+    {.key = PICCOLO_UI_COLOR_TEXT_DISABLED, .type = SettingType::color, .default_value = "#8090B0",
      .label = text_id(Str::setting_ui_color_text_disabled), .help = text_id(Str::setting_ui_color_text_disabled_help)},
-    {.key = PICCOLO_UI_COLOR_TEXT_SHADOW, .type = SettingType::color, .default_value = "#1D0E2A",
+    {.key = PICCOLO_UI_COLOR_TEXT_SHADOW, .type = SettingType::color, .default_value = "#101828",
      .label = text_id(Str::setting_ui_color_text_shadow), .help = text_id(Str::setting_ui_color_text_shadow_help)},
 
-    {.key = PICCOLO_UI_COLOR_TITLE, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_TITLE, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_title), .help = text_id(Str::setting_ui_color_title_help)},
-    {.key = PICCOLO_UI_COLOR_TITLE_BOTTOM, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_TITLE_BOTTOM, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_title_bottom), .help = text_id(Str::setting_ui_color_title_bottom_help)},
     {.key = PICCOLO_UI_COLOR_CHECK, .type = SettingType::color, .default_value = "#FFFFFF",
      .label = text_id(Str::setting_ui_color_check), .help = text_id(Str::setting_ui_color_check_help)},
-    {.key = PICCOLO_UI_COLOR_SECTION, .type = SettingType::color, .default_value = "#E9DEF2",
+    {.key = PICCOLO_UI_COLOR_SECTION, .type = SettingType::color, .default_value = "#E0E6F0",
      .label = text_id(Str::setting_ui_color_section), .help = text_id(Str::setting_ui_color_section_help)},
     {.key = PICCOLO_UI_THEME_CURSOR, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_theme_cursor), .help = text_id(Str::setting_ui_theme_cursor_help)},
-    {.key = PICCOLO_UI_COLOR_BUTTON, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BUTTON, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_button), .help = text_id(Str::setting_ui_color_button_help)},
-    {.key = PICCOLO_UI_COLOR_BUTTON_BOTTOM, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BUTTON_BOTTOM, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_button_bottom), .help = text_id(Str::setting_ui_color_button_bottom_help)},
-    {.key = PICCOLO_UI_COLOR_BUTTON_LIGHT, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BUTTON_LIGHT, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_button_light), .help = text_id(Str::setting_ui_color_button_light_help)},
-    {.key = PICCOLO_UI_COLOR_BUTTON_DARK, .type = SettingType::color, .default_value = "#5B2D83",
+    {.key = PICCOLO_UI_COLOR_BUTTON_DARK, .type = SettingType::color, .default_value = "#34507C",
      .label = text_id(Str::setting_ui_color_button_dark), .help = text_id(Str::setting_ui_color_button_dark_help)},
-    {.key = PICCOLO_UI_COLOR_BUTTON_TEXT, .type = SettingType::color, .default_value = "#E9DEF2",
+    {.key = PICCOLO_UI_COLOR_BUTTON_TEXT, .type = SettingType::color, .default_value = "#E0E6F0",
      .label = text_id(Str::setting_ui_color_button_text), .help = text_id(Str::setting_ui_color_button_text_help)},
-    {.key = PICCOLO_UI_COLOR_FIELD_TEXT, .type = SettingType::color, .default_value = "#E9DEF2",
+    {.key = PICCOLO_UI_COLOR_FIELD_TEXT, .type = SettingType::color, .default_value = "#E0E6F0",
      .label = text_id(Str::setting_ui_color_field_text), .help = text_id(Str::setting_ui_color_field_text_help)},
-    {.key = PICCOLO_UI_COLOR_CURSOR, .type = SettingType::color, .default_value = "#C282FA",
+    {.key = PICCOLO_UI_COLOR_CURSOR, .type = SettingType::color, .default_value = "#8CB4F0",
      .label = text_id(Str::setting_ui_color_cursor), .help = text_id(Str::setting_ui_color_cursor_help)},
-    {.key = PICCOLO_UI_COLOR_CURSOR_EDGE, .type = SettingType::color, .default_value = "#C282FA",
+    {.key = PICCOLO_UI_COLOR_CURSOR_EDGE, .type = SettingType::color, .default_value = "#8CB4F0",
      .label = text_id(Str::setting_ui_color_cursor_edge), .help = text_id(Str::setting_ui_color_cursor_edge_help)},
 
     // Sound. Volume and latency overridable per core / game (plan-milestones,
@@ -618,7 +618,7 @@ const char* piccolo_settings_ui_color_key(uint32_t index)
 
 void piccolo_settings_palette(const Settings* settings, RetroUiPalette* palette)
 {
-    *palette = *retro_ui_theme_palette(RetroUiTheme::piccolo);
+    *palette = *retro_ui_theme_palette(RetroUiTheme::blue);
     palette->menu_boxes = settings_get_bool(settings, PICCOLO_UI_MENU_BOXES);
     palette->shadows = settings_get_bool(settings, PICCOLO_UI_SHADOWS);
     palette->theme_cursor = settings_get_bool(settings, PICCOLO_UI_THEME_CURSOR);
@@ -632,14 +632,14 @@ Str piccolo_settings_ui_theme_name(RetroUiTheme theme)
 {
     switch (theme)
     {
-    case RetroUiTheme::piccolo:
-        return Str::theme_piccolo;
     case RetroUiTheme::blue:
         return Str::theme_blue;
-    case RetroUiTheme::classic:
-        return Str::theme_classic;
-    case RetroUiTheme::modern:
-        return Str::theme_modern;
+    case RetroUiTheme::purple:
+        return Str::theme_purple;
+    case RetroUiTheme::zsnes:
+        return Str::theme_zsnes;
+    case RetroUiTheme::black:
+        return Str::theme_black;
     case RetroUiTheme::count:
         break;
     }
@@ -706,7 +706,7 @@ bool piccolo_settings_complete_ui_theme(Settings* settings)
     // How many saved values each theme agrees with.
     uint32_t saved = 0;
     uint32_t best_score = 0;
-    RetroUiTheme best = RetroUiTheme::piccolo;
+    RetroUiTheme best = RetroUiTheme::blue;
     for (uint32_t t = 0; t < static_cast<uint32_t>(RetroUiTheme::count); t++)
     {
         RetroUiPalette theme = *retro_ui_theme_palette(static_cast<RetroUiTheme>(t));

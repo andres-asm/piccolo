@@ -12,7 +12,17 @@ constexpr float RETRO_UI_SCROLLBAR_GAP = 4.0f;
 
 // The built-in themes (0xAARRGGBB).
 static const RetroUiPalette THEMES[] = {
-    // PICCOLO: atomic purple, a see-through grape like the handheld shells; no
+    // BLUE: piccolo's colors, navy blue, the default; no drop shadows on windows.
+    {0xFF000000u, false,
+     0xFF34507Cu, 0xFF34507Cu, 0xFF5878A8u, 0xFF1A2840u,
+     false, 0xFF34507Cu, 0xFF5878A8u, 0xFF5878A8u,
+     0xFF2A4068u, 0xFF2A4068u, 0xFF5878A8u, 0xFF101828u,
+     0xFF1E2E4Cu, 0xFF26385Cu, 0xFF7090C8u,
+     0xFFE0E6F0u, 0xFFFFFFFFu, 0xFF8090B0u, 0xFF101828u,
+     0xFF34507Cu, 0xFF34507Cu,
+     0xFFFFFFFFu, 0xFFE0E6F0u,
+     0xFF34507Cu, 0xFF34507Cu, 0xFF34507Cu, 0xFFE0E6F0u, 0xFFE0E6F0u, false, 0xFF8CB4F0u, 0xFF34507Cu, 0xFF8CB4F0u},
+    // PURPLE: atomic purple, a see-through grape like the handheld shells; no
     // drop shadows on windows.
     {0xFF000000u, false,
      0xFF5B2D83u, 0xFF5B2D83u, 0xFF8350B0u, 0xFF2F1644u,
@@ -23,17 +33,7 @@ static const RetroUiPalette THEMES[] = {
      0xFF5B2D83u, 0xFF5B2D83u,
      0xFFFFFFFFu, 0xFFE9DEF2u,
      0xFF5B2D83u, 0xFF5B2D83u, 0xFF5B2D83u, 0xFFE9DEF2u, 0xFFE9DEF2u, false, 0xFFC282FAu, 0xFF5B2D83u, 0xFFC282FAu},
-    // BLUE: piccolo's first colors, navy blue; no drop shadows on windows.
-    {0xFF000000u, false,
-     0xFF34507Cu, 0xFF34507Cu, 0xFF5878A8u, 0xFF1A2840u,
-     false, 0xFF34507Cu, 0xFF5878A8u, 0xFF5878A8u,
-     0xFF2A4068u, 0xFF2A4068u, 0xFF5878A8u, 0xFF101828u,
-     0xFF1E2E4Cu, 0xFF26385Cu, 0xFF7090C8u,
-     0xFFE0E6F0u, 0xFFFFFFFFu, 0xFF8090B0u, 0xFF101828u,
-     0xFF34507Cu, 0xFF34507Cu,
-     0xFFFFFFFFu, 0xFFE0E6F0u,
-     0xFF34507Cu, 0xFF34507Cu, 0xFF34507Cu, 0xFFE0E6F0u, 0xFFE0E6F0u, false, 0xFF8CB4F0u, 0xFF34507Cu, 0xFF8CB4F0u},
-    // CLASSIC: purple background, a deep blue gradient bar with grey boxes
+    // ZSNES: purple background, a deep blue gradient bar with grey boxes
     // behind the menu titles, grey menus with a magenta highlight, blue
     // windows with black fields, drop shadows everywhere.
     {0xFF422D84u, true,
@@ -45,7 +45,7 @@ static const RetroUiPalette THEMES[] = {
      0xFF7C76A6u, 0xFF383C5Fu,
      0xFFB01818u, 0xFF9C9C68u,
      0xFF7C76A6u, 0xFFA29EC8u, 0xFF262840u, 0xFFCECFCEu, 0xFF00E000u, true, 0xFFF56F37u, 0xFF383C5Fu, 0xFFF64D25u},
-    // MODERN: flat and dark, never a shadow; the menus are the bar's color.
+    // BLACK: flat and dark, never a shadow; the menus are the bar's color.
     {0xFF000000u, false,
      0xFF1E222Au, 0xFF1E222Au, 0xFF1E222Au, 0xFF1E222Au,
      false, 0xFF1E222Au, 0xFF1E222Au, 0xFF1E222Au,

@@ -986,21 +986,21 @@ msgctxt "ui_theme_help"
 msgid "Sets every color below at once. Change them one by one for your own."
 msgstr "Cambia todos los colores de abajo a la vez. Cámbialos uno por uno para hacer el tuyo."
 
-msgctxt "theme_piccolo"
-msgid "PICCOLO"
-msgstr "PICCOLO"
-
 msgctxt "theme_blue"
 msgid "BLUE"
 msgstr "AZUL"
 
-msgctxt "theme_classic"
-msgid "CLASSIC"
-msgstr "CLÁSICO"
+msgctxt "theme_purple"
+msgid "PURPLE"
+msgstr "MORADO"
 
-msgctxt "theme_modern"
-msgid "MODERN"
-msgstr "MODERNO"
+msgctxt "theme_zsnes"
+msgid "ZSNES"
+msgstr "ZSNES"
+
+msgctxt "theme_black"
+msgid "BLACK"
+msgstr "NEGRO"
 
 msgctxt "section_colors"
 msgid "COLORS"
