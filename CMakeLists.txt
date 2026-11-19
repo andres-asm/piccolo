@@ -72,7 +72,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Submodule check
 # ---------------------------------------------------------------------------
 foreach(_dep imgui/imgui.cpp libretro-common/include/libretro.h libsamplerate/src/samplerate.c
-             common/hosts-common/CMakeLists.txt common/frontends-common/CMakeLists.txt
+             common/hosts-common/CMakeLists.txt common/frontends-common/CMakeLists.txt common/retroui/CMakeLists.txt
              libretro/host-libretro/CMakeLists.txt libretro/frontend-libretro/CMakeLists.txt)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${_dep}")
         message(FATAL_ERROR "deps/${_dep} is missing. Run: git submodule update --init --recursive")
@@ -142,6 +142,7 @@ endif()
 add_subdirectory(deps/libretro/host-libretro)
 add_subdirectory(deps/common/frontends-common)
 add_subdirectory(deps/libretro/frontend-libretro)
+add_subdirectory(deps/common/retroui)
 
 # ---------------------------------------------------------------------------
 # piccolo
@@ -149,26 +150,15 @@ add_subdirectory(deps/libretro/frontend-libretro)
 # Plays games through frontend-libretro's core session, with a retro-style UI
 # (themed ImGui widgets with piccolo's pixel font).
 
-# piccolo's own pixel font (5x5, drawn for piccolo; see src/pixel_font.h).
-# A small library so the preview tool and, later, piccolo's UI share it.
-add_library(piccolo_font STATIC
-    src/pixel_font.cpp
-)
-target_include_directories(piccolo_font PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-multitap_set_project_flags(piccolo_font)
-
 add_executable(piccolo
     src/main.cpp
     src/menus.cpp
-    src/retro_ui.cpp
-    src/pixel_font_imgui.cpp
     src/file_picker.cpp
     src/piccolo_settings.cpp
     src/settings_ui.cpp
     src/settings_window.cpp
     src/input_window.cpp
     src/map_window.cpp
-    src/pad_picture.cpp
     src/image_window.cpp
     src/piccolo_window.cpp
     src/piccolo_text.cpp
@@ -244,7 +234,7 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
-target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
+target_link_libraries(piccolo PRIVATE frontend_libretro retroui)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
 # tools/make_app_icon.py from the same PNGs as the window icon).
@@ -266,22 +256,13 @@ message(STATUS "piccolo ${PICCOLO_VERSION}")
 multitap_set_project_flags(piccolo)
 multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 
-# Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
-add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
-target_link_libraries(pixel_font_preview PRIVATE piccolo_font)
-multitap_set_project_flags(pixel_font_preview)
-
 if(MULTITAP_BUILD_TESTS)
-    # Table well formed, no character defined twice, no two glyphs identical.
-    add_test(NAME piccolo_pixel_font COMMAND pixel_font_preview --check)
-    set_tests_properties(piccolo_pixel_font PROPERTIES PASS_REGULAR_EXPRESSION "table OK")
-
     # The UI text against the translations and the font (missing translations,
     # stale keys, characters the font can't draw). Unknown keys in a .po are
     # reported in the log too.
     add_executable(piccolo_strings_check tools/strings_check.cpp "${PICCOLO_GENERATED}/piccolo_strings.cpp")
     target_include_directories(piccolo_strings_check PRIVATE "${PICCOLO_GENERATED}")
-    target_link_libraries(piccolo_strings_check PRIVATE frontend_common piccolo_font)
+    target_link_libraries(piccolo_strings_check PRIVATE frontend_common retroui_font)
     multitap_set_project_flags(piccolo_strings_check)
     add_test(NAME piccolo_strings COMMAND piccolo_strings_check "${CMAKE_CURRENT_SOURCE_DIR}/lang" es)
     set_tests_properties(piccolo_strings PROPERTIES

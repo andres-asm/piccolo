@@ -46,6 +46,7 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
+#include "menus.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -1998,10 +1999,10 @@ int main(int argc, char** argv)
                 // The status line's window goes first, so it stays behind the others.
                 retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
                 int32_t recent_picked = -1;
-                MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
-                                                      app->recent_label_pointers.data(),
-                                                      static_cast<int32_t>(app->recent_label_pointers.size()),
-                                                      &recent_picked, app->open_first_menu);
+                MenuAction action = menus_bar(app->pixel_font, app->ui_scale, &app->strings,
+                                              app->recent_label_pointers.data(),
+                                              static_cast<int32_t>(app->recent_label_pointers.size()),
+                                              &recent_picked, app->open_first_menu);
                 app->open_first_menu = false;
                 if (action == MenuAction::recent_game && recent_picked >= 0)
                 {

@@ -37,3 +37,6 @@
 	path = deps/test-libretro
 	url = https://github.com/multitap-org/test-libretro.git
 	update = none
+[submodule "deps/common/retroui"]
+	path = deps/common/retroui
+	url = https://github.com/multitap-org/retroui.git
