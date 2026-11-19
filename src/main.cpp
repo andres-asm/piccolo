@@ -48,6 +48,7 @@
 #include "map_window.h"
 #include "input_net.h"
 #include "net_access.h"
+#include "net_games.h"
 #include "net_trust.h"
 #include "net_window.h"
 #include "file_picker.h"
@@ -110,6 +111,10 @@ struct App
     NetAccess  net = {};
     NetWindow  net_window = {};
     InputNet   input_net = {};           // paired devices' pads, in the input router
+    NetGames   net_games = {};           // games from devices with FULL access (net_games.h)
+    bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
+    uint32_t   net_load_peer = NET_NO_PEER;
+    uint32_t   net_load_id = 0;
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -566,13 +571,14 @@ static bool needs_safe_start(App* app, const FilePickerChoice* choice)
     return true;
 }
 
-static void start_game(App* app, const FilePickerChoice* choice)
+// True if the game started (false also when it waits for SAFE START).
+static bool start_game(App* app, const FilePickerChoice* choice)
 {
     if (!app->safe_start_confirmed && needs_safe_start(app, choice))
     {
         app->safe_start_pending = *choice;
         app->safe_start_open = true;   // started (or not) when it's answered
-        return;
+        return false;
     }
     app->safe_start_confirmed = false;
     remove_running_marker(app);   // the previous game, if any, ended properly
@@ -624,6 +630,7 @@ static void start_game(App* app, const FilePickerChoice* choice)
                            app->session.host->content_path);
     }
     set_status(app, app->session.message);
+    return started;
 }
 
 // Saves the session's slot with a thumbnail of the picture as shown: the
@@ -1689,6 +1696,66 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
+// The load_result for the load_request waiting in pending_start.
+static void net_answer_load(App* app, NetContentStatus status)
+{
+    app->net_load_waiting = false;
+    if (!app->net_running)
+    {
+        return;
+    }
+    uint8_t reply[16];
+    size_t size = net_content_write_load_result(reply, sizeof(reply), app->net_load_id, status);
+    net_access_send(&app->net, app->net_load_peer, NetChannel::control, reply, size);
+}
+
+// A control message from a paired device (net_games.h). Folders and cores
+// are read when asked, never every frame.
+static void net_games_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    uint8_t type = event->size > 0 ? event->data[0] : 0;
+    if (type < static_cast<uint8_t>(NetContentMessage::cores_request) ||
+        type > static_cast<uint8_t>(NetContentMessage::load_result))
+    {
+        return;   // not ours (yet)
+    }
+    std::vector<std::string> game_folders;
+    piccolo_settings_game_folders(&app->settings, &game_folders);
+    net_games_set_folders(&app->net_games, &game_folders);
+
+    size_t size = net_games_answer(&app->net_games, &app->catalog, event->data, event->size);
+    if (size > 0)
+    {
+        net_access_send(&app->net, event->peer, NetChannel::control, app->net_games.reply.data(), size);
+        return;
+    }
+    uint32_t id = 0;
+    NetContentStatus status = NetContentStatus::failed;
+    FilePickerChoice choice;
+    if (!net_games_load(&app->net_games, &app->catalog, event->data, event->size, &id, &status, &choice))
+    {
+        return;   // a result type, or a damaged request: nothing to answer
+    }
+    if (status != NetContentStatus::ok || app->has_pending_start || app->net_load_waiting)
+    {
+        if (status == NetContentStatus::ok)
+        {
+            status = NetContentStatus::failed;   // another start is already on its way
+        }
+        uint8_t reply[16];
+        size_t reply_size = net_content_write_load_result(reply, sizeof(reply), id, status);
+        net_access_send(&app->net, event->peer, NetChannel::control, reply, reply_size);
+        return;
+    }
+    SDL_Log("Network: %s starts %s %s", device, choice.core_path, choice.content_path);
+    app->pending_start = choice;   // started at the top of the next loop, like LOAD GAME's
+    app->has_pending_start = true;
+    app->picker.open = false;      // what was being picked here is overtaken
+    app->net_load_waiting = true;
+    app->net_load_peer = event->peer;
+    app->net_load_id = id;
+}
+
 // The listener, when SETTINGS has it on. Started at launch and restarted
 // when ALLOW CONNECTIONS or PORT change (net_update).
 static void net_start(App* app)
@@ -1721,6 +1788,7 @@ static void net_start(App* app)
         SDL_Log("Network: this device is %s", app->net_fingerprint);
     }
     app->net = NetAccess{};
+    net_games_init(&app->net_games);
     std::string devices_path = app->paths.settings + "/net_devices.cfg";
     if (!net_access_create(&app->net, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
                            &app->net_identity, devices_path.c_str()))
@@ -1810,6 +1878,10 @@ static void net_update(App* app)
             break;
         }
         case NetAccessEventType::closed:
+            if (app->net_load_waiting && app->net_load_peer == event.peer)
+            {
+                app->net_load_waiting = false;   // the game still starts; nobody to tell
+            }
             SDL_Log("Network: \"%s\" disconnected", device);
             input_net_peer_gone(&app->input_net, &app->input, event.peer);
             break;
@@ -1825,6 +1897,10 @@ static void net_update(App* app)
                 const NetTrustedDevice* paired = &app->net.trust.devices[static_cast<size_t>(event.device)];
                 input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
                                   event.data, event.size);
+            }
+            else if (event.channel == NetChannel::control)
+            {
+                net_games_message(app, &event, device);   // net_access let through only what its level covers
             }
             break;
         case NetAccessEventType::none:
@@ -1973,7 +2049,11 @@ int main(int argc, char** argv)
         if (app->has_pending_start)
         {
             app->has_pending_start = false;
-            start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
+            bool started = start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
+            if (app->net_load_waiting)
+            {
+                net_answer_load(app, started ? NetContentStatus::ok : NetContentStatus::failed);
+            }
         }
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
