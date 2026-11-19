@@ -310,6 +310,18 @@ msgctxt "shader_unavailable"
 msgid "LIBRASHADER NOT FOUND: SHADERS ARE OFF"
 msgstr "LIBRASHADER NO ESTÁ: SHADERS APAGADOS"
 
+msgctxt "shader_choose"
+msgid "CHOOSE"
+msgstr "ELEGIR"
+
+msgctxt "shader_picker_title"
+msgid "SHADER PRESET"
+msgstr "PRESET DE SHADER"
+
+msgctxt "shader_picker_use"
+msgid "USE"
+msgstr "USAR"
+
 msgctxt "setting_language"
 msgid "LANGUAGE"
 msgstr "IDIOMA"

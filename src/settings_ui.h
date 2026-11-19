@@ -31,6 +31,12 @@ struct SettingsUiContext
 // default folder); may be nullptr. Returns true if the value changed.
 bool settings_ui_row(const SettingsUiContext* context, const char* key, const char* hint);
 
+// A path setting's row with a button after the field (e.g. CHOOSE, which
+// opens a picker). Sets *button_clicked. Returns true if the value changed
+// (typed in the field, or reset).
+bool settings_ui_path_row_with_button(const SettingsUiContext* context, const char* key, const char* hint,
+                                      const char* button, bool* button_clicked);
+
 // A text setting picked from a list (e.g. the audio devices connected now).
 // "" shows `empty_label`; a stored value that isn't in the list is shown
 // with `missing_label` after it, and kept until something else is picked.

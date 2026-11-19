@@ -170,6 +170,9 @@ image_section_controls = PICTURE CONTROLS
 image_controls_unavailable = NEEDS LIBRASHADER (NOT FOUND):\nSAVED, NOT USED
 shader_preset_none = NONE
 shader_unavailable = LIBRASHADER NOT FOUND: SHADERS ARE OFF
+shader_choose = CHOOSE
+shader_picker_title = SHADER PRESET
+shader_picker_use = USE
 
 # Settings: General
 setting_language = LANGUAGE

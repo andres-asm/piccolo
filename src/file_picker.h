@@ -24,6 +24,11 @@
 //     ("a.7z#dir/Game.sfc", extracted by the core session);
 //   - else: opens it as a folder, like BROWSE, which always does that.
 // Esc or the window's close button closes the picker.
+//
+// The same window picks a shader preset (FilePickerMode::shader_preset, from
+// SETTINGS > SHADER > CHOOSE): no core row, only .slangp files, no archives
+// (presets are always plain files), and NONE / USE instead of the game
+// buttons. It can go to any folder (e.g. a full slang-shaders checkout).
 
 #include <cstdint>
 #include <string>
@@ -38,8 +43,15 @@ struct ImFont;
 constexpr int32_t FILE_PICKER_MAX_ENTRIES = 2048;
 constexpr size_t  FILE_PICKER_NAME_MAX    = 256;
 
+enum class FilePickerMode
+{
+    game,            // LOAD GAME
+    shader_preset,   // a .slangp for the SHADER setting
+};
+
 struct FilePicker
 {
+    FilePickerMode mode = FilePickerMode::game;
     bool open = false;
     char directory[LIBRETRO_PATH_MAX] = {};
 
@@ -66,7 +78,8 @@ struct FilePicker
     std::string peek_single;         // the one file, when peek_loadable == 1
 };
 
-// What the user chose.
+// What the user chose. In shader_preset mode only content_path is used: the
+// preset, or empty for NONE.
 struct FilePickerChoice
 {
     char core_path[LIBRETRO_PATH_MAX]    = {};
@@ -76,6 +89,10 @@ struct FilePickerChoice
 // Opens the window in `directory` with `core_path` preselected (either may be
 // "" or not exist: then the home folder / the first usable core).
 void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path);
+
+// Opens the window to pick a shader preset, in `directory` (if it doesn't
+// exist: the home folder).
+void file_picker_open_shader(FilePicker* picker, const char* directory);
 
 // Draws the window if open. Returns true on the frame the user picked
 // something; the picker closes itself then.

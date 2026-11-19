@@ -94,6 +94,7 @@ struct App
     CoreSession session = {};
     CoreCatalog catalog = {};
     FilePicker  picker  = {};
+    FilePicker  shader_picker = {};   // SETTINGS > SHADER > CHOOSE
     bool        menu_visible = true;   // only hideable while a game runs
 
     // What the LOAD GAME window picked, started at the top of the NEXT loop:
@@ -110,6 +111,7 @@ struct App
     // piccolo's own presets (shaders/): pass 0, and the final scale per
     // filter (nearest, bilinear, sharp bilinear) when no preset is chosen.
     std::string   shader_pass0_path;
+    std::string   shader_presets_folder;   // the curated presets (shaders/presets/): where CHOOSE opens
     std::string   shader_scale_paths[3];
     std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
     std::string   shader_preset_seen;         // the preset setting those failures are for
@@ -399,7 +401,7 @@ static void set_status(App* app, const char* text)
 // queued audio is dropped so resuming doesn't play stale sound.
 static void update_pause(App* app)
 {
-    bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
+    bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
@@ -926,7 +928,8 @@ static void refresh_audio_devices(App* app)
 // A window is open over the menu bar (or the game).
 static bool any_window_open(const App* app)
 {
-    return app->picker.open || app->settings_window.open || app->settings_window.image_open || app->quick_menu.open ||
+    return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
+           app->quick_menu.open ||
            app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window);
 }
@@ -966,6 +969,10 @@ static void close_topmost_or_toggle_menu(App* app)
             {
                 app->input_window.open = false;
             }
+        }
+        else if (app->shader_picker.open)   // opened from SETTINGS: closes before it
+        {
+            app->shader_picker.open = false;
         }
         else if (app->settings_window.image_open)
         {
@@ -1718,8 +1725,41 @@ static void draw_settings(App* app)
         }
     }
 
-    // Closed (by its button or Esc): apply the folders and save.
-    bool open = app->settings_window.open || app->settings_window.image_open;
+    // SHADER > CHOOSE: the picker opens in the chosen preset's folder, else
+    // in the curated presets.
+    if (app->settings_window.choose_shader_request)
+    {
+        app->settings_window.choose_shader_request = false;
+        std::string folder = settings_get_at(&app->settings, app->settings_window.scope, PICCOLO_VIDEO_SHADER_PRESET,
+                                             nullptr);
+        size_t slash = folder.find_last_of("/\\");
+        folder = slash == std::string::npos ? app->shader_presets_folder : folder.substr(0, slash);
+        if (!host_fs_exists(folder.c_str()))
+        {
+            folder = app->shader_presets_folder;
+        }
+        file_picker_open_shader(&app->shader_picker, folder.c_str());
+    }
+    FilePickerChoice shader_choice = {};
+    if (file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
+                         &shader_choice))
+    {
+        // NONE: no preset at this scope. Globally that's the default; a core
+        // or game says it explicitly, so a global preset doesn't apply there.
+        SettingLayer scope = app->settings_window.scope;
+        if (shader_choice.content_path[0] != '\0' || scope != SettingLayer::global)
+        {
+            settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, shader_choice.content_path);
+        }
+        else
+        {
+            settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
+        }
+    }
+
+    // Closed (by its button or Esc): apply the folders and save. The shader
+    // picker counts as part of it.
+    bool open = app->settings_window.open || app->settings_window.image_open || app->shader_picker.open;
     if (app->settings_window_was_open && !open)
     {
         apply_folders(app);
@@ -1900,6 +1940,11 @@ int main(int argc, char** argv)
             std::string user_copy = user_folder.empty() ? std::string() : user_folder + names[i];
             *targets[i] = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? user_copy : bundled_folder + names[i];
         }
+        // The curated presets: the copy in piccolo's folder when the build
+        // put one there, else the one next to the program.
+        std::string user_presets = user_folder.empty() ? std::string() : user_folder + "presets";
+        app->shader_presets_folder = !user_presets.empty() && host_fs_exists(user_presets.c_str()) ? user_presets
+                                                                                                  : bundled_folder + "presets";
     }
 
     // Controllers: MAP CONTROLLER's mappings are in their profiles (input.cfg);
