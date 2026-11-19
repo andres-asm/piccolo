@@ -9,11 +9,6 @@
 #include "retro_ui.h"
 #include "settings_ui.h"
 
-void net_window_open(NetWindow* window)
-{
-    window->open = true;
-}
-
 // The code in two groups of three ("482 915"), in the highlight color.
 static void draw_code(const NetAccess* access)
 {
@@ -129,61 +124,36 @@ static void draw_devices(const NetWindowContext* context)
     }
 }
 
-void net_window_draw(NetWindow* window, const NetWindowContext* context, ImFont* pixel_font, int32_t scale)
+void net_window_draw_tab(const NetWindowContext* context, float label_width)
 {
-    if (!window->open)
+    const Localization* strings = context->strings;
+    SettingsUiContext rows;
+    rows.settings = context->settings;
+    rows.strings = strings;
+    rows.scope = SettingLayer::global;
+    rows.label_width = label_width;
+    settings_ui_row(&rows, PICCOLO_NET_ENABLED, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_NAME, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_PORT, nullptr);
+
+    // As a row: the marker column, then the label column.
+    ImGui::Dummy(ImGui::CalcTextSize("C"));
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::net_this_device));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::net_this_device_help));
+    ImGui::SameLine(start + label_width);
+    ImGui::TextUnformatted(context->this_device[0] != '\0' ? context->this_device : "-");
+
+    if (context->access == nullptr)
     {
+        ImGui::Spacing();
+        ImGui::TextDisabled("%s", piccolo_text(strings, context->listen_failed ? Str::net_listen_failed : Str::net_off));
         return;
     }
-    float block = static_cast<float>(scale);
-    const ImGuiIO& io = ImGui::GetIO();
-    retro_ui_push_theme(pixel_font, scale);
-    float width = 300.0f * block;
-    width = width < io.DisplaySize.x - 8.0f * block ? width : io.DisplaySize.x - 8.0f * block;
-    ImGui::SetNextWindowSize(ImVec2(width, 0.0f), ImGuiCond_Always);
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing,
-                            ImVec2(0.5f, 0.5f));
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
-                             ImGuiWindowFlags_AlwaysAutoResize;
-    const Localization* strings = context->strings;
-    char title[200] = {};
-    std::snprintf(title, sizeof(title), "%s###network", piccolo_text(strings, Str::net_title));
-    if (ImGui::Begin(title, nullptr, flags))
-    {
-        retro_ui_begin_window(scale);
-        if (retro_ui_close_button())
-        {
-            window->open = false;
-        }
-        SettingsUiContext rows;
-        rows.settings = context->settings;
-        rows.strings = strings;
-        rows.scope = SettingLayer::global;
-        rows.label_width = 90.0f * block;
-        settings_ui_row(&rows, PICCOLO_NET_ENABLED, nullptr);
-        settings_ui_row(&rows, PICCOLO_NET_NAME, nullptr);
-        settings_ui_row(&rows, PICCOLO_NET_PORT, nullptr);
-
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(piccolo_text(strings, Str::net_this_device));
-        retro_ui_item_tooltip(piccolo_text(strings, Str::net_this_device_help));
-        ImGui::SameLine(rows.label_width + ImGui::GetStyle().WindowPadding.x);
-        ImGui::TextUnformatted(context->this_device[0] != '\0' ? context->this_device : "-");
-
-        if (context->access == nullptr)
-        {
-            ImGui::Spacing();
-            ImGui::TextDisabled("%s", piccolo_text(strings, context->listen_failed ? Str::net_listen_failed : Str::net_off));
-        }
-        else
-        {
-            retro_ui_separator_text(piccolo_text(strings, Str::net_section_pairing));
-            draw_pairing(context);
-            retro_ui_separator_text(piccolo_text(strings, Str::net_section_devices));
-            draw_devices(context);
-        }
-        retro_ui_end_window();
-    }
-    ImGui::End();
-    retro_ui_pop_theme();
+    retro_ui_separator_text(piccolo_text(strings, Str::net_section_pairing));
+    draw_pairing(context);
+    retro_ui_separator_text(piccolo_text(strings, Str::net_section_devices));
+    draw_devices(context);
 }

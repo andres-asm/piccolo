@@ -193,7 +193,7 @@ setting_path_games = GAME FOLDER
 setting_path_games_help = A folder with games. LOAD GAME offers it as a place to start, and devices with FULL access can browse and load games from it over the network (never from outside these folders).
 section_game_folders = GAME FOLDERS
 game_folder_add_help = Adds a game folder.
-game_folder_choose_help = Click to choose another folder.
+game_folder_choose_help = Opens CHOOSE FOLDER to pick another folder.
 game_folder_remove_help = Removes this folder from the list. Nothing is deleted.
 
 # Settings: Picture

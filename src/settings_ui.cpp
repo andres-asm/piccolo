@@ -315,14 +315,37 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     return changed;
 }
 
-float settings_ui_widget_width(const SettingsUiContext* context)
-{
-    return widget_width(context);
-}
-
 float settings_ui_reset_width(const SettingsUiContext* context)
 {
     return ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+}
+
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint)
+{
+    // Read-only: it looks like any other field (and a long path can be
+    // scrolled), but a click opens CHOOSE FOLDER, as "..." does for whoever
+    // doesn't think of clicking the field.
+    const char* dots = "...";
+    float dots_width = ImGui::CalcTextSize(dots).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    char buffer[LIBRETRO_PATH_MAX] = {};
+    std::snprintf(buffer, sizeof(buffer), "%s", value);
+    ImGui::SetNextItemWidth(widget_width(context) - dots_width - spacing);
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer),
+                             ImGuiInputTextFlags_ReadOnly);
+    retro_ui_pop_field_text();
+    bool clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
+    ImGui::SameLine();
+    ImGui::PushID("choose");
+    if (retro_ui_button(dots))
+    {
+        clicked = true;
+    }
+    ImGui::PopID();
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
+    return clicked;
 }
 
 bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint)
@@ -343,18 +366,7 @@ bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, c
         ImGui::BeginDisabled();
     }
     label_column(context, descriptor);
-    char buffer[LIBRETRO_PATH_MAX] = {};
-    std::snprintf(buffer, sizeof(buffer), "%s", value);
-    ImGui::SetNextItemWidth(widget_width(context));
-    retro_ui_push_field_text();
-    ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer),
-                             ImGuiInputTextFlags_ReadOnly);
-    retro_ui_pop_field_text();
-    clicked = !global_only_here && ImGui::IsItemClicked(ImGuiMouseButton_Left);
-    if (!global_only_here)
-    {
-        retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
-    }
+    clicked = settings_ui_folder_field(context, value, hint) && !global_only_here;
     if (global_only_here)
     {
         ImGui::EndDisabled();

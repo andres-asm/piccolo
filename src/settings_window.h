@@ -4,7 +4,7 @@
 //
 //   +- SETTINGS ------------------------------------------+
 //   | SCOPE [ THIS CORE (SNES9X)                       v ] |   only while a game runs
-//   | [GENERAL] [INTERFACE] [VIDEO] [SOUND]               |
+//   | [GENERAL] [INTERFACE] [VIDEO] [SOUND] [NETWORK]     |
 //   |   [PICTURE] [DISPLAY] [SYNC]                        |
 //   |   ASPECT RATIO  [ CORE PROVIDED            v ]      |
 //   | C SCALING       [ INTEGER (OVER)           v ] [RESET]
@@ -25,6 +25,7 @@
 #include "app_paths.h"
 #include "image_window.h"
 #include "localization.h"
+#include "net_window.h"
 #include "piccolo_settings.h"
 #include "settings.h"
 
@@ -36,6 +37,7 @@ enum class SettingsTab
     interface,
     video,
     sound,
+    network,
 };
 
 struct SettingsWindow
@@ -75,6 +77,7 @@ struct SettingsWindowContext
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
     const char*              game_mode = "";      // GameMode's state, for the General tab
     const std::vector<PiccoloThemeFile>* themes = nullptr;   // themes/*.cfg, for THEME
+    const NetWindowContext*  network = nullptr;  // the NETWORK tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

@@ -1,9 +1,11 @@
 #pragma once
 
-// piccolo's NETWORK window (CONFIG > NETWORK): the listener's settings, this
-// device's key, pairing with its code, and the paired devices.
+// piccolo's NETWORK tab in SETTINGS (CONFIG > NETWORK opens SETTINGS on
+// it): the listener's settings, this device's key, pairing with its code,
+// and the paired devices. It was a window of its own until 2026-11-19
+// (Andrés: network settings belong in SETTINGS).
 //
-//   +- NETWORK ----------------------------------------------------+
+//   +- NETWORK (tab) ----------------------------------------------+
 //   |   ALLOW CONNECTIONS  [x]                                      |
 //   |   NAME               [LIVING ROOM               ]             |
 //   |   PORT               [- 55420 +]                              |
@@ -29,13 +31,6 @@
 #include "net_access.h"
 #include "settings.h"
 
-struct ImFont;
-
-struct NetWindow
-{
-    bool open = false;
-};
-
 struct NetWindowContext
 {
     Settings*           settings = nullptr;
@@ -45,5 +40,7 @@ struct NetWindowContext
     const char*         this_device = "";   // our key's fingerprint
 };
 
-void net_window_open(NetWindow* window);
-void net_window_draw(NetWindow* window, const NetWindowContext* context, ImFont* pixel_font, int32_t scale);
+// The tab's contents, inside SETTINGS' tab. The rows always edit the global
+// settings (networking isn't per core or game), with labels `label_width`
+// wide like the other tabs'.
+void net_window_draw_tab(const NetWindowContext* context, float label_width);

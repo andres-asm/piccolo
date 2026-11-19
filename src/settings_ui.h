@@ -36,10 +36,13 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
 // opens the picker). `hint` as in settings_ui_row; RESET as usual.
 bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint);
 
-// The width settings_ui_row gives a widget (what's left of the row after the
-// label column, leaving the reset button's room), and that button's width:
-// for rows drawn by hand that line up with the others.
-float settings_ui_widget_width(const SettingsUiContext* context);
+// The field of a folder row: `value` read-only (or `hint` when empty) and
+// "..." after it, together as wide as settings_ui_row's widget. True when
+// either was clicked (the caller opens CHOOSE FOLDER).
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint);
+
+// The reset button's width: for rows drawn by hand that line up with the
+// others (a button in its column).
 float settings_ui_reset_width(const SettingsUiContext* context);
 
 // A text setting picked from a list (e.g. the audio devices connected now).

@@ -387,8 +387,8 @@ msgid "Adds a game folder."
 msgstr "Agrega una carpeta de juegos."
 
 msgctxt "game_folder_choose_help"
-msgid "Click to choose another folder."
-msgstr "Haz clic para elegir otra carpeta."
+msgid "Opens CHOOSE FOLDER to pick another folder."
+msgstr "Abre ELEGIR CARPETA para escoger otra carpeta."
 
 msgctxt "game_folder_remove_help"
 msgid "Removes this folder from the list. Nothing is deleted."

@@ -109,7 +109,6 @@ struct App
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
     NetAccess  net = {};
-    NetWindow  net_window = {};
     InputNet   input_net = {};           // paired devices' pads, in the input router
     NetGames   net_games = {};           // games from devices with FULL access (net_games.h)
     bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
@@ -734,7 +733,7 @@ static void handle_menu_action(App* app, MenuAction action)
             core_options_manager_open(&app->core_options_manager, &app->core_options_state);
             break;
         case MenuAction::network:
-            net_window_open(&app->net_window);
+            settings_window_open(&app->settings_window, SettingsTab::network);
             break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
@@ -1604,6 +1603,13 @@ static void draw_settings(App* app)
     context.image = &image;
     context.strings = &app->strings;
     context.themes = &app->themes;
+    NetWindowContext network;
+    network.settings = &app->settings;
+    network.strings = &app->strings;
+    network.access = app->net_running ? &app->net : nullptr;
+    network.listen_failed = app->net_listen_failed;
+    network.this_device = app->net_fingerprint;
+    context.network = &network;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
     char window_size[200] = {};
@@ -2311,18 +2317,6 @@ int main(int argc, char** argv)
             map_context.layouts = &app->layouts;
             map_context.now_ms = SDL_GetTicks();
             map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
-            NetWindowContext net_context;
-            net_context.settings = &app->settings;
-            net_context.strings = &app->strings;
-            net_context.access = app->net_running ? &app->net : nullptr;
-            net_context.listen_failed = app->net_listen_failed;
-            net_context.this_device = app->net_fingerprint;
-            bool net_was_open = app->net_window.open;
-            net_window_draw(&app->net_window, &net_context, app->pixel_font, app->ui_scale);
-            if (net_was_open && !app->net_window.open)
-            {
-                save_settings(app);   // NAME, PORT, ALLOW CONNECTIONS
-            }
             if (input_was_open && !app->input_window.open)
             {
                 save_settings(app);   // SETTINGS tab

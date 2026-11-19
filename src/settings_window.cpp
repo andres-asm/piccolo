@@ -80,19 +80,10 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
         retro_ui_item_tooltip(piccolo_text(ui->strings, Str::setting_path_games_help));
         ImGui::SameLine(start + ui->label_width);
 
-        // Read-only: it looks like the other folder fields (and a long path
-        // can be scrolled), but a click opens CHOOSE FOLDER.
-        char buffer[LIBRETRO_PATH_MAX] = {};
-        std::snprintf(buffer, sizeof(buffer), "%s", settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]));
-        ImGui::SetNextItemWidth(settings_ui_widget_width(ui));
-        retro_ui_push_field_text();
-        ImGui::InputText("##value", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
-        retro_ui_pop_field_text();
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+        if (settings_ui_folder_field(ui, settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]), nullptr))
         {
             window->choose_folder_key = PICCOLO_PATH_GAMES[i];
         }
-        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_choose_help));
         ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
         if (retro_ui_button_sized("-", remove_width, 0.0f))
         {
@@ -660,7 +651,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     {
         return;
     }
-    int target = retro_ui_tab_switch(static_cast<int>(window->tab), 4);
+    int target = retro_ui_tab_switch(static_cast<int>(window->tab), 5);
     if (target >= 0)
     {
         window->tab = static_cast<SettingsTab>(target);
@@ -674,6 +665,8 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags sound_flags =
         window->select_tab && window->tab == SettingsTab::sound ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags network_flags =
+        window->select_tab && window->tab == SettingsTab::network ? ImGuiTabItemFlags_SetSelected : 0;
     window->select_tab = false;
     if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_general), "general"), nullptr,
                             general_flags))
@@ -730,6 +723,16 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->tab = SettingsTab::sound;
         begin_tab_content();
         draw_sound(ui, context);
+        end_tab_content();
+        ImGui::EndTabItem();
+    }
+    if (context->network != nullptr &&
+        ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::net_title), "network"), nullptr,
+                            network_flags))
+    {
+        window->tab = SettingsTab::network;
+        begin_tab_content();
+        net_window_draw_tab(context->network, ui->label_width);
         end_tab_content();
         ImGui::EndTabItem();
     }
