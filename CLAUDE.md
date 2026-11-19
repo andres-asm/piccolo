@@ -114,7 +114,8 @@ src/
   settings_ui.* settings_window.* image_window.* piccolo_window.*   SETTINGS, IMAGE SETTINGS, display
   file_picker.*           LOAD GAME: core first, files filtered by its extensions; zip/7z: LOAD
                           (whole / the one loadable file / folder, peeked on selection) or BROWSE;
-                          FOLDER: the game folders (SETTINGS > GENERAL, "+") or HOME
+                          FOLDER: the game folders (SETTINGS > GENERAL, "+") or HOME;
+                          CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun)

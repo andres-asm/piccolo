@@ -43,9 +43,9 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
                       &window->choose_scope);
 }
 
-// GAME FOLDERS: one row per folder set, each with "-" (remove), then "+"
-// for one more. "+" shows an empty row; typing a folder there keeps it.
-// Global only, like the other folders (shown, greyed out, in other scopes).
+// GAME FOLDERS: one row per folder, then "+". Clicking a row's field or
+// "+" asks piccolo for CHOOSE FOLDER (choose_game_folder); "-" removes the
+// row. Global only, like the other folders (greyed out in other scopes).
 static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
 {
     retro_ui_separator_text(piccolo_text(ui->strings, Str::section_game_folders));
@@ -59,17 +59,12 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
     {
         set++;
     }
-    if (set == PICCOLO_GAME_FOLDER_MAX)
-    {
-        window->adding_game_folder = false;
-    }
-    uint32_t rows = set + (window->adding_game_folder ? 1u : 0u);
     float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
     float spacing = ImGui::GetStyle().ItemSpacing.x;
     float remove_width = ImGui::CalcTextSize("-").x + padding;
     const char* label = piccolo_text(ui->strings, Str::setting_path_games);
     int32_t remove = -1;
-    for (uint32_t i = 0; i < rows; i++)
+    for (uint32_t i = 0; i < set; i++)
     {
         ImGui::PushID(PICCOLO_PATH_GAMES[i]);
         ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column, so rows line up with the others
@@ -80,25 +75,19 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
         retro_ui_item_tooltip(piccolo_text(ui->strings, Str::setting_path_games_help));
         ImGui::SameLine(start + ui->label_width);
 
-        // As path_widget (settings_ui.cpp): ImGui keeps its own copy while
-        // the field is edited; the value is set when editing ends.
+        // Read-only: it looks like the other folder fields (and a long path
+        // can be scrolled), but a click opens CHOOSE FOLDER.
         char buffer[LIBRETRO_PATH_MAX] = {};
         std::snprintf(buffer, sizeof(buffer), "%s", settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]));
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - remove_width - spacing);
         retro_ui_push_field_text();
-        ImGui::InputText("##value", buffer, sizeof(buffer));
+        ImGui::InputText("##value", buffer, sizeof(buffer), ImGuiInputTextFlags_ReadOnly);
         retro_ui_pop_field_text();
-        if (ImGui::IsItemDeactivatedAfterEdit())
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
         {
-            if (buffer[0] == '\0')
-            {
-                remove = static_cast<int32_t>(i);   // emptied: the same as "-"
-            }
-            else if (settings_set(ui->settings, SettingLayer::global, PICCOLO_PATH_GAMES[i], buffer) && i == set)
-            {
-                window->adding_game_folder = false;   // the new row now holds a folder
-            }
+            window->choose_game_folder = static_cast<int32_t>(i);
         }
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_choose_help));
         ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
         if (retro_ui_button("-"))
         {
@@ -109,22 +98,15 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
     }
     if (remove >= 0)
     {
-        if (static_cast<uint32_t>(remove) == set)
-        {
-            window->adding_game_folder = false;   // the empty row: nothing stored
-        }
-        else
-        {
-            piccolo_settings_remove_game_folder(ui->settings, static_cast<uint32_t>(remove));
-        }
+        piccolo_settings_remove_game_folder(ui->settings, static_cast<uint32_t>(remove));
     }
     ImGui::Dummy(ImGui::CalcTextSize("C"));
     ImGui::SameLine();
-    ImGui::BeginDisabled(rows >= PICCOLO_GAME_FOLDER_MAX);
+    ImGui::BeginDisabled(set >= PICCOLO_GAME_FOLDER_MAX);
     ImGui::PushID("add_game_folder");
     if (retro_ui_button("+"))
     {
-        window->adding_game_folder = true;
+        window->choose_game_folder = static_cast<int32_t>(set);
     }
     ImGui::PopID();
     ImGui::EndDisabled();

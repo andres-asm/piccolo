@@ -98,6 +98,14 @@ msgctxt "picker_home"
 msgid "HOME"
 msgstr "INICIO"
 
+msgctxt "picker_folder_title"
+msgid "CHOOSE FOLDER"
+msgstr "ELEGIR CARPETA"
+
+msgctxt "picker_use_folder"
+msgid "USE THIS FOLDER"
+msgstr "USAR ESTA CARPETA"
+
 msgctxt "picker_no_cores"
 msgid "NO CORES FOUND"
 msgstr "NO HAY CORES"
@@ -377,6 +385,10 @@ msgstr "CARPETAS DE JUEGOS"
 msgctxt "game_folder_add_help"
 msgid "Adds a game folder."
 msgstr "Agrega una carpeta de juegos."
+
+msgctxt "game_folder_choose_help"
+msgid "Click to choose another folder."
+msgstr "Haz clic para elegir otra carpeta."
 
 msgctxt "game_folder_remove_help"
 msgid "Removes this folder from the list. Nothing is deleted."

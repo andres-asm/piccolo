@@ -139,6 +139,7 @@ struct App
     Settings       settings = {};
     std::string    settings_path;
     SettingsWindow settings_window = {};
+    uint32_t       game_folder_slot = 0;   // the GAME FOLDER row CHOOSE FOLDER fills
     bool           settings_window_was_open = false;
     bool           options_window_was_open = false;   // the quick menu or the options manager
     std::string    cores_directory;   // the one the catalog lists now
@@ -987,6 +988,10 @@ static void close_topmost_or_toggle_menu(App* app)
                 app->input_window.open = false;
             }
         }
+        else if (app->picker.open && app->picker.mode == FilePickerMode::folder)
+        {
+            app->picker.open = false;   // CHOOSE FOLDER sits on top of SETTINGS: it goes first
+        }
         else if (app->settings_window.image_open)
         {
             app->settings_window.image_open = false;
@@ -1493,6 +1498,45 @@ static void draw_game(App* app)
     }
 }
 
+// A GAME FOLDER row or "+" in SETTINGS: CHOOSE FOLDER, starting at the
+// folder that row has (or the first game folder).
+static void choose_game_folder_start(App* app)
+{
+    int32_t slot = app->settings_window.choose_game_folder;
+    app->settings_window.choose_game_folder = -1;
+    if (slot < 0 || static_cast<uint32_t>(slot) >= PICCOLO_GAME_FOLDER_MAX)
+    {
+        return;
+    }
+    std::vector<std::string> game_folders;
+    piccolo_settings_game_folders(&app->settings, &game_folders);
+    app->game_folder_slot = static_cast<uint32_t>(slot);
+    file_picker_open_folder(&app->picker, settings_get_text(&app->settings, PICCOLO_PATH_GAMES[slot]), &game_folders);
+}
+
+static void choose_game_folder_done(App* app, const FilePickerChoice* picked)
+{
+    // Into that row, or the first empty one: the slots have no gaps, and
+    // a row may have been removed while the picker was open.
+    uint32_t slot = 0;
+    while (slot < app->game_folder_slot && settings_get_text(&app->settings, PICCOLO_PATH_GAMES[slot])[0] != '\0')
+    {
+        slot++;
+    }
+    for (uint32_t i = 0; i < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        if (i != slot && std::strcmp(settings_get_text(&app->settings, PICCOLO_PATH_GAMES[i]), picked->content_path) == 0)
+        {
+            return;   // already in the list
+        }
+    }
+    settings_set(&app->settings, SettingLayer::global, PICCOLO_PATH_GAMES[slot], picked->content_path);
+    if (!app->settings_window.open)
+    {
+        save_settings(app);   // SETTINGS closed (and saved) while the folder was being chosen
+    }
+}
+
 static void draw_settings(App* app)
 {
     const CoreSession* session = &app->session;
@@ -1598,6 +1642,7 @@ static void draw_settings(App* app)
     context.frame_delay = frame_delay_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
+    choose_game_folder_start(app);
     if (app->settings_window.search_frame_delay)
     {
         app->settings_window.search_frame_delay = false;
@@ -2130,12 +2175,22 @@ int main(int argc, char** argv)
                 handle_menu_action(app, action);
             }
 
-            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
-                                 &app->pending_start))
-            {
-                app->has_pending_start = true;   // see pending_start
-            }
             draw_settings(app);
+            // After SETTINGS, so CHOOSE FOLDER opened from it is drawn on top.
+            FilePickerChoice picked;
+            bool choosing_folder = app->picker.mode == FilePickerMode::folder;
+            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &picked))
+            {
+                if (choosing_folder)
+                {
+                    choose_game_folder_done(app, &picked);
+                }
+                else
+                {
+                    app->pending_start = picked;
+                    app->has_pending_start = true;   // see pending_start
+                }
+            }
             if (!game_running(app))
             {
                 app->quick_menu.open = false;
