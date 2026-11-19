@@ -12,9 +12,9 @@ that checkout to work here.
 Multitap project: sync options, a curated shader list, input mapping, scaling
 options, save/load states. **No game library** (no ROM scanning, playlists or
 metadata). Its UI recreates the look and feel of a classic emulator GUI with
-ImGui ("retro-style UI"), with piccolo's own 5x5 pixel font. Andrés provides
-the reference; don't name it in the repo. The reference software is GPL: never
-copy its font, logo or graphics, everything is redrawn. See "piccolo and the
+ImGui ("retro-style UI"), with piccolo's own 5x5 pixel font. The reference is
+ZSNES's GUI (naming it is fine: a theme is called ZSNES). It is GPL: never copy
+its font, logo or graphics, everything is redrawn. See "piccolo and the
 host-libretro test frontend" in `docs/design-notes.md`.
 
 Owner: Andrés (former RetroArch developer, `andres-asm` on GitHub). He wants
@@ -80,7 +80,7 @@ Hosts never use SDL or frontend code.
    ctest, no ASan; just edit, commit and push.
 8. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
    to `docs/design-notes.md`).
-   Never name ZSNES in the repo. Ask before anything destructive.
+   Ask before anything destructive.
 
 ## Stack
 
