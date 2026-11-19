@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "content_archive.h"
 #include "host_fs.h"
 #include "imgui.h"
 
@@ -16,10 +17,14 @@
 // Paths
 // ---------------------------------------------------------------------------
 
+// "a.7z#" (an archive's top folder) takes names right after the '#'.
 static bool join_path(const char* directory, const char* name, char* out, size_t out_size)
 {
     size_t length = std::strlen(directory);
-    bool has_separator = length > 0 && (directory[length - 1] == '/' || directory[length - 1] == '\\');
+    std::string archive;
+    std::string folder;
+    bool archive_top = archive_split_path(directory, &archive, &folder) && folder.empty();
+    bool has_separator = archive_top || (length > 0 && (directory[length - 1] == '/' || directory[length - 1] == '\\'));
     int written = std::snprintf(out, out_size, "%s%s%s", directory, has_separator ? "" : "/", name);
     return written > 0 && static_cast<size_t>(written) < out_size;
 }
@@ -32,8 +37,23 @@ static bool is_separator(char c)
 // "/a/b/c" -> "/a/b", "/a" -> "/". Stays "/" at the root.
 // Windows drives: "C:/a" -> "C:/" (not "C:", which means the drive's current
 // folder), and it stays at "C:/".
+// Archives: "/r/a.7z#d/e" -> "/r/a.7z#d" -> "/r/a.7z#" -> "/r".
 static void go_to_parent(char* directory)
 {
+    std::string archive;
+    std::string folder;
+    if (archive_split_path(directory, &archive, &folder))
+    {
+        // Either way the result is shorter than `directory`: copied in place.
+        if (!folder.empty())
+        {
+            size_t slash = folder.rfind('/');
+            std::string parent = archive + "#" + (slash == std::string::npos ? std::string() : folder.substr(0, slash));
+            std::memcpy(directory, parent.c_str(), parent.size() + 1);
+            return;
+        }
+        std::memcpy(directory, archive.c_str(), archive.size() + 1);   // then its folder's parent, below
+    }
     size_t length = std::strlen(directory);
     bool drive = length >= 2 && directory[1] == ':' &&
                  ((directory[0] >= 'A' && directory[0] <= 'Z') || (directory[0] >= 'a' && directory[0] <= 'z'));
@@ -91,6 +111,79 @@ static const LibretroCoreInfo* selected_core(const FilePicker* picker, const Cor
     return &catalog->entries[picker->core_index].info;
 }
 
+static void add_folder(FilePicker* picker, const char* name)
+{
+    if (picker->folder_count < FILE_PICKER_MAX_ENTRIES && std::strlen(name) < FILE_PICKER_NAME_MAX)
+    {
+        std::snprintf(picker->folders[picker->folder_count], FILE_PICKER_NAME_MAX, "%s", name);
+        picker->folder_count++;
+    }
+}
+
+static void add_file(FilePicker* picker, const char* name)
+{
+    if (picker->file_count < FILE_PICKER_MAX_ENTRIES && std::strlen(name) < FILE_PICKER_NAME_MAX)
+    {
+        std::snprintf(picker->files[picker->file_count], FILE_PICKER_NAME_MAX, "%s", name);
+        picker->file_count++;
+    }
+}
+
+// Archives list folders once per file inside them ("d/a", "d/b"): added once.
+static void add_folder_once(FilePicker* picker, const char* name)
+{
+    for (int32_t i = 0; i < picker->folder_count; i++)
+    {
+        if (std::strcmp(picker->folders[i], name) == 0)
+        {
+            return;
+        }
+    }
+    add_folder(picker, name);
+}
+
+// Hidden entries, and the resource folder macOS adds to zips it makes.
+static bool hidden_name(const char* name)
+{
+    return name[0] == '.' || std::strcmp(name, "__MACOSX") == 0;
+}
+
+// The folder `folder` ("" = the top) inside the archive: its subfolders and
+// the files the core can load.
+static void list_archive(FilePicker* picker, const LibretroCoreInfo* core, const std::string* archive,
+                         const std::string* folder)
+{
+    if (picker->archive_path != *archive)
+    {
+        archive_list(archive->c_str(), &picker->archive_entries);   // a failure leaves it empty (logged)
+        picker->archive_path = *archive;
+    }
+    std::string prefix = folder->empty() ? std::string() : *folder + "/";
+    for (size_t i = 0; i < picker->archive_entries.size(); i++)
+    {
+        const ArchiveEntry* entry = &picker->archive_entries[i];
+        if (entry->name.size() <= prefix.size() || entry->name.compare(0, prefix.size(), prefix) != 0)
+        {
+            continue;   // not inside this folder (or the folder itself)
+        }
+        std::string rest = entry->name.substr(prefix.size());
+        size_t slash = rest.find('/');
+        std::string first = slash == std::string::npos ? rest : rest.substr(0, slash);
+        if (hidden_name(first.c_str()))
+        {
+            continue;
+        }
+        if (slash != std::string::npos || entry->is_directory)
+        {
+            add_folder_once(picker, first.c_str());
+        }
+        else if (picker->show_all || core == nullptr || libretro_core_info_accepts(core, rest.c_str()))
+        {
+            add_file(picker, rest.c_str());
+        }
+    }
+}
+
 static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
 {
     picker->folder_count = 0;
@@ -99,6 +192,16 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
     picker->listing_stale = false;
 
     const LibretroCoreInfo* core = selected_core(picker, catalog);
+    std::string archive;
+    std::string folder;
+    if (archive_split_path(picker->directory, &archive, &folder))
+    {
+        list_archive(picker, core, &archive, &folder);
+        std::qsort(picker->folders, static_cast<size_t>(picker->folder_count), FILE_PICKER_NAME_MAX, compare_names);
+        std::qsort(picker->files, static_cast<size_t>(picker->file_count), FILE_PICKER_NAME_MAX, compare_names);
+        return;
+    }
+
     int count = 0;
     char** names = SDL_GlobDirectory(picker->directory, "*", 0, &count);
     for (int i = 0; names != nullptr && i < count; i++)
@@ -114,19 +217,18 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
         {
             continue;
         }
-        if (info.type == SDL_PATHTYPE_DIRECTORY && picker->folder_count < FILE_PICKER_MAX_ENTRIES)
+        bool archive_folder = info.type == SDL_PATHTYPE_FILE && archive_format(name) != ArchiveFormat::none &&
+                              !content_archive_core_takes_whole(core, name);
+        if (info.type == SDL_PATHTYPE_DIRECTORY || archive_folder)
         {
-            std::snprintf(picker->folders[picker->folder_count], FILE_PICKER_NAME_MAX, "%s", name);
-            picker->folder_count++;
+            add_folder(picker, name);
         }
-        else if (info.type == SDL_PATHTYPE_FILE && picker->file_count < FILE_PICKER_MAX_ENTRIES)
+        else if (info.type == SDL_PATHTYPE_FILE)
         {
             // Only what the chosen core says it loads (its own extension list).
-            bool wanted = picker->show_all || core == nullptr || libretro_core_info_accepts(core, name);
-            if (wanted)
+            if (picker->show_all || core == nullptr || libretro_core_info_accepts(core, name))
             {
-                std::snprintf(picker->files[picker->file_count], FILE_PICKER_NAME_MAX, "%s", name);
-                picker->file_count++;
+                add_file(picker, name);
             }
         }
     }
@@ -147,9 +249,18 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
     picker->open = true;
     picker->listing_stale = true;
 
+    picker->archive_path.clear();   // the archive may have changed since: read it again
+    picker->archive_entries.clear();
+
+    // A folder, or a folder inside an archive that still exists.
     SDL_PathInfo info = {};
-    if (directory != nullptr && directory[0] != '\0' && SDL_GetPathInfo(directory, &info) &&
-        info.type == SDL_PATHTYPE_DIRECTORY)
+    std::string archive;
+    std::string folder;
+    bool in_archive = directory != nullptr && archive_split_path(directory, &archive, &folder);
+    bool usable = in_archive ? SDL_GetPathInfo(archive.c_str(), &info) && info.type == SDL_PATHTYPE_FILE
+                             : directory != nullptr && directory[0] != '\0' && SDL_GetPathInfo(directory, &info) &&
+                                   info.type == SDL_PATHTYPE_DIRECTORY;
+    if (usable)
     {
         std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
     }
@@ -309,9 +420,19 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         retro_ui_end_list();
         if (open_folder != nullptr)
         {
+            // An archive in a real folder opens as its top folder ("a.7z#").
+            std::string archive;
+            std::string folder;
+            bool into_archive = !archive_split_path(picker->directory, &archive, &folder) &&
+                                archive_format(open_folder) != ArchiveFormat::none;
             char next[LIBRETRO_PATH_MAX] = {};
-            if (join_path(picker->directory, open_folder, next, sizeof(next)))
+            if (join_path(picker->directory, open_folder, next, sizeof(next)) &&
+                (!into_archive || std::strlen(next) + 1 < sizeof(next)))
             {
+                if (into_archive)
+                {
+                    std::strcat(next, "#");
+                }
                 std::snprintf(picker->directory, sizeof(picker->directory), "%s", next);
                 picker->listing_stale = true;
             }

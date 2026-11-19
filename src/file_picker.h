@@ -13,12 +13,20 @@
 //   +-------------------------------------------------------+
 //
 // The core is picked first; the file list shows only what that core says it
-// can load (its own extension list, from the core catalog). No archives yet.
-// Double-click a file or press LOAD to start it; click a folder to open it.
+// can load (its own extension list, from the core catalog). Double-click a
+// file or press LOAD to start it; click a folder to open it.
+//
+// Zip and 7z archives are folders (content_archive.h): opening one lists
+// what's inside, and a file picked there is "a.7z#dir/Game.sfc", which the
+// core session extracts. Cores that take archives whole (arcade cores,
+// block_extract) see them as files instead.
 // Esc or the window's close button closes the picker.
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
+#include "archive.h"
 #include "core_catalog.h"
 #include "localization.h"
 
@@ -43,6 +51,11 @@ struct FilePicker
     int32_t file_count = 0;
     int32_t selected_file = -1;
     bool    listing_stale = true;
+
+    // Inside an archive (`directory` is "a.7z#" or "a.7z#dir"): its listing,
+    // read once per archive rather than on every folder change.
+    std::string               archive_path;
+    std::vector<ArchiveEntry> archive_entries;
 };
 
 // What the user chose.
