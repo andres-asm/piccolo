@@ -46,6 +46,7 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
+#include "input_net.h"
 #include "net_access.h"
 #include "net_trust.h"
 #include "net_window.h"
@@ -108,6 +109,7 @@ struct App
     uint16_t   net_port = 0;             // what `net` listens on
     NetAccess  net = {};
     NetWindow  net_window = {};
+    InputNet   input_net = {};           // paired devices' pads, in the input router
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -1730,6 +1732,10 @@ static void net_stop(App* app)
 {
     if (app->net_running)
     {
+        for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+        {
+            input_net_peer_gone(&app->input_net, &app->input, peer);   // their pads are unplugged
+        }
         net_access_destroy(&app->net);
         app->net_running = false;
     }
@@ -1746,9 +1752,9 @@ static void net_shutdown_all(App* app)
     }
 }
 
-// Once per loop: follow the settings, then the network's events. Paired
-// devices are let in (and get nothing yet: remote input is milestone 4);
-// everyone else needs the pairing code.
+// Once per loop, before the input is read: follow the settings, then the
+// network's events. Paired devices are let in and their pads join the input
+// router (input_net); everyone else needs the pairing code.
 static void net_update(App* app)
 {
     bool enabled = settings_get_bool(&app->settings, PICCOLO_NET_ENABLED);
@@ -1801,6 +1807,7 @@ static void net_update(App* app)
         }
         case NetAccessEventType::closed:
             SDL_Log("Network: \"%s\" disconnected", device);
+            input_net_peer_gone(&app->input_net, &app->input, event.peer);
             break;
         case NetAccessEventType::pairing_failed:
             set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_failed));
@@ -1809,6 +1816,13 @@ static void net_update(App* app)
             set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_closed));
             break;
         case NetAccessEventType::message:
+            if (event.channel == NetChannel::input && event.device >= 0)
+            {
+                const NetTrustedDevice* paired = &app->net.trust.devices[static_cast<size_t>(event.device)];
+                input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
+                                  event.data, event.size);
+            }
+            break;
         case NetAccessEventType::none:
             break;
         }
