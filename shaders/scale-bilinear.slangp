@@ -1,0 +1,4 @@
+# piccolo: the final scale, bilinear (no preset chosen).
+shaders = 1
+shader0 = scale.slang
+filter_linear0 = true

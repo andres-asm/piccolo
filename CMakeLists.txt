@@ -231,6 +231,19 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
+# piccolo's own shader presets (shaders/: pass 0 and the final scale) next to
+# the program and in piccolo's folder, like the themes.
+add_custom_command(TARGET piccolo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "$<TARGET_FILE_DIR:piccolo>/shaders"
+    VERBATIM)
+if(MULTITAP_PICCOLO_DIR)
+    add_custom_target(copy_piccolo_shaders ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders" "${MULTITAP_PICCOLO_DIR}/shaders"
+        DEPENDS piccolo
+        COMMENT "Copying piccolo's shader presets to ${MULTITAP_PICCOLO_DIR}/shaders"
+        VERBATIM)
+endif()
+
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by

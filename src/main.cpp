@@ -100,7 +100,15 @@ struct App
     AppPaths    paths = {};
     Picture     picture = {};   // the game on screen (viewport + filter)
     ShaderLibrary shader_library = {};   // librashader, when it's there
-    ShaderChain   shader_chain = {};     // the shader preset on the picture (instead of `picture`)
+    ShaderChain   shader_chain = {};     // pass 0 + the shader preset on the picture (instead of `picture`)
+    // piccolo's own presets (shaders/): pass 0, and the final scale per
+    // filter (nearest, bilinear, sharp bilinear) when no preset is chosen.
+    std::string   shader_pass0_path;
+    std::string   shader_scale_paths[3];
+    std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
+    std::string   shader_preset_seen;         // the preset setting those failures are for
+    float         pass0_applied[PICCOLO_PASS0_CONTROL_COUNT] = {};   // what pass 0's parameters hold
+    bool          pass0_stale = true;         // set them all (pass 0 was just loaded)
     // The part of the core's frame on screen (a cursor maps from it to the
     // whole frame), and the ports' cursors for the core (mouse, pointer, lightgun).
     uint32_t           view_source[4] = {};      // x, y, width, height in core pixels
@@ -1415,6 +1423,81 @@ static void app_handle_events(App* app)
 // Drawing
 // ---------------------------------------------------------------------------
 
+// Loads what each shader stage should hold when it changes: stage 0 = pass 0,
+// stage 1 = the preset setting, or piccolo's final scale for `filter` when
+// there's none (or it failed). Then pass 0's parameters from the settings,
+// only the ones that changed. A preset that fails isn't retried every frame.
+static bool shader_failed_before(const App* app, const std::string& path)
+{
+    for (size_t i = 0; i < app->shader_failed.size(); i++)
+    {
+        if (app->shader_failed[i] == path)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void load_shader_stage(App* app, uint32_t stage, const std::string& path)
+{
+    if (app->shader_chain.stages[stage].preset_path == path || shader_failed_before(app, path))
+    {
+        return;
+    }
+    if (path.empty())
+    {
+        shader_chain_clear(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage);
+    }
+    else if (!shader_chain_load(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage, path.c_str()))
+    {
+        app->shader_failed.push_back(path);
+    }
+    if (stage == 0)
+    {
+        app->pass0_stale = true;
+    }
+}
+
+static void update_shader_stages(App* app, ViewportFilter filter)
+{
+    if (!app->shader_library.loaded)
+    {
+        return;
+    }
+    const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
+    if (app->shader_preset_seen != preset)
+    {
+        app->shader_preset_seen = preset;   // a new choice: everything may be tried again
+        app->shader_failed.clear();
+    }
+    load_shader_stage(app, 0, app->shader_pass0_path);
+    const std::string* scale = &app->shader_scale_paths[static_cast<uint32_t>(filter)];
+    if (preset[0] != '\0' && !shader_failed_before(app, app->shader_preset_seen))
+    {
+        load_shader_stage(app, 1, app->shader_preset_seen);
+    }
+    else
+    {
+        load_shader_stage(app, 1, *scale);
+    }
+
+    if (app->shader_chain.stages[0].chain == nullptr)
+    {
+        return;
+    }
+    for (uint32_t i = 0; i < PICCOLO_PASS0_CONTROL_COUNT; i++)
+    {
+        float value = static_cast<float>(settings_get_real(&app->settings, PICCOLO_PASS0_CONTROLS[i].key));
+        if (app->pass0_stale || value != app->pass0_applied[i])
+        {
+            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
+            app->pass0_applied[i] = value;
+        }
+    }
+    app->pass0_stale = false;
+}
+
 static void draw_game(App* app)
 {
     CoreSession* session = &app->session;
@@ -1434,22 +1517,7 @@ static void draw_game(App* app)
     input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
     piccolo_settings_viewport(&app->settings, &input);
 
-    // The shader preset setting: (re)loaded when it changes; one that failed
-    // is not retried until the setting changes again.
-    const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
-    if (preset[0] == '\0')
-    {
-        if (shader_chain_active(&app->shader_chain))
-        {
-            shader_chain_destroy(&app->shader_chain, &app->shader_library, &app->shell.vulkan);
-        }
-        app->shader_chain.failed_path.clear();
-    }
-    else if (app->shader_library.loaded && app->shader_chain.preset_path != preset &&
-             app->shader_chain.failed_path != preset)
-    {
-        shader_chain_load(&app->shader_chain, &app->shader_library, &app->shell.vulkan, preset);
-    }
+    update_shader_stages(app, input.filter);
 
     ViewportResult viewport = {};
     bool shaded = false;
@@ -1782,6 +1850,23 @@ int main(int argc, char** argv)
     }
     shader_library_folders.push_back(app->paths.root);
     shader_library_load(&app->shader_library, shader_library_folders);
+    // piccolo's own presets: the user's copy in piccolo's folder wins over
+    // the ones that come with piccolo (next to the program), like lang/.
+    {
+        std::string user_folder = app->paths.root.empty() ? std::string() : app->paths.root + "/shaders/";
+        std::string bundled_folder = std::string(program_folder_for_shaders != nullptr ? program_folder_for_shaders : "") +
+                                     "shaders/";
+        host_fs_forward_slashes(bundled_folder.data());
+        const char* names[4] = {"pass0.slangp", "scale-nearest.slangp", "scale-bilinear.slangp",
+                                "scale-sharp-bilinear.slangp"};
+        std::string* targets[4] = {&app->shader_pass0_path, &app->shader_scale_paths[0], &app->shader_scale_paths[1],
+                                   &app->shader_scale_paths[2]};
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            std::string user_copy = user_folder.empty() ? std::string() : user_folder + names[i];
+            *targets[i] = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? user_copy : bundled_folder + names[i];
+        }
+    }
 
     // Controllers: MAP CONTROLLER's mappings are in their profiles (input.cfg);
     // settings/gamecontrollerdb.txt, if the user drops one in (SDL's format),

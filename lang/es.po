@@ -370,6 +370,86 @@ msgctxt "setting_shader_preset_help"
 msgid "A RetroArch shader preset (.slangp). Empty: none."
 msgstr "Un preset de shaders de RetroArch (.slangp). Vacío: ninguno."
 
+msgctxt "setting_image_brightness"
+msgid "BRIGHTNESS"
+msgstr "BRILLO"
+
+msgctxt "setting_image_brightness_help"
+msgid "Added to every color. 0: unchanged."
+msgstr "Se suma a cada color. 0: sin cambio."
+
+msgctxt "setting_image_contrast"
+msgid "CONTRAST"
+msgstr "CONTRASTE"
+
+msgctxt "setting_image_contrast_help"
+msgid "Spread around mid grey. 1: unchanged."
+msgstr "Separación alrededor del gris medio. 1: sin cambio."
+
+msgctxt "setting_image_saturation"
+msgid "SATURATION"
+msgstr "SATURACIÓN"
+
+msgctxt "setting_image_saturation_help"
+msgid "Color strength. 0: black and white, 1: unchanged."
+msgstr "Intensidad del color. 0: blanco y negro, 1: sin cambio."
+
+msgctxt "setting_image_hue"
+msgid "HUE"
+msgstr "TONO"
+
+msgctxt "setting_image_hue_help"
+msgid "Turns every color around the color wheel, in degrees. 0: unchanged."
+msgstr "Gira cada color en el círculo cromático, en grados. 0: sin cambio."
+
+msgctxt "setting_image_gamma"
+msgid "GAMMA"
+msgstr "GAMMA"
+
+msgctxt "setting_image_gamma_help"
+msgid "Above 1 darkens the mid tones, below 1 lightens them. 1: unchanged."
+msgstr "Más de 1 oscurece los tonos medios, menos de 1 los aclara. 1: sin cambio."
+
+msgctxt "setting_image_black_level"
+msgid "BLACK LEVEL"
+msgstr "NIVEL DE NEGRO"
+
+msgctxt "setting_image_black_level_help"
+msgid "Lifts (+) or crushes (-) the blacks; white stays white. 0: unchanged."
+msgstr "Levanta (+) o hunde (-) los negros; el blanco sigue blanco. 0: sin cambio."
+
+msgctxt "setting_image_temperature"
+msgid "TEMPERATURE"
+msgstr "TEMPERATURA"
+
+msgctxt "setting_image_temperature_help"
+msgid "Warmer (+, redder) or cooler (-, bluer). 0: unchanged."
+msgstr "Más cálido (+, más rojo) o más frío (-, más azul). 0: sin cambio."
+
+msgctxt "setting_image_gain_red"
+msgid "RED GAIN"
+msgstr "GANANCIA ROJO"
+
+msgctxt "setting_image_gain_red_help"
+msgid "How much red. 1: unchanged."
+msgstr "Cuánto rojo. 1: sin cambio."
+
+msgctxt "setting_image_gain_green"
+msgid "GREEN GAIN"
+msgstr "GANANCIA VERDE"
+
+msgctxt "setting_image_gain_green_help"
+msgid "How much green. 1: unchanged."
+msgstr "Cuánto verde. 1: sin cambio."
+
+msgctxt "setting_image_gain_blue"
+msgid "BLUE GAIN"
+msgstr "GANANCIA AZUL"
+
+msgctxt "setting_image_gain_blue_help"
+msgid "How much blue. 1: unchanged."
+msgstr "Cuánto azul. 1: sin cambio."
+
 msgctxt "setting_position"
 msgid "POSITION"
 msgstr "POSICIÓN"
