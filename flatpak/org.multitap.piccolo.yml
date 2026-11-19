@@ -45,10 +45,10 @@ modules:
       # MULTITAP_PICCOLO_DIR empty: don't copy the build to ~/.local/share.
       - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_PICCOLO_DIR= -DMULTITAP_BUILD_TESTS=OFF
       - cmake --build build --target piccolo
-      # piccolo reads lang/ and layouts/ next to its program (SDL_GetBasePath,
+      # piccolo reads lang/, layouts/ and shaders/ next to its program (SDL_GetBasePath,
       # which follows the symlink in /app/bin).
       - install -Dm755 build/piccolo /app/lib/piccolo/piccolo
-      - cp -r lang layouts /app/lib/piccolo/
+      - cp -r lang layouts build/shaders /app/lib/piccolo/
       - mkdir -p /app/bin && ln -s ../lib/piccolo/piccolo /app/bin/piccolo
       - install -Dm644 assets/linux/org.multitap.piccolo.desktop /app/share/applications/org.multitap.piccolo.desktop
       - install -Dm644 assets/linux/org.multitap.piccolo.metainfo.xml /app/share/metainfo/org.multitap.piccolo.metainfo.xml

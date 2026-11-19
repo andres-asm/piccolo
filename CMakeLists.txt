@@ -255,6 +255,28 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
+# The curated presets (deps/piccolo-shaders: a trimmed branch of libretro's
+# slang-shaders, each file under its own license) go to shaders/presets/, where
+# the shader picker opens. Optional: without the submodule only our own presets
+# ship. Its .git file is left out.
+set(PICCOLO_PRESETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/piccolo-shaders")
+if(EXISTS "${PICCOLO_PRESETS_DIR}/LICENSES")
+    add_custom_command(TARGET piccolo POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -DSOURCE=${PICCOLO_PRESETS_DIR} -DDESTINATION=$<TARGET_FILE_DIR:piccolo>/shaders/presets
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/copy_presets.cmake"
+        VERBATIM)
+    if(MULTITAP_PICCOLO_DIR)
+        add_custom_target(copy_piccolo_presets ALL
+            COMMAND ${CMAKE_COMMAND} -DSOURCE=${PICCOLO_PRESETS_DIR} -DDESTINATION=${MULTITAP_PICCOLO_DIR}/shaders/presets
+                    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/copy_presets.cmake"
+            DEPENDS piccolo
+            COMMENT "Copying the curated shader presets to ${MULTITAP_PICCOLO_DIR}/shaders/presets"
+            VERBATIM)
+    endif()
+else()
+    message(STATUS "piccolo: deps/piccolo-shaders not checked out, no curated shader presets")
+endif()
+
 target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
