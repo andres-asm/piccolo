@@ -28,8 +28,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Only the submodules the build uses (deps/librashader isn't built yet
-      # and brings many submodules of its own; deps/test-libretro is optional).
+      # Only the submodules the build uses (deps/test-libretro is optional).
+      # deps/librashader without --recursive: its own submodules are tests.
       - name: Submodules
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -38,6 +38,7 @@ jobs:
             deps/gamemode deps/miniz deps/7zip deps/piccolo-shaders \
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
+          git submodule update --init --depth 1 deps/librashader
 
       # The image comes with the SDK installed, and flatpak-builder updates it.
       # On the x86_64 runners that update fails with "Invalid cross-device

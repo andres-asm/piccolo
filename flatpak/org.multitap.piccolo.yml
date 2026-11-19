@@ -9,6 +9,8 @@ app-id: org.multitap.piccolo
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable   # cargo, for librashader
 command: piccolo
 finish-args:
   - --share=ipc
@@ -38,6 +40,30 @@ modules:
     sources:
       - type: dir
         path: ../deps/gamemode
+
+  # librashader (shader presets), which piccolo loads at run time from its own
+  # folder: only the C API with the Vulkan runtime. cargo downloads the crates
+  # pinned in Cargo.lock, so this module needs the network (fine for
+  # flatpak-builder and CI; Flathub would need the crates as sources,
+  # flatpak-cargo-generator).
+  - name: librashader
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      build-args:
+        - --share=network
+      env:
+        CARGO_HOME: /run/build/librashader/cargo
+    build-commands:
+      - cargo build -p librashader-capi --release --locked --no-default-features --features runtime-vulkan
+      - install -Dm755 target/release/liblibrashader_capi.so /app/lib/piccolo/librashader.so
+      - install -Dm644 LICENSE.md /app/share/licenses/org.multitap.piccolo/librashader-LICENSE.md
+    sources:
+      - type: dir
+        path: ../deps/librashader
+        skip:
+          - target
+          - test
 
   - name: piccolo
     buildsystem: simple
