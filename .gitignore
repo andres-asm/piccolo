@@ -11,3 +11,6 @@ imgui.ini
 .vscode/
 .idea/
 *.user
+
+# flatpak-builder state (build-flatpak* is covered by build*)
+.flatpak-builder/
