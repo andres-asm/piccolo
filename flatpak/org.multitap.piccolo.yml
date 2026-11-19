@@ -19,6 +19,26 @@ finish-args:
   - --filesystem=home       # games and cores are picked from anywhere in home
 
 modules:
+  # libgamemode, which piccolo's GAME MODE setting loads at run time. Inside a
+  # Flatpak it asks the GameMode portal (org.freedesktop.portal.GameMode),
+  # which passes the request to GameMode on the host; that needs GameMode
+  # installed on the host. Only the library: no daemon, tools or examples.
+  - name: gamemode
+    buildsystem: meson
+    config-opts:
+      - -Dwith-sd-bus-provider=no-daemon
+      - -Dwith-examples=false
+      - -Dwith-util=false
+      - -Dwith-pam-renicing=false
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /lib/libgamemode.so
+      - /lib/libgamemodeauto.so*
+    sources:
+      - type: dir
+        path: ../deps/gamemode
+
   - name: piccolo
     buildsystem: simple
     build-commands:
