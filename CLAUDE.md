@@ -34,7 +34,8 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
-  `deps/speexdsp`, `deps/gamemode`, `deps/librashader`
+  `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
+  (only its C 7z decoder, no PPMd)
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
@@ -78,7 +79,10 @@ Hosts never use SDL or frontend code.
 7. **Checks.** Larger changes: `build/` with warnings as errors, `build-asan/`,
    ctest in both. **Small changes** (a label, a spacing, a string): no build, no
    ctest, no ASan; just edit, commit and push.
-8. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
+8. **Parallel sessions:** work in your own git worktree; never switch the main
+   checkout's branch unless this session owns it. To commit to another branch,
+   use a temporary worktree.
+9. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
    to `docs/design-notes.md`).
    Ask before anything destructive.
 
@@ -107,7 +111,8 @@ src/
   piccolo_text.*          piccolo_text(strings, Str::x): the text in the current language
   piccolo_settings.*      piccolo's settings table (settings/piccolo.cfg)
   settings_ui.* settings_window.* image_window.* piccolo_window.*   SETTINGS, IMAGE SETTINGS, display
-  file_picker.*           LOAD GAME: core first, files filtered by its extensions
+  file_picker.*           LOAD GAME: core first, files filtered by its extensions; zip/7z: LOAD
+                          (whole / the one loadable file / folder, peeked on selection) or BROWSE
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun)
@@ -124,11 +129,13 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               frame_timing, frame_delay, rate_control, settings_file / settings (layers global ->
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
-                              input_sdl_mapping / input_layouts; tools/strings_generator; tests/
+                              input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
+                              content_cache (extracted files, LRU); tools/strings_generator; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
                               tools/core_info.cpp (libretro_core_info); tests/ (test core, unit tests, Test libretro runs)
 deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, core_options_store / cache,
-                              keyboard_input, fixed_input; tests/
+                              keyboard_input, fixed_input, content_archive (which cores take archives
+                              whole, extraction before loading); tests/
 ```
 
 ## Setup (first time on a machine)
@@ -158,7 +165,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DMULTITAP_WARNINGS_AS_ERR
 cmake --build build && ctest --test-dir build
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DMULTITAP_WARNINGS_AS_ERRORS=ON -DMULTITAP_SANITIZE=ON
 cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../tools/lsan-suppressions.txt ctest)
-./build/piccolo                    # normal builds also copy it to ~/.local/share/piccolo/
+./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
+                                   # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
@@ -174,7 +182,8 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 - piccolo 0.3: plays games through frontend-libretro; LOAD GAME, RECENT,
   SETTINGS (global / core / game layers), IMAGE SETTINGS, QUICK MENU
   (savestates 1-9 with thumbnails, core options, controls), fast forward,
-  native pixel formats, frame delay, localization (es).
+  native pixel formats, frame delay, localization (es), games from zip / 7z
+  (extracted into <root>/cache, trimmed to 4 GiB; cores never get virtual paths).
 - Input (done for this version): N:N ports (hotkeys and UI from port 1 + the
   keyboard), per-core remaps with per-game copies, combos and macros (recorder)
   per core, turbo (row box + TURBO BUTTON for the session), mouse / pointer /

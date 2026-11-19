@@ -39,6 +39,7 @@
 #include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
+#include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
 #include "input_bindings.h"
@@ -51,6 +52,11 @@
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
 #include "vk_swapchain.h"
+
+// Files extracted from zip / 7z archives (content_cache.h) are kept up to
+// this much: room for several disc images, small next to what the games
+// themselves take. Trimmed after each game starts.
+constexpr uint64_t PICCOLO_CONTENT_CACHE_MAX_BYTES = 4ull * 1024ull * 1024ull * 1024ull;
 
 
 struct App
@@ -298,6 +304,7 @@ static void apply_folders(App* app)
     std::snprintf(app->session.saves_directory, sizeof(app->session.saves_directory), "%s", saves.c_str());
     std::snprintf(app->session.states_directory, sizeof(app->session.states_directory), "%s", states.c_str());
     std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s", system.c_str());
+    std::snprintf(app->session.cache_directory, sizeof(app->session.cache_directory), "%s", app->paths.cache.c_str());
 
     std::string cores = folder_setting(app, PICCOLO_PATH_CORES, app->paths.cores);
     if (cores != app->cores_directory)
@@ -605,6 +612,10 @@ static void start_game(App* app, const FilePickerChoice* choice)
         }
         save_last_used(app);
         remember_recent(app, choice->core_path, choice->content_path);
+        // Files extracted from archives: keep the cache bounded, never
+        // touching the game that just started.
+        content_cache_trim(app->session.cache_directory, PICCOLO_CONTENT_CACHE_MAX_BYTES,
+                           app->session.host->content_path);
     }
     set_status(app, app->session.message);
 }

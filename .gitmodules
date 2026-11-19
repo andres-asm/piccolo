@@ -11,9 +11,6 @@
 [submodule "deps/libsamplerate"]
 	path = deps/libsamplerate
 	url = https://github.com/libsndfile/libsamplerate.git
-[submodule "deps/speexdsp"]
-	path = deps/speexdsp
-	url = https://github.com/xiph/speexdsp.git
 [submodule "deps/gamemode"]
 	path = deps/gamemode
 	url = https://github.com/FeralInteractive/gamemode.git
@@ -37,3 +34,10 @@
 	path = deps/test-libretro
 	url = https://github.com/multitap-org/test-libretro.git
 	update = none
+[submodule "deps/miniz"]
+	path = deps/miniz
+	url = https://github.com/richgel999/miniz.git
+[submodule "deps/7zip"]
+	path = deps/7zip
+	url = https://github.com/ip7z/7zip.git
+	shallow = true

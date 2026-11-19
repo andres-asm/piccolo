@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#include "host_fs.h"
+#include "content_archive.h"
 #include "libretro_host.h"   // libretro_core_short_name
 #include "settings_file.h"
 
@@ -80,7 +80,7 @@ void recent_games_label(const RecentGame* game, const char* no_game, char* out, 
     {
         std::snprintf(core, sizeof(core), "?");
     }
-    if (game->content_path.empty() || !host_fs_stem(game->content_path.c_str(), content, sizeof(content)))
+    if (game->content_path.empty() || !content_archive_game_name(game->content_path.c_str(), content, sizeof(content)))
     {
         std::snprintf(content, sizeof(content), "%s", no_game);
     }
