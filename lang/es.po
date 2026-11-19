@@ -986,6 +986,38 @@ msgctxt "ui_theme_help"
 msgid "Sets every color below at once. Change them one by one for your own."
 msgstr "Cambia todos los colores de abajo a la vez. Cámbialos uno por uno para hacer el tuyo."
 
+msgctxt "ui_theme_save"
+msgid "SAVE THEME..."
+msgstr "GUARDAR TEMA..."
+
+msgctxt "ui_theme_save_help"
+msgid "Saves the colors as they are now as a theme of your own (in the themes folder in piccolo's folder), listed in THEME by its name."
+msgstr "Guarda los colores tal como están como un tema tuyo (en la carpeta themes de la carpeta de piccolo), que aparece en TEMA con su nombre."
+
+msgctxt "ui_theme_save_title"
+msgid "SAVE THEME"
+msgstr "GUARDAR TEMA"
+
+msgctxt "ui_theme_save_name"
+msgid "NAME"
+msgstr "NOMBRE"
+
+msgctxt "ui_theme_save_replaces"
+msgid "REPLACES YOUR THEME WITH THIS NAME"
+msgstr "REEMPLAZA TU TEMA CON ESTE NOMBRE"
+
+msgctxt "ui_theme_save_builtin"
+msgid "A BUILT-IN THEME HAS THIS NAME"
+msgstr "UN TEMA INCLUIDO TIENE ESTE NOMBRE"
+
+msgctxt "ui_theme_save_button"
+msgid "SAVE"
+msgstr "GUARDAR"
+
+msgctxt "ui_theme_save_failed"
+msgid "COULDN'T SAVE THE THEME"
+msgstr "NO SE PUDO GUARDAR EL TEMA"
+
 msgctxt "theme_blue"
 msgid "BLUE"
 msgstr "AZUL"

@@ -295,15 +295,113 @@ static void draw_theme_preset(const SettingsUiContext* ui, const std::vector<Pic
     ImGui::PopID();
 }
 
+// SAVE THEME...: a button under THEME, then a popup that asks for the
+// theme's name. SAVE leaves the name in window->save_theme_request for piccolo
+// to write the file. A built-in theme's name can't be used; one of the user's
+// themes' names replaces it.
+static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui, const std::vector<PiccoloThemeFile>* files)
+{
+    const Localization* strings = ui->strings;
+    bool global = ui->scope == SettingLayer::global;
+    ImGui::PushID("ui_theme_save");
+    ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
+    ImGui::SameLine();
+    float start = ImGui::GetCursorPosX();
+    ImGui::SameLine(start + ui->label_width);
+    ImGui::BeginDisabled(!global);
+    if (retro_ui_button(piccolo_text(strings, Str::ui_theme_save)))
+    {
+        window->save_theme_open = true;
+        window->save_theme_name[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    retro_ui_item_tooltip(piccolo_text(strings, Str::ui_theme_save_help));
+
+    char title[128] = {};
+    std::snprintf(title, sizeof(title), "%s###save_theme", piccolo_text(strings, Str::ui_theme_save_title));
+    if (window->save_theme_open && !ImGui::IsPopupOpen(title))
+    {
+        ImGui::OpenPopup(title);
+    }
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.4f)), 0.0f), ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+    {
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+        {
+            window->save_theme_open = false;   // (B on a gamepad sends Escape while a popup is up)
+        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(piccolo_text(strings, Str::ui_theme_save_name));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::IsWindowAppearing())
+        {
+            ImGui::SetKeyboardFocusHere();
+        }
+        retro_ui_push_field_text();
+        bool enter = ImGui::InputText("##name", window->save_theme_name, sizeof(window->save_theme_name),
+                                      ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_EnterReturnsTrue);
+        retro_ui_pop_field_text();
+
+        // The name without spaces around it.
+        std::string name = window->save_theme_name;
+        size_t first = name.find_first_not_of(' ');
+        size_t last = name.find_last_not_of(' ');
+        name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
+        bool builtin = false;
+        for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
+        {
+            builtin = builtin || name == piccolo_text(strings, piccolo_settings_ui_theme_name(static_cast<RetroUiTheme>(i)));
+        }
+        bool replaces = false;
+        for (size_t i = 0; files != nullptr && i < files->size(); i++)
+        {
+            replaces = replaces || name == (*files)[i].name;
+        }
+        if (builtin)
+        {
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::ui_theme_save_builtin));
+        }
+        else if (replaces)
+        {
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::ui_theme_save_replaces));
+        }
+
+        bool can_save = !name.empty() && !builtin;
+        ImGui::BeginDisabled(!can_save);
+        if ((retro_ui_button(piccolo_text(strings, Str::ui_theme_save_button)) || enter) && can_save)
+        {
+            window->save_theme_request = name;
+            window->save_theme_open = false;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::map_cancel)))
+        {
+            window->save_theme_open = false;
+        }
+        if (!window->save_theme_open)
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::PopID();
+}
+
 // The interface settings are global only, so this tab edits the global
 // layer whatever the scope (on a core or game scope everything here would
 // be disabled).
-static void draw_interface(const SettingsUiContext* context, const SettingsWindowContext* window_context)
+static void draw_interface(SettingsWindow* window, const SettingsUiContext* context,
+                           const SettingsWindowContext* window_context)
 {
     SettingsUiContext global = *context;
     global.scope = SettingLayer::global;
     const SettingsUiContext* ui = &global;
     draw_theme_preset(ui, window_context->themes);
+    draw_save_theme(window, ui, window_context->themes);
     settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
     settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);
     settings_ui_row(ui, PICCOLO_UI_THEME_CURSOR, nullptr);
@@ -366,7 +464,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     {
         window->tab = SettingsTab::interface;
         begin_tab_content();
-        draw_interface(ui, context);
+        draw_interface(window, ui, context);
         end_tab_content();
         ImGui::EndTabItem();
     }

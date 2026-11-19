@@ -19,6 +19,7 @@
 // with its own on THIS CORE, else GLOBAL. Changes keep going to the override.
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "app_paths.h"
@@ -46,6 +47,9 @@ struct SettingsWindow
     SettingLayer scope       = SettingLayer::global;
     bool         choose_scope = false;  // pick the scope on the next draw (just opened)
     bool         search_frame_delay = false;   // SEARCH AGAIN was pressed (piccolo acts on it, then clears it)
+    bool         save_theme_open = false;      // the SAVE THEME popup (asks for the name)
+    char         save_theme_name[48] = {};
+    std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
 };
 
 // What the window needs from piccolo this frame.

@@ -1,9 +1,11 @@
 #include "piccolo_settings.h"
 
+#include "host_fs.h"
 #include "piccolo_text.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -721,6 +723,20 @@ static bool theme_name_before(const PiccoloThemeFile& a, const PiccoloThemeFile&
     return a.name < b.name;
 }
 
+// Adds `theme` to the list, or replaces the one with its name.
+static void add_theme(std::vector<PiccoloThemeFile>* themes, const PiccoloThemeFile* theme)
+{
+    for (size_t t = 0; t < themes->size(); t++)
+    {
+        if ((*themes)[t].name == theme->name)
+        {
+            (*themes)[t] = *theme;
+            return;
+        }
+    }
+    themes->push_back(*theme);
+}
+
 void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const char* directory)
 {
     int count = 0;
@@ -736,6 +752,7 @@ void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const 
         }
 
         PiccoloThemeFile theme = {};
+        theme.path = path;
         theme.palette = *retro_ui_theme_palette(RetroUiTheme::blue);
         const char* name = settings_file_get(&file, "", "name");
         if (name != nullptr && name[0] != '\0')
@@ -769,23 +786,84 @@ void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const 
             *palette_color(&theme.palette, i) = color | 0xFF000000u;
         }
 
-        bool replaced = false;
-        for (size_t t = 0; t < themes->size(); t++)
-        {
-            if ((*themes)[t].name == theme.name)
-            {
-                (*themes)[t] = theme;
-                replaced = true;
-            }
-        }
-        if (!replaced)
-        {
-            themes->push_back(theme);
-        }
+        add_theme(themes, &theme);
         SDL_Log("Theme %s from %s", theme.name.c_str(), path.c_str());
     }
     SDL_free(files);
     std::sort(themes->begin(), themes->end(), theme_name_before);
+}
+
+bool piccolo_themes_save(const Settings* settings, const char* name, const char* directory,
+                         std::vector<PiccoloThemeFile>* themes)
+{
+    PiccoloThemeFile theme = {};
+    theme.name = name;
+    piccolo_settings_palette(settings, &theme.palette);
+
+    // The file: the one a theme with this name came from, if it is in `directory`...
+    std::string folder = std::string(directory) + "/";
+    for (size_t t = 0; t < themes->size(); t++)
+    {
+        const std::string& path = (*themes)[t].path;
+        if ((*themes)[t].name == theme.name && path.compare(0, folder.size(), folder) == 0)
+        {
+            theme.path = path;
+        }
+    }
+    // ...else <name>.cfg: lower case letters and digits, "-" between words, a
+    // number after it if that file is taken.
+    if (theme.path.empty())
+    {
+        std::string stem;
+        for (size_t i = 0; i < theme.name.size(); i++)
+        {
+            unsigned char c = static_cast<unsigned char>(theme.name[i]);
+            if (std::isalnum(c))
+            {
+                stem.push_back(static_cast<char>(std::tolower(c)));
+            }
+            else if (!stem.empty() && stem.back() != '-')
+            {
+                stem.push_back('-');
+            }
+        }
+        while (!stem.empty() && stem.back() == '-')
+        {
+            stem.pop_back();
+        }
+        if (stem.empty())
+        {
+            stem = "theme";
+        }
+        theme.path = folder + stem + ".cfg";
+        for (int n = 2; host_fs_exists(theme.path.c_str()); n++)
+        {
+            theme.path = folder + stem + "-" + std::to_string(n) + ".cfg";
+        }
+    }
+
+    SettingsFile file = {};
+    bool ok = settings_file_set(&file, "", "name", theme.name.c_str());
+    ok = settings_file_set(&file, "", PICCOLO_UI_MENU_BOXES, theme.palette.menu_boxes ? "true" : "false") && ok;
+    ok = settings_file_set(&file, "", PICCOLO_UI_SHADOWS, theme.palette.shadows ? "true" : "false") && ok;
+    ok = settings_file_set(&file, "", PICCOLO_UI_THEME_CURSOR, theme.palette.theme_cursor ? "true" : "false") && ok;
+    for (uint32_t i = 0; i < UI_COLOR_COUNT; i++)
+    {
+        char color[16] = {};
+        std::snprintf(color, sizeof(color), "#%06X", *palette_color(&theme.palette, i) & 0xFFFFFFu);
+        ok = settings_file_set(&file, "", UI_COLOR_KEYS[i], color) && ok;
+    }
+    if (!ok || !host_fs_make_directories(directory) ||
+        !settings_file_save(&file, theme.path.c_str(), "piccolo interface theme, saved from SETTINGS > INTERFACE.\n"
+                                                         "The keys are explained in themes/example.cfg next to piccolo."))
+    {
+        SDL_Log("Couldn't save the theme %s to %s", theme.name.c_str(), theme.path.c_str());
+        return false;
+    }
+    SDL_Log("Theme %s saved to %s", theme.name.c_str(), theme.path.c_str());
+    add_theme(themes, &theme);
+    std::sort(themes->begin(), themes->end(), theme_name_before);
+    return true;
 }
 
 // The interface switches, as the palette has them.

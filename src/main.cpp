@@ -1560,6 +1560,17 @@ static void draw_settings(App* app)
         app->settings_window.search_frame_delay = false;
         search_frame_delay_again(app);
     }
+    // SAVE THEME: into themes/ in piccolo's folder, then listed in THEME.
+    if (!app->settings_window.save_theme_request.empty())
+    {
+        std::string name = app->settings_window.save_theme_request;
+        app->settings_window.save_theme_request.clear();
+        if (app->paths.root.empty() ||
+            !piccolo_themes_save(&app->settings, name.c_str(), (app->paths.root + "/themes").c_str(), &app->themes))
+        {
+            set_status(app, piccolo_text(&app->strings, Str::ui_theme_save_failed));
+        }
+    }
 
     // Closed (by its button or Esc): apply the folders and save.
     bool open = app->settings_window.open || app->settings_window.image_open;

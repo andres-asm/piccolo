@@ -147,6 +147,7 @@ bool piccolo_settings_apply_ui_theme(Settings* settings, RetroUiTheme theme);
 struct PiccoloThemeFile
 {
     std::string    name;
+    std::string    path;   // the file it came from
     RetroUiPalette palette = {};
 };
 
@@ -154,6 +155,14 @@ struct PiccoloThemeFile
 // with the same name as one already in the list replaces it, so the folder
 // loaded last wins.
 void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const char* directory);
+
+// SAVE THEME: the interface settings as they are now, as a theme named
+// `name` in `directory` (made if missing): the file of a theme there with
+// that name, else a new <name>.cfg (lower case, letters and digits). The
+// theme goes in `themes` (replacing one with the same name). False (logged)
+// if the file can't be written.
+bool piccolo_themes_save(const Settings* settings, const char* name, const char* directory,
+                         std::vector<PiccoloThemeFile>* themes);
 
 // Whether the interface settings are exactly `palette`, and setting them all to it.
 bool piccolo_settings_ui_palette_is(const Settings* settings, const RetroUiPalette* palette);
