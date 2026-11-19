@@ -78,7 +78,8 @@ of the branches and what's left.
 - 16-63 need gamepad, 64-127 stream, 128-255 full: `net_access` drops what a
   device's level doesn't cover. Give new application messages a type in the
   range of the level they need. Input channel: type 1 = pad states.
-- 16: game_state (host -> client). 17-19: actions (net_settings). 128-133:
+- 16: game_state (host -> client). 17-19: actions, 20-22: controllers /
+  port_device (net_settings). Input channel: 1 pad, 2 RetroPad. 128-133:
   net_content (cores / list / load). 136-140: settings (net_settings).
 
 ## Pending, in order
@@ -116,12 +117,19 @@ of the branches and what's left.
      a device's PAUSE ends when it leaves or the game changes). net_probe:
      `--settings`, `--set LAYER KEY VALUE`, `--actions`, `--action KEY`,
      `--lang`. Tried against a scratch piccolo.
-   - **Next: remote input as RetroPad (Andrés: "Phone maps, sends RetroPad").**
-     The phone decides which touch button is which RetroPad button (per core /
-     game, kept on the phone) and sends RetroPad states; piccolo doesn't remap
-     remote pads (host remaps / turbo / combos don't apply to them). A new input
-     message type (per-port RetroPad frames, the format rollback netplay will
-     use too), the remote device placed in a port; changes piccoletto.
+   - Remote input as RetroPad (Andrés: "Phone maps, sends RetroPad"), done:
+     net_input type 2 (per-pad RetroPad frames, history like type 1);
+     InputDevice::retropad in the router (straight to its port: no bindings,
+     remaps, turbo or combos; START joins; a tap between frames counts);
+     `controllers` (types 20-22: per port the core's devices, the one in use,
+     its input descriptors, and where each of the device's pads plays; pushed
+     when any of it changes) and `port_device` (any level, the port its own pad
+     is on; written like the quick menu's CONTROLS, core layer). net_probe:
+     `--retropad`, `--controllers`, `--port-device PAD DEVICE`. Tried with
+     snes9x: join, pushes, port 1 to SNES Mouse.
+   - Open (Andrés): the port's device is kept per core today (quick menu and
+     network alike); he said it should rather be per game. Not changed yet.
+   - Later: pointer / mouse / lightgun from touch in the same message (Andrés: yes, second step).
 3. **Milestone 6: streaming (access stream) and headless (access full)**, with
    piccoletto. Postponed (Andrés, 2026-11-19): the other milestones first. The
    discussion (two codecs: lossless delta at native size / H.264 by hardware;

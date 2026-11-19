@@ -122,6 +122,7 @@ struct App
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
     NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
+    uint64_t   net_controllers_sent[NET_MAX_PEERS] = {};   // a summary of the controllers each device was last sent
     // What the devices were last told runs (game_state): sent again when it changes.
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
@@ -1867,6 +1868,151 @@ static void net_send_actions(App* app, uint32_t peer, uint32_t id)
     }
 }
 
+// The ports the core has, as the quick menu's CONTROLS shows them: as many
+// as SETTINGS > INPUT > PORTS says, no more than the core describes. 0 when
+// no game runs.
+static uint32_t net_core_ports(const App* app)
+{
+    const LibretroHost* host = app->session.host;
+    if (!game_running(app) || host == nullptr)
+    {
+        return 0;
+    }
+    int32_t wanted = settings_get_int(&app->settings, PICCOLO_INPUT_PORTS);
+    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
+                                                                                     : INPUT_PORT_COUNT;
+    if (host->input_info.port_count > 0 && host->input_info.port_count < ports)
+    {
+        ports = host->input_info.port_count;
+    }
+    return ports;
+}
+
+// The port a peer's pad plays on, or -1.
+static int32_t net_pad_port(const App* app, uint32_t peer, uint32_t pad)
+{
+    const InputNetPad* entry = &app->input_net.pads[peer][pad];
+    if (!entry->active)
+    {
+        return -1;
+    }
+    int32_t controller = input_first_controller(&app->input, entry->device);
+    return controller < 0 ? -1 : input_controller_port(&app->input, static_cast<uint32_t>(controller));
+}
+
+// What the core expects on each port, and where this peer's pads play.
+static void net_controllers_for(const App* app, uint32_t peer, NetControllers* controllers)
+{
+    for (uint32_t pad = 0; pad < NET_CONTROLLERS_PADS; pad++)
+    {
+        controllers->pad_ports[pad] = static_cast<int8_t>(net_pad_port(app, peer, pad));
+    }
+    controllers->ports.clear();
+    uint32_t ports = net_core_ports(app);
+    const LibretroHost* host = app->session.host;
+    for (uint32_t p = 0; p < ports; p++)
+    {
+        NetPort port;
+        port.device = host->port_devices[p];
+        const LibretroInputInfo* info = &host->input_info;
+        if (p < info->port_count)
+        {
+            for (uint32_t t = 0; t < info->ports[p].count; t++)
+            {
+                NetPortDevice device;
+                device.id = info->ports[p].types[t].id;
+                device.name = info->ports[p].types[t].description;
+                port.devices.push_back(device);
+            }
+        }
+        for (uint32_t d = 0; d < info->descriptor_count; d++)
+        {
+            const LibretroInputDescriptor* in = &info->descriptors[d];
+            if (in->port != p)
+            {
+                continue;
+            }
+            NetPortDescriptor descriptor;
+            descriptor.device = static_cast<uint8_t>(in->device);
+            descriptor.index = static_cast<uint8_t>(in->index);
+            descriptor.id = static_cast<uint8_t>(in->id);
+            descriptor.name = in->description;
+            port.descriptors.push_back(descriptor);
+        }
+        controllers->ports.push_back(port);
+    }
+}
+
+// A summary of what net_controllers_for would say, compared every loop
+// (no allocation) to know when to send it again.
+static uint64_t net_controllers_summary(const App* app, uint32_t peer)
+{
+    uint64_t summary = 1469598103934665603ull;   // FNV-1a over the numbers
+    uint32_t values[16] = {};
+    uint32_t count = 0;
+    for (uint32_t pad = 0; pad < NET_CONTROLLERS_PADS; pad++)
+    {
+        values[count++] = static_cast<uint32_t>(net_pad_port(app, peer, pad) + 1);
+    }
+    uint32_t ports = net_core_ports(app);
+    values[count++] = ports;
+    if (ports > 0)
+    {
+        values[count++] = app->session.host->input_info.controller_serial;
+        values[count++] = app->session.host->input_info.descriptor_serial;
+        for (uint32_t p = 0; p < ports && count < 16; p++)
+        {
+            values[count++] = app->session.host->port_devices[p];
+        }
+    }
+    for (uint32_t i = 0; i < count; i++)
+    {
+        summary = (summary ^ values[i]) * 1099511628211ull;
+    }
+    return summary;
+}
+
+static void net_send_controllers(App* app, uint32_t peer, uint32_t id)
+{
+    NetControllers controllers;
+    net_controllers_for(app, peer, &controllers);
+    size_t size = net_settings_write_controllers(app->net_remote.reply.data(), app->net_remote.reply.size(), id,
+                                                 &controllers);
+    net_access_send(&app->net, peer, NetChannel::control, app->net_remote.reply.data(), size);
+    app->net_controllers_sent[peer] = net_controllers_summary(app, peer);
+}
+
+// port_device: the device on the port this peer's pad plays on, as the
+// quick menu's CONTROLS changes it (the core is told; kept for the core).
+static void net_change_port_device(App* app, uint32_t peer, uint8_t pad, uint32_t device_id, const char* device)
+{
+    int32_t port = net_pad_port(app, peer, pad);
+    const LibretroHost* host = app->session.host;
+    if (port < 0 || static_cast<uint32_t>(port) >= net_core_ports(app) ||
+        static_cast<uint32_t>(port) >= host->input_info.port_count)
+    {
+        return;   // not on a port, or the core offers nothing to choose there
+    }
+    const LibretroPortControllers* types = &host->input_info.ports[port];
+    bool offered = false;
+    for (uint32_t t = 0; t < types->count && !offered; t++)
+    {
+        offered = types->types[t].id == device_id;
+    }
+    if (!offered)
+    {
+        return;
+    }
+    libretro_host_set_port_device(app->session.host, static_cast<unsigned>(port), device_id);
+    settings_set_int(&app->settings, SettingLayer::core, PICCOLO_INPUT_PORT_DEVICES[port],
+                     static_cast<int32_t>(device_id));
+    if (!app->settings_window.open)
+    {
+        save_settings(app);
+    }
+    SDL_Log("Network: %s set port %d to device %u", device, port + 1, device_id);
+}
+
 // Every loop: settings that changed (from anywhere) go to the FULL devices,
 // and the action lists again when what they show changed.
 static void net_follow_remote(App* app)
@@ -1892,6 +2038,14 @@ static void net_follow_remote(App* app)
     if (app->net_paused && game_running(app) != app->net_actions_sent.running)
     {
         app->net_paused = false;
+    }
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net.peers[i].state == NetAccessPeerState::authorized &&
+            net_controllers_summary(app, i) != app->net_controllers_sent[i])
+        {
+            net_send_controllers(app, i, 0);   // a pad joined or left a port, another game, another device
+        }
     }
     NetRemoteGame game = net_remote_game(app);
     if (game.running != app->net_actions_sent.running || game.slot != app->net_actions_sent.slot ||
@@ -2019,6 +2173,22 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
     if (net_settings_read_action(event->data, event->size, &key, &pressed))
     {
         net_do_action(app, event->peer, &key, pressed, device);
+        return;
+    }
+    if (event->peer >= NET_MAX_PEERS)
+    {
+        return;
+    }
+    if (net_settings_read_controllers_request(event->data, event->size, &id))
+    {
+        net_send_controllers(app, event->peer, id);
+        return;
+    }
+    uint8_t pad = 0;
+    uint32_t device_id = 0;
+    if (net_settings_read_port_device(event->data, event->size, &pad, &device_id))
+    {
+        net_change_port_device(app, event->peer, pad, device_id, device);
     }
 }
 
@@ -2201,6 +2371,7 @@ static void net_update(App* app)
             SDL_Log("Network: \"%s\" connected from %s", device, address);
             net_send_game_state(app, event.peer);   // what runs, from the start
             net_send_actions(app, event.peer, 0);
+            net_send_controllers(app, event.peer, 0);
             break;
         case NetAccessEventType::paired:
         {
@@ -2209,6 +2380,7 @@ static void net_update(App* app)
             set_status(app, status);
             net_send_game_state(app, event.peer);
             net_send_actions(app, event.peer, 0);
+            net_send_controllers(app, event.peer, 0);
             break;
         }
         case NetAccessEventType::closed:
