@@ -2113,6 +2113,10 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         {
             below = shown[q] ? static_cast<int32_t>(q) : -1;
         }
+        // At the right, like REMAP / UNASSIGN.
+        float move_width = button_width(up) + button_width(down) + spacing;
+        float move_x = ImGui::GetWindowContentRegionMax().x - move_width;
+        ImGui::SetCursorPosX(move_x > ImGui::GetCursorPosX() ? move_x : ImGui::GetCursorPosX());
         ImGui::BeginDisabled(above < 0);
         if (retro_ui_button(up))
         {
