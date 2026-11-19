@@ -315,12 +315,7 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     return changed;
 }
 
-float settings_ui_reset_width(const SettingsUiContext* context)
-{
-    return ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-}
-
-bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint)
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint, float reserved)
 {
     // Read-only: it looks like any other field (and a long path can be
     // scrolled), but a click opens CHOOSE FOLDER, as "..." does for whoever
@@ -330,7 +325,9 @@ bool settings_ui_folder_field(const SettingsUiContext* context, const char* valu
     float spacing = ImGui::GetStyle().ItemSpacing.x;
     char buffer[LIBRETRO_PATH_MAX] = {};
     std::snprintf(buffer, sizeof(buffer), "%s", value);
-    ImGui::SetNextItemWidth(widget_width(context) - dots_width - spacing);
+    // Up to the right edge (Andrés: no empty column after it), less what
+    // the caller's button needs.
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - reserved - dots_width - spacing);
     retro_ui_push_field_text();
     ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer),
                              ImGuiInputTextFlags_ReadOnly);
@@ -366,7 +363,14 @@ bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, c
         ImGui::BeginDisabled();
     }
     label_column(context, descriptor);
-    clicked = settings_ui_folder_field(context, value, hint) && !global_only_here;
+    // RESET only when this scope sets the folder: then its room is kept.
+    float reserved = 0.0f;
+    if (!global_only_here && settings_get_layer(context->settings, context->scope, key) != nullptr)
+    {
+        reserved = ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x +
+                   ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+    }
+    clicked = settings_ui_folder_field(context, value, hint, reserved) && !global_only_here;
     if (global_only_here)
     {
         ImGui::EndDisabled();

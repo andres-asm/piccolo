@@ -65,8 +65,8 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
     {
         set++;
     }
-    // The field as wide as the other folders', "-" where their RESET goes.
-    float remove_width = settings_ui_reset_width(ui);
+    // The field up to "-" at the right edge.
+    float remove_width = ImGui::CalcTextSize("-").x + ImGui::GetStyle().FramePadding.x * 2.0f;
     const char* label = piccolo_text(ui->strings, Str::setting_path_games);
     int32_t remove = -1;
     for (uint32_t i = 0; i < set; i++)
@@ -80,12 +80,13 @@ static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* u
         retro_ui_item_tooltip(piccolo_text(ui->strings, Str::setting_path_games_help));
         ImGui::SameLine(start + ui->label_width);
 
-        if (settings_ui_folder_field(ui, settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]), nullptr))
+        if (settings_ui_folder_field(ui, settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]), nullptr,
+                                     remove_width + ImGui::GetStyle().ItemSpacing.x))
         {
             window->choose_folder_key = PICCOLO_PATH_GAMES[i];
         }
         ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
-        if (retro_ui_button_sized("-", remove_width, 0.0f))
+        if (retro_ui_button("-"))
         {
             remove = static_cast<int32_t>(i);
         }

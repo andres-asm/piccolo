@@ -37,13 +37,11 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
 bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint);
 
 // The field of a folder row: `value` read-only (or `hint` when empty) and
-// "..." after it, together as wide as settings_ui_row's widget. True when
-// either was clicked (the caller opens CHOOSE FOLDER).
-bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint);
+// "..." after it, filling the row up to `reserved` pixels from its right
+// edge (room for a button after it; 0 = none). True when either was
+// clicked (the caller opens CHOOSE FOLDER).
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint, float reserved);
 
-// The reset button's width: for rows drawn by hand that line up with the
-// others (a button in its column).
-float settings_ui_reset_width(const SettingsUiContext* context);
 
 // A text setting picked from a list (e.g. the audio devices connected now).
 // "" shows `empty_label`; a stored value that isn't in the list is shown
