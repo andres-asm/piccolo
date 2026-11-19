@@ -2479,17 +2479,17 @@ msgctxt "net_pair_instructions"
 msgid "Type this code on the other device. It changes after a wrong try."
 msgstr "Escribe este código en el otro dispositivo. Cambia después de un intento fallido."
 
-msgctxt "net_pair_left"
-msgid "LEFT"
-msgstr "RESTANTE"
+msgctxt "net_pair_validity"
+msgid "VALIDITY"
+msgstr "VALIDEZ"
 
 msgctxt "net_pair_stop"
 msgid "STOP"
 msgstr "DETENER"
 
-msgctxt "net_pair_new_code"
-msgid "NEW CODE"
-msgstr "CÓDIGO NUEVO"
+msgctxt "net_pair_refresh"
+msgid "REFRESH"
+msgstr "RENOVAR"
 
 msgctxt "net_section_devices"
 msgid "PAIRED DEVICES"
@@ -2525,9 +2525,6 @@ msgctxt "status_net_pairing_closed"
 msgid "PAIRING CLOSED"
 msgstr "VINCULACIÓN CERRADA"
 
-msgctxt "net_device_access"
-msgid "ACCESS"
-msgstr "PERMISO"
 
 msgctxt "net_device_access_help"
 msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."

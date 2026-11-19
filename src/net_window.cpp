@@ -6,7 +6,6 @@
 
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
-#include "pixel_font_imgui.h"
 #include "retro_ui.h"
 #include "settings_ui.h"
 
@@ -15,20 +14,20 @@ void net_window_open(NetWindow* window)
     window->open = true;
 }
 
-// The code in two groups of three ("482 915"), big: it's read from across
-// the room and typed on a phone.
-static void draw_code(const NetAccess* access, ImFont* pixel_font, float block)
+// The code in two groups of three ("482 915"), in the highlight color.
+static void draw_code(const NetAccess* access)
 {
     char grouped[8] = {};
     std::snprintf(grouped, sizeof(grouped), "%.3s %.3s", access->code, access->code + 3);
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block * 3.0f);
     retro_ui_push_section_text();
     ImGui::TextUnformatted(grouped);
     retro_ui_pop_section_text();
-    ImGui::PopFont();
 }
 
-static void draw_pairing(const NetWindowContext* context, ImFont* pixel_font, float block)
+//   CODE  482 915
+//   VALIDITY: 4:32  [REFRESH] [STOP]
+//   Type this code on the other device...
+static void draw_pairing(const NetWindowContext* context)
 {
     NetAccess* access = context->access;
     const Localization* strings = context->strings;
@@ -41,15 +40,14 @@ static void draw_pairing(const NetWindowContext* context, ImFont* pixel_font, fl
         retro_ui_item_tooltip(piccolo_text(strings, Str::net_pair_button_help));
         return;
     }
-    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(piccolo_text(strings, Str::net_pair_code));
     ImGui::SameLine();
-    draw_code(access, pixel_font, block);
-    ImGui::SameLine();
+    draw_code(access);
     uint32_t left = static_cast<uint32_t>(net_access_pairing_seconds_left(access));
-    ImGui::Text("%u:%02u %s", left / 60, left % 60, piccolo_text(strings, Str::net_pair_left));
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("%s: %u:%02u", piccolo_text(strings, Str::net_pair_validity), left / 60, left % 60);
     ImGui::SameLine();
-    if (retro_ui_button(piccolo_text(strings, Str::net_pair_new_code)))
+    if (retro_ui_button(piccolo_text(strings, Str::net_pair_refresh)))
     {
         net_access_open_pairing(access);   // already open: a new code
     }
@@ -66,32 +64,26 @@ static void draw_pairing(const NetWindowContext* context, ImFont* pixel_font, fl
 static const Str ACCESS_LABELS[NET_ACCESS_LEVEL_COUNT] = {Str::net_access_gamepad, Str::net_access_stream,
                                                           Str::net_access_full};
 
-// ACCESS: GAMEPAD / STREAM / FULL for one device (applied and saved at once).
-static void draw_access(NetAccess* access, uint32_t device, const Localization* strings, float block)
+// ACCESS: GAMEPAD / STREAM / FULL for one device, as a row of buttons
+// (applied and saved at once).
+static void draw_access(NetAccess* access, uint32_t device, const Localization* strings)
 {
-    uint32_t current = static_cast<uint32_t>(access->trust.devices[device].access);
-    ImGui::TextUnformatted(piccolo_text(strings, Str::net_device_access));
-    retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(56.0f * block);
-    if (retro_ui_begin_combo("##access", piccolo_text(strings, ACCESS_LABELS[current])))
+    const char* labels[NET_ACCESS_LEVEL_COUNT];
+    for (uint32_t level = 0; level < NET_ACCESS_LEVEL_COUNT; level++)
     {
-        for (uint32_t level = 0; level < NET_ACCESS_LEVEL_COUNT; level++)
-        {
-            ImGui::PushID(static_cast<int>(level));
-            bool picked = ImGui::Selectable(piccolo_text(strings, ACCESS_LABELS[level]), level == current);
-            ImGui::PopID();
-            if (picked && level != current)
-            {
-                net_access_set_level(access, device, static_cast<NetAccessLevel>(level));
-            }
-        }
-        ImGui::EndCombo();
+        labels[level] = piccolo_text(strings, ACCESS_LABELS[level]);
+    }
+    uint32_t current = static_cast<uint32_t>(access->trust.devices[device].access);
+    if (retro_ui_choice_buttons("##access", labels, NET_ACCESS_LEVEL_COUNT, &current))
+    {
+        net_access_set_level(access, device, static_cast<NetAccessLevel>(current));
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
 }
 
-static void draw_devices(const NetWindowContext* context, float block)
+//   ANA'S PHONE  9c77-3332-311c-4017  CONNECTED
+//   [GAMEPAD][STREAM][FULL]  [FORGET]
+static void draw_devices(const NetWindowContext* context)
 {
     NetAccess* access = context->access;
     const Localization* strings = context->strings;
@@ -106,14 +98,15 @@ static void draw_devices(const NetWindowContext* context, float block)
     {
         const NetTrustedDevice* device = &access->trust.devices[i];
         ImGui::PushID(static_cast<int>(i));
+        if (i > 0)
+        {
+            ImGui::Spacing();
+        }
         char fingerprint[32];
         net_key_fingerprint(device->key, fingerprint, sizeof(fingerprint));
-        ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(device->name.empty() ? "?" : device->name.c_str());
         ImGui::SameLine();
-        ImGui::TextDisabled("%s  %s", fingerprint, device->paired.c_str());
-        ImGui::SameLine();
-        draw_access(access, static_cast<uint32_t>(i), strings, block);
+        ImGui::TextDisabled("%s", fingerprint);
         if (net_access_device_connected(access, static_cast<uint32_t>(i)))
         {
             ImGui::SameLine();
@@ -121,6 +114,7 @@ static void draw_devices(const NetWindowContext* context, float block)
             ImGui::TextUnformatted(piccolo_text(strings, Str::net_device_connected));
             retro_ui_pop_section_text();
         }
+        draw_access(access, static_cast<uint32_t>(i), strings);
         ImGui::SameLine();
         if (retro_ui_button(piccolo_text(strings, Str::net_device_forget)))
         {
@@ -184,9 +178,9 @@ void net_window_draw(NetWindow* window, const NetWindowContext* context, ImFont*
         else
         {
             retro_ui_separator_text(piccolo_text(strings, Str::net_section_pairing));
-            draw_pairing(context, pixel_font, block);
+            draw_pairing(context);
             retro_ui_separator_text(piccolo_text(strings, Str::net_section_devices));
-            draw_devices(context, block);
+            draw_devices(context);
         }
         retro_ui_end_window();
     }

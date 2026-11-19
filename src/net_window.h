@@ -11,10 +11,12 @@
 //   | -- PAIRING -------------------------------------------------- |
 //   |   [PAIR A DEVICE]                                             |
 //   |     or, while pairing:                                        |
-//   |   CODE   482 915            4:32 LEFT   [NEW CODE] [STOP]     |
+//   |   CODE  482 915                       (highlight color)       |
+//   |   VALIDITY: 4:32  [REFRESH] [STOP]                            |
 //   |   Type this code on the other device. It changes after...     |
 //   | -- PAIRED DEVICES ------------------------------------------- |
-//   |   ANA'S PHONE   9c77-3332-311c-4017  [x] OWN  CONNECTED [FORGET]
+//   |   ANA'S PHONE  9c77-3332-311c-4017  CONNECTED                 |
+//   |   [GAMEPAD][STREAM][FULL]  [FORGET]                           |
 //   +--------------------------------------------------------------+
 //
 // The settings rows edit piccolo's global settings; main.cpp restarts the
