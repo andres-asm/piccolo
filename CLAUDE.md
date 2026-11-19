@@ -40,8 +40,9 @@ cores, no GUI) and **frontends** (GUI).
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
-used by test-libretro). Later: piccoletto (streaming companion, Android first),
-Multitap (modern multi-host frontend).
+used by test-libretro), piccoletto (the companion app: gamepad, remote play,
+devices; Android first; `.repos/piccoletto`, shares retroui; its own CLAUDE.md).
+Later: Multitap (modern multi-host frontend).
 
 **A library change:** edit it in its submodule (the five are on `main`), build
 and test here, commit and push THERE first, then commit piccolo's pointer.
