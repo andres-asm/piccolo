@@ -114,6 +114,11 @@ of the branches and what's left.
    TURN; IPv6 (upstream ENet is IPv4 only: revisit a fork then); rollback
    netplay in host-libretro (savestate ring, resimulation, per-port RetroPad
    frames as their own input message type, state hash).
+   **net_http is shared:** piccolo-cores (branch `cores`, docs/cores.md) wants
+   it for a core updater: a plain HTTPS GET of a file with progress and
+   cancel (Ed25519-signed index with Monocypher, SHA-256 from the LZMA SDK).
+   Whoever writes net_http first covers that API; tell Andrés when it lands
+   so the two branches don't each write their own.
 5. Discord lobbies, later.
 
 ## Open points / known limits
