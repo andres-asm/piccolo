@@ -1162,7 +1162,9 @@ static void draw_macro_editor(QuickMenu* menu, const QuickMenuContext* context, 
         ImGui::PushID(200 + kind);
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(piccolo_text(strings, kind == 0 ? Str::remap_macro_change_steps : Str::remap_macro_change_pauses));
-        ImGui::SameLine(label_width * 1.6f);
+        // (Its field under the steps' frames.)
+        float field_x = ImGui::GetWindowContentRegionMax().x - row_buttons;
+        ImGui::SameLine(field_x > ImGui::GetCursorPosX() ? field_x : 0.0f);
         int32_t* value = kind == 0 ? &menu->macro_change_steps : &menu->macro_change_pauses;
         frames_field("##to", value, frames_width);
         ImGui::SameLine();
