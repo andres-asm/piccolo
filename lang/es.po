@@ -2410,3 +2410,123 @@ msgstr "El mapeo empieza solo, o cuando presionas cualquier botón del control."
 msgctxt "map_any_button"
 msgid "Or press any button on the controller."
 msgstr "O presiona cualquier botón del control."
+
+msgctxt "menu_network"
+msgid "NETWORK..."
+msgstr "RED..."
+
+msgctxt "net_title"
+msgid "NETWORK"
+msgstr "RED"
+
+msgctxt "setting_net_enabled"
+msgid "ALLOW CONNECTIONS"
+msgstr "PERMITIR CONEXIONES"
+
+msgctxt "setting_net_enabled_help"
+msgid "Lets paired devices (PICCOLETTO, another PICCOLO) connect to this one over the network. Off: nothing listens."
+msgstr "Deja que los dispositivos vinculados (PICCOLETTO, otro PICCOLO) se conecten a este por la red. Apagado: nada escucha."
+
+msgctxt "setting_net_name"
+msgid "NAME"
+msgstr "NOMBRE"
+
+msgctxt "setting_net_name_help"
+msgid "What other devices see when they look for this one."
+msgstr "Lo que ven los otros dispositivos cuando buscan este."
+
+msgctxt "setting_net_port"
+msgid "PORT"
+msgstr "PUERTO"
+
+msgctxt "setting_net_port_help"
+msgid "The UDP port for everything network. Change it only if another program uses it."
+msgstr "El puerto UDP para todo lo de red. Cámbialo solo si otro programa lo usa."
+
+msgctxt "net_this_device"
+msgid "THIS DEVICE"
+msgstr "ESTE DISPOSITIVO"
+
+msgctxt "net_this_device_help"
+msgid "This device's key, in short. The other device shows the same when it pairs with this one."
+msgstr "La llave de este dispositivo, en corto. El otro dispositivo muestra la misma cuando se vincula con este."
+
+msgctxt "net_off"
+msgid "NETWORKING IS OFF"
+msgstr "LA RED ESTÁ APAGADA"
+
+msgctxt "net_listen_failed"
+msgid "THE PORT COULD NOT BE OPENED (IN USE?)"
+msgstr "NO SE PUDO ABRIR EL PUERTO (¿EN USO?)"
+
+msgctxt "net_section_pairing"
+msgid "PAIRING"
+msgstr "VINCULAR"
+
+msgctxt "net_pair_button"
+msgid "PAIR A DEVICE"
+msgstr "VINCULAR UN DISPOSITIVO"
+
+msgctxt "net_pair_button_help"
+msgid "Shows a code to type on the other device."
+msgstr "Muestra un código para escribir en el otro dispositivo."
+
+msgctxt "net_pair_code"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "net_pair_instructions"
+msgid "Type this code on the other device. It changes after a wrong try."
+msgstr "Escribe este código en el otro dispositivo. Cambia después de un intento fallido."
+
+msgctxt "net_pair_left"
+msgid "LEFT"
+msgstr "RESTANTE"
+
+msgctxt "net_pair_stop"
+msgid "STOP"
+msgstr "DETENER"
+
+msgctxt "net_pair_new_code"
+msgid "NEW CODE"
+msgstr "CÓDIGO NUEVO"
+
+msgctxt "net_section_devices"
+msgid "PAIRED DEVICES"
+msgstr "DISPOSITIVOS VINCULADOS"
+
+msgctxt "net_no_devices"
+msgid "NO DEVICES PAIRED YET"
+msgstr "TODAVÍA NO HAY DISPOSITIVOS VINCULADOS"
+
+msgctxt "net_device_own"
+msgid "OWN"
+msgstr "PROPIO"
+
+msgctxt "net_device_own_help"
+msgid "A device of yours. Later the game can move to it and leave this machine without a screen."
+msgstr "Un dispositivo tuyo. Más adelante el juego podrá pasar a él y dejar esta máquina sin pantalla."
+
+msgctxt "net_device_connected"
+msgid "CONNECTED"
+msgstr "CONECTADO"
+
+msgctxt "net_device_forget"
+msgid "FORGET"
+msgstr "OLVIDAR"
+
+msgctxt "net_device_forget_help"
+msgid "Removes this device: it has to pair again to connect."
+msgstr "Quita este dispositivo: tiene que vincularse de nuevo para conectarse."
+
+msgctxt "status_net_paired"
+msgid "PAIRED WITH"
+msgstr "VINCULADO CON"
+
+msgctxt "status_net_pairing_failed"
+msgid "WRONG PAIRING CODE: A NEW ONE IS SHOWN"
+msgstr "CÓDIGO DE VINCULACIÓN INCORRECTO: SE MUESTRA UNO NUEVO"
+
+msgctxt "status_net_pairing_closed"
+msgid "PAIRING CLOSED"
+msgstr "VINCULACIÓN CERRADA"

@@ -46,7 +46,9 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
-#include "net_session.h"
+#include "net_access.h"
+#include "net_trust.h"
+#include "net_window.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -94,11 +96,18 @@ struct App
     CoreSession session = {};
     CoreCatalog catalog = {};
 
-    // Network listener (settings net_*), started at launch when enabled.
-    // Connections are encrypted (Noise handshake) but nobody is paired yet:
-    // they're closed as soon as the handshake ends.
-    bool       net_ready = false;   // net_init() succeeded
-    NetSession net = {};
+    // Network (CONFIG > NETWORK): the listener with access control and
+    // pairing, while net_enabled. The device key and the paired devices live
+    // in <settings>/net_identity.cfg and net_devices.cfg.
+    bool       net_ready = false;        // net_init() succeeded
+    bool       net_running = false;      // `net` is listening
+    bool       net_listen_failed = false;
+    bool       net_has_identity = false;
+    NetKeypair net_identity = {};
+    char       net_fingerprint[32] = "";
+    uint16_t   net_port = 0;             // what `net` listens on
+    NetAccess  net = {};
+    NetWindow  net_window = {};
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -709,6 +718,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::options_manager:
             core_options_manager_open(&app->core_options_manager, &app->core_options_state);
+            break;
+        case MenuAction::network:
+            net_window_open(&app->net_window);
             break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
@@ -1671,59 +1683,135 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
-// The network listener, if SETTINGS has it on (net_enabled, read at launch).
+// The listener, when SETTINGS has it on. Started at launch and restarted
+// when ALLOW CONNECTIONS or PORT change (net_update).
 static void net_start(App* app)
 {
-    if (!settings_get_bool(&app->settings, PICCOLO_NET_ENABLED))
+    // Any failure below is remembered with the port it was tried on, so it
+    // isn't retried every frame (net_update).
+    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    app->net_listen_failed = true;
+    if (app->paths.settings.empty())
     {
-        return;
+        return;   // nowhere to keep the device key: networking stays off
     }
-    app->net_ready = net_init();
     if (!app->net_ready)
     {
-        return;
-    }
-    // A new device key every launch until pairing keeps one (milestone 3).
-    NetKeypair identity;
-    if (!net_keypair_generate(&identity))
-    {
-        return;
-    }
-    char fingerprint[32];
-    net_key_fingerprint(identity.public_key, fingerprint, sizeof(fingerprint));
-    SDL_Log("Network: this device is %s", fingerprint);
-    uint16_t port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
-    net_session_create_listener(&app->net, port, settings_get_text(&app->settings, PICCOLO_NET_NAME), &identity);
-    net_keypair_wipe(&identity);
-}
-
-// Once per loop: discovery requests are answered and handshakes run inside
-// net_session_poll. Nobody can be paired yet (milestone 3), so a connection
-// is closed as soon as it's secured: nothing a peer sends is acted on.
-static void net_update(App* app)
-{
-    NetSessionEvent event;
-    while (net_session_poll(&app->net, &event))
-    {
-        if (event.type == NetSessionEventType::secured)
+        app->net_ready = net_init();
+        if (!app->net_ready)
         {
-            char address[64];
-            char fingerprint[32];
-            net_address_to_text(event.address, address, sizeof(address));
-            net_key_fingerprint(event.remote_key, fingerprint, sizeof(fingerprint));
-            SDL_Log("Network: device %s at %s connected, closed (not paired)", fingerprint, address);
-            net_session_close(&app->net, event.peer);
+            return;
         }
     }
+    if (!app->net_has_identity)
+    {
+        std::string identity_path = app->paths.settings + "/net_identity.cfg";
+        app->net_has_identity = net_identity_load_or_create(identity_path.c_str(), &app->net_identity);
+        if (!app->net_has_identity)
+        {
+            return;
+        }
+        net_key_fingerprint(app->net_identity.public_key, app->net_fingerprint, sizeof(app->net_fingerprint));
+        SDL_Log("Network: this device is %s", app->net_fingerprint);
+    }
+    app->net = NetAccess{};
+    std::string devices_path = app->paths.settings + "/net_devices.cfg";
+    if (!net_access_create(&app->net, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
+                           &app->net_identity, devices_path.c_str()))
+    {
+        net_access_destroy(&app->net);
+        return;
+    }
+    app->net_listen_failed = false;
+    app->net_running = true;
 }
 
 static void net_stop(App* app)
 {
-    net_session_destroy(&app->net);
+    if (app->net_running)
+    {
+        net_access_destroy(&app->net);
+        app->net_running = false;
+    }
+}
+
+static void net_shutdown_all(App* app)
+{
+    net_stop(app);
+    net_keypair_wipe(&app->net_identity);
     if (app->net_ready)
     {
         net_shutdown();
         app->net_ready = false;
+    }
+}
+
+// Once per loop: follow the settings, then the network's events. Paired
+// devices are let in (and get nothing yet: remote input is milestone 4);
+// everyone else needs the pairing code.
+static void net_update(App* app)
+{
+    bool enabled = settings_get_bool(&app->settings, PICCOLO_NET_ENABLED);
+    uint16_t port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    if (app->net_running && (!enabled || port != app->net_port))
+    {
+        net_stop(app);
+        app->net_listen_failed = false;
+    }
+    // After a failure (port in use) it's tried again only with another port.
+    if (enabled && !app->net_running && (!app->net_listen_failed || port != app->net_port))
+    {
+        net_start(app);
+    }
+    if (!enabled)
+    {
+        app->net_listen_failed = false;
+    }
+    if (!app->net_running)
+    {
+        return;
+    }
+    // A new NAME is used at once (discovery and pairing show it).
+    const char* name = settings_get_text(&app->settings, PICCOLO_NET_NAME);
+    if (app->net.name != name)
+    {
+        app->net.name = name;
+        app->net.session.host.name = name;
+    }
+
+    NetAccessEvent event;
+    while (net_access_poll(&app->net, &event))
+    {
+        char address[64];
+        net_address_to_text(event.address, address, sizeof(address));
+        const char* device = event.device >= 0 && static_cast<size_t>(event.device) < app->net.trust.devices.size()
+                                 ? app->net.trust.devices[static_cast<size_t>(event.device)].name.c_str()
+                                 : "?";
+        switch (event.type)
+        {
+        case NetAccessEventType::authorized:
+            SDL_Log("Network: \"%s\" connected from %s", device, address);
+            break;
+        case NetAccessEventType::paired:
+        {
+            char status[256];
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_paired), device);
+            set_status(app, status);
+            break;
+        }
+        case NetAccessEventType::closed:
+            SDL_Log("Network: \"%s\" disconnected", device);
+            break;
+        case NetAccessEventType::pairing_failed:
+            set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_failed));
+            break;
+        case NetAccessEventType::pairing_closed:
+            set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_closed));
+            break;
+        case NetAccessEventType::message:
+        case NetAccessEventType::none:
+            break;
+        }
     }
 }
 
@@ -1848,7 +1936,6 @@ int main(int argc, char** argv)
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audio subsystem: %s", SDL_GetError());
     }
     refresh_audio_devices(app);
-    net_start(app);
 
     app->running = true;
     while (app->running)
@@ -2023,6 +2110,18 @@ int main(int argc, char** argv)
             map_context.layouts = &app->layouts;
             map_context.now_ms = SDL_GetTicks();
             map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
+            NetWindowContext net_context;
+            net_context.settings = &app->settings;
+            net_context.strings = &app->strings;
+            net_context.access = app->net_running ? &app->net : nullptr;
+            net_context.listen_failed = app->net_listen_failed;
+            net_context.this_device = app->net_fingerprint;
+            bool net_was_open = app->net_window.open;
+            net_window_draw(&app->net_window, &net_context, app->pixel_font, app->ui_scale);
+            if (net_was_open && !app->net_window.open)
+            {
+                save_settings(app);   // NAME, PORT, ALLOW CONNECTIONS
+            }
             if (input_was_open && !app->input_window.open)
             {
                 save_settings(app);   // SETTINGS tab
@@ -2109,7 +2208,7 @@ int main(int argc, char** argv)
         input_config_save(&app->input, app->input_config_path.c_str());
     }
     input_sdl_shutdown(&app->input_sdl);
-    net_stop(app);
+    net_shutdown_all(app);
     app_shell_destroy(&app->shell);
     delete app;
     return 0;

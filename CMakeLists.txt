@@ -178,6 +178,7 @@ add_executable(piccolo
     src/settings_ui.cpp
     src/settings_window.cpp
     src/input_window.cpp
+    src/net_window.cpp
     src/map_window.cpp
     src/pad_picture.cpp
     src/image_window.cpp

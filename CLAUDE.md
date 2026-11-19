@@ -118,6 +118,7 @@ src/
                           combos, macros, mouse / lightgun)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
+  net_window.*            NETWORK: listener settings, pairing code, paired devices
   core_options_ui.* safe_start_window.*
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
