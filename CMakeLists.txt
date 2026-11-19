@@ -59,6 +59,17 @@ if(_programs_base)
 endif()
 set(MULTITAP_PICCOLO_DIR "${_piccolo_dir_default}" CACHE PATH "Copy piccolo here after building (empty = don't)")
 
+# A git worktree (its .git is a file, not a folder; so is a submodule
+# checkout) doesn't copy there unless asked: parallel work in worktrees would
+# otherwise overwrite the piccolo the main checkout installed (the one being
+# tried). Run ./build/piccolo from the worktree instead, or turn this on.
+option(MULTITAP_COPY_FROM_WORKTREE "Copy to MULTITAP_PICCOLO_DIR from a git worktree too" OFF)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git" AND NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.git" AND
+   NOT MULTITAP_COPY_FROM_WORKTREE)
+    message(STATUS "piccolo: a git worktree, not copied to ${MULTITAP_PICCOLO_DIR} (MULTITAP_COPY_FROM_WORKTREE=ON to copy)")
+    set(MULTITAP_PICCOLO_DIR "")   # hides the cache value for this configure only
+endif()
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
