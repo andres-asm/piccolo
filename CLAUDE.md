@@ -79,7 +79,10 @@ Hosts never use SDL or frontend code.
 7. **Checks.** Larger changes: `build/` with warnings as errors, `build-asan/`,
    ctest in both. **Small changes** (a label, a spacing, a string): no build, no
    ctest, no ASan; just edit, commit and push.
-8. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
+8. **Parallel sessions:** work in your own git worktree; never switch the main
+   checkout's branch unless this session owns it. To commit to another branch,
+   use a temporary worktree.
+9. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
    to `docs/design-notes.md`).
    Ask before anything destructive.
 
@@ -162,7 +165,8 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DMULTITAP_WARNINGS_AS_ERR
 cmake --build build && ctest --test-dir build
 cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DMULTITAP_WARNINGS_AS_ERRORS=ON -DMULTITAP_SANITIZE=ON
 cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../tools/lsan-suppressions.txt ctest)
-./build/piccolo                    # normal builds also copy it to ~/.local/share/piccolo/
+./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
+                                   # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
