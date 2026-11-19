@@ -2499,13 +2499,7 @@ msgctxt "net_no_devices"
 msgid "NO DEVICES PAIRED YET"
 msgstr "TODAVÍA NO HAY DISPOSITIVOS VINCULADOS"
 
-msgctxt "net_device_own"
-msgid "OWN"
-msgstr "PROPIO"
 
-msgctxt "net_device_own_help"
-msgid "A device of yours. Later the game can move to it and leave this machine without a screen."
-msgstr "Un dispositivo tuyo. Más adelante el juego podrá pasar a él y dejar esta máquina sin pantalla."
 
 msgctxt "net_device_connected"
 msgid "CONNECTED"
@@ -2530,3 +2524,23 @@ msgstr "CÓDIGO DE VINCULACIÓN INCORRECTO: SE MUESTRA UNO NUEVO"
 msgctxt "status_net_pairing_closed"
 msgid "PAIRING CLOSED"
 msgstr "VINCULACIÓN CERRADA"
+
+msgctxt "net_device_access"
+msgid "ACCESS"
+msgstr "PERMISO"
+
+msgctxt "net_device_access_help"
+msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."
+msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego."
+
+msgctxt "net_access_gamepad"
+msgid "GAMEPAD"
+msgstr "GAMEPAD"
+
+msgctxt "net_access_stream"
+msgid "STREAM"
+msgstr "STREAM"
+
+msgctxt "net_access_full"
+msgid "FULL"
+msgstr "COMPLETO"

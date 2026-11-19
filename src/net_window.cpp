@@ -63,7 +63,35 @@ static void draw_pairing(const NetWindowContext* context, ImFont* pixel_font, fl
     ImGui::PopTextWrapPos();
 }
 
-static void draw_devices(const NetWindowContext* context)
+static const Str ACCESS_LABELS[NET_ACCESS_LEVEL_COUNT] = {Str::net_access_gamepad, Str::net_access_stream,
+                                                          Str::net_access_full};
+
+// ACCESS: GAMEPAD / STREAM / FULL for one device (applied and saved at once).
+static void draw_access(NetAccess* access, uint32_t device, const Localization* strings, float block)
+{
+    uint32_t current = static_cast<uint32_t>(access->trust.devices[device].access);
+    ImGui::TextUnformatted(piccolo_text(strings, Str::net_device_access));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(56.0f * block);
+    if (retro_ui_begin_combo("##access", piccolo_text(strings, ACCESS_LABELS[current])))
+    {
+        for (uint32_t level = 0; level < NET_ACCESS_LEVEL_COUNT; level++)
+        {
+            ImGui::PushID(static_cast<int>(level));
+            bool picked = ImGui::Selectable(piccolo_text(strings, ACCESS_LABELS[level]), level == current);
+            ImGui::PopID();
+            if (picked && level != current)
+            {
+                net_access_set_level(access, device, static_cast<NetAccessLevel>(level));
+            }
+        }
+        ImGui::EndCombo();
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
+}
+
+static void draw_devices(const NetWindowContext* context, float block)
 {
     NetAccess* access = context->access;
     const Localization* strings = context->strings;
@@ -85,12 +113,7 @@ static void draw_devices(const NetWindowContext* context)
         ImGui::SameLine();
         ImGui::TextDisabled("%s  %s", fingerprint, device->paired.c_str());
         ImGui::SameLine();
-        bool own = device->own;
-        if (retro_ui_checkbox(piccolo_text(strings, Str::net_device_own), &own))
-        {
-            net_access_set_own(access, static_cast<uint32_t>(i), own);
-        }
-        retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_own_help));
+        draw_access(access, static_cast<uint32_t>(i), strings, block);
         if (net_access_device_connected(access, static_cast<uint32_t>(i)))
         {
             ImGui::SameLine();
@@ -163,7 +186,7 @@ void net_window_draw(NetWindow* window, const NetWindowContext* context, ImFont*
             retro_ui_separator_text(piccolo_text(strings, Str::net_section_pairing));
             draw_pairing(context, pixel_font, block);
             retro_ui_separator_text(piccolo_text(strings, Str::net_section_devices));
-            draw_devices(context);
+            draw_devices(context, block);
         }
         retro_ui_end_window();
     }
