@@ -39,6 +39,21 @@ jobs:
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
 
+      # The image comes with the SDK installed, and flatpak-builder updates it.
+      # On the x86_64 runners that update fails with "Invalid cross-device
+      # link": Docker's overlayfs can't rename folders that are in the image's
+      # layers. A copy of the install folder is in the container's own layer,
+      # where renaming works.
+      - name: Make the installed runtimes updatable
+        run: |
+          for dir in /var/lib/flatpak "$HOME/.local/share/flatpak"; do
+            if [ -d "$dir" ]; then
+              cp -a "$dir" "$dir.copy"
+              rm -rf "$dir"
+              mv "$dir.copy" "$dir"
+            fi
+          done
+
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: piccolo-${{ matrix.arch }}.flatpak
