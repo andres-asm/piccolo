@@ -46,12 +46,28 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
 // GAME FOLDERS: one row per folder, then "+". Clicking a row's field or
 // "+" asks piccolo for CHOOSE FOLDER (choose_game_folder); "-" removes the
 // row. Global only, like the other folders (greyed out in other scopes).
-static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
+// FOLDERS and GAME FOLDERS: one open at a time (opening one closes the
+// other; Andrés: their rows needn't line up then). True if `section` is open.
+static bool folder_section(SettingsWindow* window, FolderSection section, const char* label, const char* id)
 {
     char header[200] = {};
-    if (!retro_ui_collapsing_header(with_id(header, sizeof(header), piccolo_text(ui->strings, Str::section_game_folders),
-                                            "game_folders"),
-                                    ImGuiTreeNodeFlags_DefaultOpen))
+    ImGui::SetNextItemOpen(window->folder_section == section, ImGuiCond_Always);
+    bool open = retro_ui_collapsing_header(with_id(header, sizeof(header), label, id), 0);
+    if (open)
+    {
+        window->folder_section = section;
+    }
+    else if (window->folder_section == section)
+    {
+        window->folder_section = FolderSection::none;   // closed by its header
+    }
+    return open;
+}
+
+static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
+{
+    if (!folder_section(window, FolderSection::game_folders, piccolo_text(ui->strings, Str::section_game_folders),
+                        "game_folders"))
     {
         return;
     }
@@ -131,10 +147,7 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
     }
     // FOLDERS: rarely changed, closed until opened. A click on a field
     // opens CHOOSE FOLDER (piccolo); RESET goes back to the default shown.
-    char header[200] = {};
-    if (retro_ui_collapsing_header(with_id(header, sizeof(header), piccolo_text(ui->strings, Str::section_folders),
-                                           "folders"),
-                                   0))
+    if (folder_section(window, FolderSection::folders, piccolo_text(ui->strings, Str::section_folders), "folders"))
     {
         const char* keys[4] = {PICCOLO_PATH_CORES, PICCOLO_PATH_SYSTEM, PICCOLO_PATH_SAVES, PICCOLO_PATH_STATES};
         const char* hints[4] = {context->paths->cores.c_str(), context->paths->system.c_str(),

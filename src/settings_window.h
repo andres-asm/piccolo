@@ -40,6 +40,14 @@ enum class SettingsTab
     network,
 };
 
+// Which of GENERAL's folder sections is open (one at a time).
+enum class FolderSection
+{
+    none,
+    folders,        // CORES, SYSTEM, SAVES, STATES
+    game_folders,
+};
+
 struct SettingsWindow
 {
     bool         open        = false;
@@ -55,6 +63,7 @@ struct SettingsWindow
     std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
     std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match
     bool         theme_custom = false;         // THEME was set to CUSTOM (else CUSTOM only when no shipped theme matches)
+    FolderSection folder_section = FolderSection::game_folders;   // GAME FOLDERS open at first
     const char*  choose_folder_key = nullptr; // a folder field or GAME FOLDERS' "+" was clicked: that setting
                                                // (piccolo opens CHOOSE FOLDER, sets it, then clears this)
 };
