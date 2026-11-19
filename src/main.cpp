@@ -27,6 +27,7 @@
 #include "game_mode.h"
 #include "host_libretro_version.h"
 #include "picture.h"
+#include "shader_chain.h"
 #include "piccolo_version.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -98,6 +99,8 @@ struct App
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
     Picture     picture = {};   // the game on screen (viewport + filter)
+    ShaderLibrary shader_library = {};   // librashader, when it's there
+    ShaderChain   shader_chain = {};     // the shader preset on the picture (instead of `picture`)
     // The part of the core's frame on screen (a cursor maps from it to the
     // whole frame), and the ports' cursors for the core (mouse, pointer, lightgun).
     uint32_t           view_source[4] = {};      // x, y, width, height in core pixels
@@ -1416,6 +1419,7 @@ static void draw_game(App* app)
 {
     CoreSession* session = &app->session;
     app->picture.ready = false;
+    app->shader_chain.ready = false;
     app->input.view_width = 0.0f;   // (until it is drawn)
     if (!game_running(app) || !session->texture.has_content || session->texture_id == 0)
     {
@@ -1430,9 +1434,36 @@ static void draw_game(App* app)
     input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
     piccolo_settings_viewport(&app->settings, &input);
 
+    // The shader preset setting: (re)loaded when it changes; one that failed
+    // is not retried until the setting changes again.
+    const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
+    if (preset[0] == '\0')
+    {
+        if (shader_chain_active(&app->shader_chain))
+        {
+            shader_chain_destroy(&app->shader_chain, &app->shader_library, &app->shell.vulkan);
+        }
+        app->shader_chain.failed_path.clear();
+    }
+    else if (app->shader_library.loaded && app->shader_chain.preset_path != preset &&
+             app->shader_chain.failed_path != preset)
+    {
+        shader_chain_load(&app->shader_chain, &app->shader_library, &app->shell.vulkan, preset);
+    }
+
     ViewportResult viewport = {};
-    if (viewport_compute(&input, &viewport) &&
-        picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport))
+    bool shaded = false;
+    bool shown = false;
+    if (viewport_compute(&input, &viewport))
+    {
+        shaded = shader_chain_prepare(&app->shader_chain, &app->shell.vulkan, &session->texture, &viewport);
+        shown = shaded || picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport);
+    }
+    if (shaded)
+    {
+        app->picture.ready = false;   // the chain draws it; the picture records nothing
+    }
+    if (shown)
     {
         // Where the cursors live (window pixels), and the part of the frame it shows.
         app->input.view_x = static_cast<float>(viewport.x);
@@ -1446,7 +1477,15 @@ static void draw_game(App* app)
         app->view_frame[0] = input.frame_width;
         app->view_frame[1] = input.frame_height;
         // The background draw list is behind every window, menu bar included.
-        picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f, 0.0f);
+        if (shaded)
+        {
+            shader_chain_draw(&app->shader_chain, ImGui::GetBackgroundDrawList(), 0.0f, 0.0f);
+        }
+        else
+        {
+            picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f,
+                         0.0f);
+        }
     }
 }
 
@@ -1732,6 +1771,18 @@ int main(int argc, char** argv)
     {
         io.IniFilename = nullptr;
     }
+
+    // librashader (shader presets): next to the program, in piccolo's folder,
+    // or wherever the system finds it. Without it, presets are off.
+    std::vector<std::string> shader_library_folders;
+    const char* program_folder_for_shaders = SDL_GetBasePath();   // SDL owns it
+    if (program_folder_for_shaders != nullptr)
+    {
+        shader_library_folders.push_back(program_folder_for_shaders);
+    }
+    shader_library_folders.push_back(app->paths.root);
+    shader_library_load(&app->shader_library, shader_library_folders);
+
     // Controllers: MAP CONTROLLER's mappings are in their profiles (input.cfg);
     // settings/gamecontrollerdb.txt, if the user drops one in (SDL's format),
     // adds to the ones SDL knows.
@@ -2003,6 +2054,8 @@ int main(int argc, char** argv)
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
+                shader_chain_record(&app->shader_chain, &app->shader_library,
+                                    renderer_command_buffer(&app->shell.renderer), &app->session.texture);
             }
             if (!app_shell_present(&app->shell, background))
             {
@@ -2028,6 +2081,8 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
+    shader_chain_destroy(&app->shader_chain, &app->shader_library, &app->shell.vulkan);
+    shader_library_unload(&app->shader_library);
     if (!app->input_config_path.empty())
     {
         input_config_save(&app->input, app->input_config_path.c_str());

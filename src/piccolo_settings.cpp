@@ -182,6 +182,8 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_VIDEO_FILTER, .type = SettingType::enumeration, .default_value = "nearest", .overridable = true,
      .values = FILTER_VALUES, .value_count = FILTER_COUNT, .label = text_id(Str::setting_filter),
      .help = text_id(Str::setting_filter_help)},
+    {.key = PICCOLO_VIDEO_SHADER_PRESET, .type = SettingType::path, .default_value = "", .overridable = true,
+     .label = text_id(Str::setting_shader_preset), .help = text_id(Str::setting_shader_preset_help)},
     {.key = PICCOLO_VIDEO_POSITION, .type = SettingType::enumeration, .default_value = "center", .overridable = true,
      .values = POSITION_VALUES, .value_count = POSITION_COUNT, .label = text_id(Str::setting_position),
      .help = text_id(Str::setting_position_help)},

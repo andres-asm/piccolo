@@ -362,6 +362,14 @@ msgctxt "setting_filter_help"
 msgid "Sharp bilinear: sharp pixels, soft only where a pixel lands between two screen pixels."
 msgstr "Bilineal nítido: píxeles nítidos, suaves solo donde un píxel cae entre dos de la pantalla."
 
+msgctxt "setting_shader_preset"
+msgid "SHADER"
+msgstr "SHADER"
+
+msgctxt "setting_shader_preset_help"
+msgid "A RetroArch shader preset (.slangp). Empty: none."
+msgstr "Un preset de shaders de RetroArch (.slangp). Vacío: ninguno."
+
 msgctxt "setting_position"
 msgid "POSITION"
 msgstr "POSICIÓN"

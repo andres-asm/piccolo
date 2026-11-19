@@ -41,6 +41,7 @@ constexpr const char* PICCOLO_VIDEO_SCALING = "video_scaling";
 constexpr const char* PICCOLO_VIDEO_MAX_OFFSCREEN = "video_max_offscreen";
 constexpr const char* PICCOLO_VIDEO_FILTER = "video_filter";
 constexpr const char* PICCOLO_VIDEO_POSITION = "video_position";
+constexpr const char* PICCOLO_VIDEO_SHADER_PRESET = "video_shader_preset";   // a .slangp; empty = none
 constexpr const char* PICCOLO_VIDEO_CROP_TOP = "video_crop_top";
 constexpr const char* PICCOLO_VIDEO_CROP_BOTTOM = "video_crop_bottom";
 constexpr const char* PICCOLO_VIDEO_CROP_LEFT = "video_crop_left";
