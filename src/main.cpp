@@ -1158,7 +1158,7 @@ static void draw_remap_prompt(App* app)
     int left = static_cast<int>((REMAP_PROMPT_MS - (elapsed < REMAP_PROMPT_MS ? elapsed : REMAP_PROMPT_MS) + 999) / 1000);
     char text[400] = {};
     std::snprintf(text, sizeof(text), piccolo_text(&app->strings, Str::remap_prompt), device != nullptr ? device : "RETROPAD",
-                  static_cast<int>(port + 1), app->input.controllers[app->remap_prompt_controller].name.c_str(), left);
+                  static_cast<int>(port + 1), input_controller_label(&app->input, app->remap_prompt_controller).c_str(), left);
     retro_ui_push_theme(app->pixel_font, app->ui_scale);
     const ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, 16.0f * static_cast<float>(app->ui_scale)), ImGuiCond_Always,
@@ -1256,7 +1256,7 @@ static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
         cursor->off_screen = frame->cursor_off[p] || app->input.view_width <= 0.0f;
         cursor->mouse_dx = frame->mouse_dx[p];
         cursor->mouse_dy = frame->mouse_dy[p];
-        cursor->buttons = frame->mouse_buttons[p];   // (the same bits: left, right, middle, wheel up / down, reload)
+        cursor->buttons = frame->mouse_buttons[p];   // (the same bits: left, right, middle, wheel, reload, the lightgun's)
     }
     if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_grab_mouse)])
     {
@@ -1311,14 +1311,14 @@ static void app_update_input(App* app)
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_joined),
-                      app->input.controllers[static_cast<size_t>(frame.joined_controller)].name.c_str(), frame.joined_port + 1);
+                      input_controller_label(&app->input, static_cast<uint32_t>(frame.joined_controller)).c_str(), frame.joined_port + 1);
         set_status(app, message);
         SDL_Log("%s", message);
     }
     if (frame.left_port != INPUT_NO_PORT && frame.left_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_left),
-                      app->input.controllers[static_cast<size_t>(frame.left_controller)].name.c_str(), frame.left_port + 1);
+                      input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
         set_status(app, message);
         SDL_Log("%s", message);
         if (game_running(app) && !app->quick_menu.open)

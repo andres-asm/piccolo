@@ -35,6 +35,7 @@ struct InputWindow
     SettingLayer scope = SettingLayer::global;
     bool         choose_scope = false;       // pick the scope on the next draw (just opened)
     uint32_t     mapping = UINT32_MAX;       // the controller mapped in RETROPAD / INTERFACE / HOTKEYS (UINT32_MAX: port 1's)
+    bool         mapping_picked = false;     // picked in its list: stays; else it follows port 1 (who joins it)
 
     bool        capturing = false;           // SET: waiting for a key or button
     InputAction capture_action = InputAction::pad_b;

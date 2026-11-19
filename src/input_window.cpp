@@ -34,6 +34,8 @@ static const Str ACTION_LABELS[INPUT_ACTION_COUNT] = {
     Str::input_action_cursor_right, Str::input_action_cursor_left, Str::input_action_cursor_down, Str::input_action_cursor_up,
     Str::input_action_mouse_left, Str::input_action_mouse_right, Str::input_action_mouse_middle,
     Str::input_action_mouse_wheel_up, Str::input_action_mouse_wheel_down, Str::input_action_gun_reload,
+    Str::input_action_gun_aux_a, Str::input_action_gun_aux_b, Str::input_action_gun_aux_c, Str::input_action_gun_start,
+    Str::input_action_gun_select,
     Str::input_action_ui_up, Str::input_action_ui_down, Str::input_action_ui_left, Str::input_action_ui_right,
     Str::input_action_ui_accept, Str::input_action_ui_back, Str::input_action_ui_page_left,
     Str::input_action_ui_page_right, Str::input_action_ui_open_menu,
@@ -226,6 +228,7 @@ void input_window_open(InputWindow* window)
     window->open = true;
     window->choose_scope = true;
     window->mapping = UINT32_MAX;   // port 1's controller comes up
+    window->mapping_picked = false;
 }
 
 void input_window_controller_defaults(const InputSystem* input, uint32_t controller, InputBindingSet* set)
@@ -275,7 +278,7 @@ static void controller_label(const InputWindowContext* context, uint32_t control
     {
         state = piccolo_text(context->strings, Str::input_device_ignored);
     }
-    std::snprintf(out, out_size, state[0] != '\0' ? "%s (%s)" : "%s%s", input->controllers[controller].name.c_str(), state);
+    std::snprintf(out, out_size, state[0] != '\0' ? "%s (%s)" : "%s%s", input_controller_label(input, controller).c_str(), state);
 }
 
 // The same sources, in any order?
@@ -580,18 +583,27 @@ static void binding_row(InputWindow* window, const InputWindowContext* context, 
     ImGui::PopID();
 }
 
-// The controller mapped: picked by the user, else port 1's, else the keyboard.
+// The controller mapped: picked by the user (it stays), else port 1's (the
+// last that joined it that isn't the keyboard or the mouse put there: a
+// gamepad pressing START takes over at once), else the keyboard.
 static uint32_t mapped_controller(InputWindow* window, const InputWindowContext* context)
 {
     InputSystem* input = context->input;
-    if (window->mapping < input->controllers.size())
+    if (window->mapping_picked && window->mapping < input->controllers.size())
     {
         return window->mapping;
     }
-    if (!input->ports[0].empty())
+    const std::vector<uint32_t>* port1 = &input->ports[0];
+    for (size_t m = port1->size(); m > 0; m--)
     {
-        window->mapping = input->ports[0][0];
-        return window->mapping;
+        uint32_t controller = (*port1)[m - 1];
+        const InputDevice* device =
+            controller < input->controllers.size() ? input_devices_find_const(&input->devices, input->controllers[controller].device_id) : nullptr;
+        if (device != nullptr && device->kind == InputDeviceKind::gamepad)
+        {
+            window->mapping = controller;
+            return window->mapping;
+        }
     }
     window->mapping = 0;
     for (uint32_t c = 0; c < input->controllers.size(); c++)
@@ -638,6 +650,7 @@ static void draw_bindings(InputWindow* window, const InputWindowContext* context
             if (ImGui::Selectable(label, c == controller))
             {
                 window->mapping = c;
+                window->mapping_picked = true;
             }
             ImGui::PopID();
         }
@@ -1121,6 +1134,7 @@ static void draw_device(InputWindow* window, const InputWindowContext* context, 
                     {
                         input_remove_controller(input, c);
                         window->mapping = UINT32_MAX;   // indices moved
+                        window->mapping_picked = false;
                         window->names.clear();
                         window->dirty = true;
                         ImGui::PopID();
@@ -1136,6 +1150,7 @@ static void draw_device(InputWindow* window, const InputWindowContext* context, 
                 std::snprintf(name, sizeof(name), "%s %u", base, static_cast<unsigned>(number + 1));
                 InputBindingSet empty = {};
                 window->mapping = input_add_controller(input, device->id, name, &empty);   // ready to map
+                window->mapping_picked = true;
                 window->dirty = true;
             }
             retro_ui_item_tooltip(piccolo_text(strings, Str::input_add_part_help));
