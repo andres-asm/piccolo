@@ -990,6 +990,10 @@ msgctxt "theme_piccolo"
 msgid "PICCOLO"
 msgstr "PICCOLO"
 
+msgctxt "theme_blue"
+msgid "BLUE"
+msgstr "AZUL"
+
 msgctxt "theme_classic"
 msgid "CLASSIC"
 msgstr "CLÁSICO"

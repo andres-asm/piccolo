@@ -15,7 +15,8 @@
 struct ImFont;
 
 // The colors of the whole UI (0xAARRGGBB; alpha is always FF). Themes are
-// palettes (decided by Andrés, 2026-11-14): PICCOLO (the original colors),
+// palettes (decided by Andrés, 2026-11-14): PICCOLO (atomic purple, the default since
+// 2026-11-19), BLUE (the original navy colors),
 // CLASSIC (a blue gradient bar with grey boxes behind the menu titles) and
 // MODERN (flat, the dropdowns the same color as the bar); every color can
 // also be set on its own in SETTINGS > INTERFACE.
@@ -60,6 +61,7 @@ struct RetroUiPalette
 enum class RetroUiTheme
 {
     piccolo,
+    blue,
     classic,
     modern,
     count,

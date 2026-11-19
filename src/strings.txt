@@ -271,6 +271,7 @@ menu_interface = INTERFACE...
 ui_theme = THEME
 ui_theme_help = Sets every color below at once. Change them one by one for your own.
 theme_piccolo = PICCOLO
+theme_blue = BLUE
 theme_classic = CLASSIC
 theme_modern = MODERN
 section_colors = COLORS

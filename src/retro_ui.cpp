@@ -12,7 +12,18 @@ constexpr float RETRO_UI_SCROLLBAR_GAP = 4.0f;
 
 // The built-in themes (0xAARRGGBB).
 static const RetroUiPalette THEMES[] = {
-    // PICCOLO: the original colors, no drop shadows on windows.
+    // PICCOLO: atomic purple, a see-through grape like the handheld shells; no
+    // drop shadows on windows.
+    {0xFF000000u, false,
+     0xFF5B2D83u, 0xFF5B2D83u, 0xFF8350B0u, 0xFF2F1644u,
+     false, 0xFF5B2D83u, 0xFF8350B0u, 0xFF8350B0u,
+     0xFF4B246Eu, 0xFF4B246Eu, 0xFF8350B0u, 0xFF1D0E2Au,
+     0xFF371951u, 0xFF432161u, 0xFFA067D1u,
+     0xFFE9DEF2u, 0xFFFFFFFFu, 0xFF9A7BB5u, 0xFF1D0E2Au,
+     0xFF5B2D83u, 0xFF5B2D83u,
+     0xFFFFFFFFu, 0xFFE9DEF2u,
+     0xFF5B2D83u, 0xFF5B2D83u, 0xFF5B2D83u, 0xFFE9DEF2u, 0xFFE9DEF2u, false, 0xFFC282FAu, 0xFF5B2D83u, 0xFFC282FAu},
+    // BLUE: piccolo's first colors, navy blue; no drop shadows on windows.
     {0xFF000000u, false,
      0xFF34507Cu, 0xFF34507Cu, 0xFF5878A8u, 0xFF1A2840u,
      false, 0xFF34507Cu, 0xFF5878A8u, 0xFF5878A8u,
