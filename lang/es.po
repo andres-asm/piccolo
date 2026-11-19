@@ -2550,8 +2550,8 @@ msgid "FORGET"
 msgstr "OLVIDAR"
 
 msgctxt "net_device_forget_help"
-msgid "Removes this device: it has to pair again to connect."
-msgstr "Quita este dispositivo: tiene que vincularse de nuevo para conectarse."
+msgid "Unpairs this device: if it's connected now it forgets this piccolo too; either way it has to pair again to connect."
+msgstr "Desempareja este dispositivo: si está conectado ahora también olvida este piccolo; en todo caso tiene que emparejarse de nuevo para conectarse."
 
 msgctxt "status_net_paired"
 msgid "PAIRED WITH"
@@ -2605,3 +2605,7 @@ msgstr "EN PAUSA DESDE"
 msgctxt "status_resumed"
 msgid "RESUMED"
 msgstr "REANUDADO"
+
+msgctxt "status_net_unpaired"
+msgid "UNPAIRED:"
+msgstr "DESEMPAREJADO:"

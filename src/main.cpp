@@ -2407,6 +2407,16 @@ static void net_update(App* app)
         case NetAccessEventType::pairing_closed:
             set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_closed));
             break;
+        case NetAccessEventType::unpaired:
+        {
+            // The device forgot this piccolo, so it's gone from PAIRED DEVICES too.
+            char status[256];
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_unpaired),
+                          event.name);
+            set_status(app, status);
+            SDL_Log("Network: \"%s\" unpaired itself", event.name);
+            break;
+        }
         case NetAccessEventType::message:
             if (event.channel == NetChannel::input && event.device >= 0)
             {
