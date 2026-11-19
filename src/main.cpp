@@ -46,7 +46,7 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
-#include "net_host.h"
+#include "net_session.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -95,9 +95,10 @@ struct App
     CoreCatalog catalog = {};
 
     // Network listener (settings net_*), started at launch when enabled.
-    // Nothing is authenticated yet: connections are closed right away.
-    bool    net_ready = false;   // net_init() succeeded
-    NetHost net = {};
+    // Connections are encrypted (Noise handshake) but nobody is paired yet:
+    // they're closed as soon as the handshake ends.
+    bool       net_ready = false;   // net_init() succeeded
+    NetSession net = {};
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -1682,31 +1683,43 @@ static void net_start(App* app)
     {
         return;
     }
+    // A new device key every launch until pairing keeps one (milestone 3).
+    NetKeypair identity;
+    if (!net_keypair_generate(&identity))
+    {
+        return;
+    }
+    char fingerprint[32];
+    net_key_fingerprint(identity.public_key, fingerprint, sizeof(fingerprint));
+    SDL_Log("Network: this device is %s", fingerprint);
     uint16_t port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
-    net_host_create_listener(&app->net, port, settings_get_text(&app->settings, PICCOLO_NET_NAME));
+    net_session_create_listener(&app->net, port, settings_get_text(&app->settings, PICCOLO_NET_NAME), &identity);
+    net_keypair_wipe(&identity);
 }
 
-// Once per loop: discovery requests are answered inside net_host_poll.
-// Connections are closed until pairing and encryption exist (milestones 2-3):
-// nothing a peer sends may be acted on before that.
+// Once per loop: discovery requests are answered and handshakes run inside
+// net_session_poll. Nobody can be paired yet (milestone 3), so a connection
+// is closed as soon as it's secured: nothing a peer sends is acted on.
 static void net_update(App* app)
 {
-    NetEvent event;
-    while (net_host_poll(&app->net, &event))
+    NetSessionEvent event;
+    while (net_session_poll(&app->net, &event))
     {
-        char address[64];
-        net_address_to_text(event.address, address, sizeof(address));
-        if (event.type == NetEventType::connected)
+        if (event.type == NetSessionEventType::secured)
         {
-            SDL_Log("Network: connection from %s closed (pairing doesn't exist yet)", address);
-            net_host_disconnect(&app->net, event.peer);
+            char address[64];
+            char fingerprint[32];
+            net_address_to_text(event.address, address, sizeof(address));
+            net_key_fingerprint(event.remote_key, fingerprint, sizeof(fingerprint));
+            SDL_Log("Network: device %s at %s connected, closed (not paired)", fingerprint, address);
+            net_session_close(&app->net, event.peer);
         }
     }
 }
 
 static void net_stop(App* app)
 {
-    net_host_destroy(&app->net);
+    net_session_destroy(&app->net);
     if (app->net_ready)
     {
         net_shutdown();
