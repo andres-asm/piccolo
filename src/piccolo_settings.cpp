@@ -723,12 +723,12 @@ static bool theme_name_before(const PiccoloThemeFile& a, const PiccoloThemeFile&
     return a.name < b.name;
 }
 
-// Adds `theme` to the list, or replaces the one with its name.
+// Adds `theme` to the list, or replaces the one of its kind with its name.
 static void add_theme(std::vector<PiccoloThemeFile>* themes, const PiccoloThemeFile* theme)
 {
     for (size_t t = 0; t < themes->size(); t++)
     {
-        if ((*themes)[t].name == theme->name)
+        if ((*themes)[t].name == theme->name && (*themes)[t].custom == theme->custom)
         {
             (*themes)[t] = *theme;
             return;
@@ -753,6 +753,7 @@ void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const 
 
         PiccoloThemeFile theme = {};
         theme.path = path;
+        theme.custom = file_name.size() > 11 && file_name.compare(file_name.size() - 11, 11, "-custom.cfg") == 0;
         theme.palette = *retro_ui_theme_palette(RetroUiTheme::blue);
         const char* name = settings_file_get(&file, "", "name");
         if (name != nullptr && name[0] != '\0')
@@ -798,6 +799,7 @@ bool piccolo_themes_save(const Settings* settings, const char* name, const char*
 {
     PiccoloThemeFile theme = {};
     theme.name = name;
+    theme.custom = true;
     piccolo_settings_palette(settings, &theme.palette);
 
     // The file: the one a theme with this name came from, if it is in `directory`...
@@ -805,13 +807,13 @@ bool piccolo_themes_save(const Settings* settings, const char* name, const char*
     for (size_t t = 0; t < themes->size(); t++)
     {
         const std::string& path = (*themes)[t].path;
-        if ((*themes)[t].name == theme.name && path.compare(0, folder.size(), folder) == 0)
+        if ((*themes)[t].custom && (*themes)[t].name == theme.name && path.compare(0, folder.size(), folder) == 0)
         {
             theme.path = path;
         }
     }
-    // ...else <name>.cfg: lower case letters and digits, "-" between words, a
-    // number after it if that file is taken.
+    // ...else <name>-custom.cfg: lower case letters and digits, "-" between
+    // words, a number after the name if that file is taken.
     if (theme.path.empty())
     {
         std::string stem;
@@ -835,10 +837,10 @@ bool piccolo_themes_save(const Settings* settings, const char* name, const char*
         {
             stem = "theme";
         }
-        theme.path = folder + stem + ".cfg";
+        theme.path = folder + stem + "-custom.cfg";
         for (int n = 2; host_fs_exists(theme.path.c_str()); n++)
         {
-            theme.path = folder + stem + "-" + std::to_string(n) + ".cfg";
+            theme.path = folder + stem + "-" + std::to_string(n) + "-custom.cfg";
         }
     }
 

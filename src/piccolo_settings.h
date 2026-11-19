@@ -144,23 +144,28 @@ bool piccolo_settings_apply_ui_theme(Settings* settings, RetroUiTheme theme);
 // folder. The same ui_ keys as piccolo.cfg's interface settings, plus "name"
 // (what THEME shows; without it, the file's name in capitals). Keys the file
 // doesn't set come from BLUE. See themes/example.cfg.
+//
+// A file named *-custom.cfg is one of the user's own (SAVE THEME writes them):
+// listed in CUSTOM THEME. The others ship with piccolo: listed in THEME.
 struct PiccoloThemeFile
 {
     std::string    name;
-    std::string    path;   // the file it came from
+    std::string    path;            // the file it came from
+    bool           custom = false;  // a *-custom.cfg file
     RetroUiPalette palette = {};
 };
 
 // Adds every *.cfg in `directory` (a missing folder adds nothing). A theme
-// with the same name as one already in the list replaces it, so the folder
-// loaded last wins.
+// with the same name and kind (shipped or custom) as one already in the list
+// replaces it, so the folder loaded last wins.
 void piccolo_themes_load_directory(std::vector<PiccoloThemeFile>* themes, const char* directory);
 
-// SAVE THEME: the interface settings as they are now, as a theme named
-// `name` in `directory` (made if missing): the file of a theme there with
-// that name, else a new <name>.cfg (lower case, letters and digits). The
-// theme goes in `themes` (replacing one with the same name). False (logged)
-// if the file can't be written.
+// SAVE THEME: the interface settings as they are now, as a custom theme
+// named `name` in `directory` (made if missing): the file of a custom theme
+// there with that name, else a new <name>-custom.cfg (lower case, letters and
+// digits), so a shipped theme is never overwritten. The theme goes in
+// `themes` (replacing the custom one with the same name). False (logged) if
+// the file can't be written.
 bool piccolo_themes_save(const Settings* settings, const char* name, const char* directory,
                          std::vector<PiccoloThemeFile>* themes);
 

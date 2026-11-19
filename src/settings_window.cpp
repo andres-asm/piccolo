@@ -206,11 +206,10 @@ static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext*
     settings_ui_row(ui, PICCOLO_AUDIO_QUALITY, nullptr);
 }
 
-// One entry of THEME's list: a built-in theme or one from a file.
+// One entry of THEME's or CUSTOM THEME's list.
 struct ThemeChoice
 {
     std::string           label;
-    RetroUiTheme          builtin = RetroUiTheme::count;   // count = from a file
     const RetroUiPalette* palette = nullptr;
 };
 
@@ -219,97 +218,153 @@ static bool theme_choice_before(const ThemeChoice& a, const ThemeChoice& b)
     return a.label < b.label;
 }
 
-// THEME: sets every interface color. Not a setting itself: it shows the
-// theme the colors match, or CUSTOM. The built-in themes and the ones from
-// themes/*.cfg, sorted by their names in the current language. The
-// interface is global only.
+// The theme in `choices` the colors match: `preferred` (the one last picked
+// or saved) when it does, since two themes may have the same colors, else
+// the first. -1 if none.
+static int32_t matching_theme(const Settings* settings, const std::vector<ThemeChoice>& choices, const std::string& preferred)
+{
+    int32_t found = -1;
+    for (size_t i = 0; i < choices.size(); i++)
+    {
+        if (!piccolo_settings_ui_palette_is(settings, choices[i].palette))
+        {
+            continue;
+        }
+        if (choices[i].label == preferred)
+        {
+            return static_cast<int32_t>(i);
+        }
+        if (found < 0)
+        {
+            found = static_cast<int32_t>(i);
+        }
+    }
+    return found;
+}
+
+// A theme row's label, then the value column's width for its combo.
+static void theme_row_label(const SettingsUiContext* ui, Str label, Str help)
+{
+    ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(ui->strings, label));
+    retro_ui_item_tooltip(piccolo_text(ui->strings, help));
+    ImGui::SameLine(start + ui->label_width);
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+}
+
+// THEME and CUSTOM THEME: they set every interface color. Not settings
+// themselves: they show the theme the colors match.
+//   THEME          the built-in themes and the ones that ship in themes/,
+//                  sorted by name, then CUSTOM: CUSTOM when picked, or when
+//                  the colors match none of them.
+//   CUSTOM THEME   the user's own (themes/*-custom.cfg, SAVE THEME), only
+//                  while THEME is CUSTOM: the one the colors match, or
+//                  UNSAVED.
+// The interface is global only.
 static void draw_theme_preset(SettingsWindow* window, const SettingsUiContext* ui,
                               const std::vector<PiccoloThemeFile>* files)
 {
-    std::vector<ThemeChoice> choices;
+    const Localization* strings = ui->strings;
+    std::vector<ThemeChoice> shipped;
+    std::vector<ThemeChoice> custom;
     for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
     {
         ThemeChoice choice = {};
-        choice.builtin = static_cast<RetroUiTheme>(i);
-        choice.label = piccolo_text(ui->strings, piccolo_settings_ui_theme_name(choice.builtin));
-        choice.palette = retro_ui_theme_palette(choice.builtin);
-        choices.push_back(choice);
+        choice.label = piccolo_text(strings, piccolo_settings_ui_theme_name(static_cast<RetroUiTheme>(i)));
+        choice.palette = retro_ui_theme_palette(static_cast<RetroUiTheme>(i));
+        shipped.push_back(choice);
     }
     for (size_t i = 0; files != nullptr && i < files->size(); i++)
     {
         ThemeChoice choice = {};
         choice.label = (*files)[i].name;
         choice.palette = &(*files)[i].palette;
-        choices.push_back(choice);
+        if ((*files)[i].custom)
+        {
+            custom.push_back(choice);
+        }
+        else
+        {
+            shipped.push_back(choice);
+        }
     }
-    std::stable_sort(choices.begin(), choices.end(), theme_choice_before);
+    std::stable_sort(shipped.begin(), shipped.end(), theme_choice_before);
+    std::stable_sort(custom.begin(), custom.end(), theme_choice_before);
 
-    // The one the colors match, or CUSTOM: the theme last picked or saved
-    // when it matches (two themes may have the same colors), else a built-in
-    // theme, else one from a file.
-    int32_t current = -1;
-    for (size_t i = 0; current < 0 && i < choices.size(); i++)
-    {
-        if (choices[i].label == window->theme_choice && piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
-        {
-            current = static_cast<int32_t>(i);
-        }
-    }
-    for (size_t i = 0; current < 0 && i < choices.size(); i++)
-    {
-        if (choices[i].builtin != RetroUiTheme::count && piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
-        {
-            current = static_cast<int32_t>(i);
-        }
-    }
-    for (size_t i = 0; current < 0 && i < choices.size(); i++)
-    {
-        if (piccolo_settings_ui_palette_is(ui->settings, choices[i].palette))
-        {
-            current = static_cast<int32_t>(i);
-        }
-    }
-    const char* current_label = current >= 0 ? choices[static_cast<size_t>(current)].label.c_str()
-                                             : piccolo_text(ui->strings, Str::preset_custom);
+    int32_t shipped_current = matching_theme(ui->settings, shipped, window->theme_choice);
+    int32_t custom_current = matching_theme(ui->settings, custom, window->theme_choice);
+    bool on_custom = window->theme_custom || shipped_current < 0;
+    const char* custom_label = piccolo_text(strings, Str::preset_custom);
 
     bool global = ui->scope == SettingLayer::global;
     ImGui::PushID("ui_theme");
-    ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column
-    ImGui::SameLine();
     ImGui::BeginDisabled(!global);
-    ImGui::AlignTextToFramePadding();
-    float start = ImGui::GetCursorPosX();
-    ImGui::TextUnformatted(piccolo_text(ui->strings, Str::ui_theme));
-    retro_ui_item_tooltip(piccolo_text(ui->strings, Str::ui_theme_help));
-    ImGui::SameLine(start + ui->label_width);
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    if (retro_ui_begin_combo("##theme", current_label))
+
+    theme_row_label(ui, Str::ui_theme, Str::ui_theme_help);
+    const char* theme_label = on_custom ? custom_label : shipped[static_cast<size_t>(shipped_current)].label.c_str();
+    if (retro_ui_begin_combo("##theme", theme_label))
     {
-        for (size_t i = 0; i < choices.size(); i++)
+        for (size_t i = 0; i < shipped.size(); i++)
         {
             ImGui::PushID(static_cast<int>(i));
-            bool picked = ImGui::Selectable(choices[i].label.c_str(), static_cast<int32_t>(i) == current);
+            bool picked = ImGui::Selectable(shipped[i].label.c_str(), !on_custom && static_cast<int32_t>(i) == shipped_current);
             ImGui::PopID();
             if (picked)
             {
-                piccolo_settings_apply_ui_palette(ui->settings, choices[i].palette);
-                window->theme_choice = choices[i].label;
+                piccolo_settings_apply_ui_palette(ui->settings, shipped[i].palette);
+                window->theme_choice = shipped[i].label;
+                window->theme_custom = false;
+            }
+        }
+        if (ImGui::Selectable(custom_label, on_custom))
+        {
+            window->theme_custom = true;   // the colors stay; CUSTOM THEME picks one
+        }
+        ImGui::EndCombo();
+    }
+
+    theme_row_label(ui, Str::ui_custom_theme, Str::ui_custom_theme_help);
+    const char* custom_theme_label = "-";
+    if (on_custom)
+    {
+        custom_theme_label = custom_current >= 0 ? custom[static_cast<size_t>(custom_current)].label.c_str()
+                             : custom.empty()    ? piccolo_text(strings, Str::ui_custom_theme_none)
+                                                 : piccolo_text(strings, Str::ui_custom_theme_unsaved);
+    }
+    ImGui::BeginDisabled(!on_custom || custom.empty());
+    if (retro_ui_begin_combo("##custom_theme", custom_theme_label))
+    {
+        for (size_t i = 0; i < custom.size(); i++)
+        {
+            ImGui::PushID(static_cast<int>(i));
+            bool picked = ImGui::Selectable(custom[i].label.c_str(), static_cast<int32_t>(i) == custom_current);
+            ImGui::PopID();
+            if (picked)
+            {
+                piccolo_settings_apply_ui_palette(ui->settings, custom[i].palette);
+                window->theme_choice = custom[i].label;
+                window->theme_custom = true;
             }
         }
         ImGui::EndCombo();
     }
     ImGui::EndDisabled();
+
+    ImGui::EndDisabled();
     if (!global && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
-        retro_ui_tooltip(piccolo_text(ui->strings, Str::global_only_help));
+        retro_ui_tooltip(piccolo_text(strings, Str::global_only_help));
     }
     ImGui::PopID();
 }
 
-// SAVE THEME...: a button under THEME, then a popup that asks for the
+// SAVE THEME...: a button under CUSTOM THEME, then a popup that asks for the
 // theme's name. SAVE leaves the name in window->save_theme_request for piccolo
-// to write the file. A built-in theme's name can't be used; one of the user's
-// themes' names replaces it.
+// to write the file (a custom theme: it never replaces a shipped one). One of
+// the user's themes' names replaces that theme.
 static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui, const std::vector<PiccoloThemeFile>* files)
 {
     const Localization* strings = ui->strings;
@@ -361,26 +416,17 @@ static void draw_save_theme(SettingsWindow* window, const SettingsUiContext* ui,
         size_t first = name.find_first_not_of(' ');
         size_t last = name.find_last_not_of(' ');
         name = first != std::string::npos ? name.substr(first, last - first + 1) : std::string();
-        bool builtin = false;
-        for (uint32_t i = 0; i < static_cast<uint32_t>(RetroUiTheme::count); i++)
-        {
-            builtin = builtin || name == piccolo_text(strings, piccolo_settings_ui_theme_name(static_cast<RetroUiTheme>(i)));
-        }
         bool replaces = false;
         for (size_t i = 0; files != nullptr && i < files->size(); i++)
         {
-            replaces = replaces || name == (*files)[i].name;
+            replaces = replaces || ((*files)[i].custom && name == (*files)[i].name);
         }
-        if (builtin)
-        {
-            ImGui::TextDisabled("%s", piccolo_text(strings, Str::ui_theme_save_builtin));
-        }
-        else if (replaces)
+        if (replaces)
         {
             ImGui::TextDisabled("%s", piccolo_text(strings, Str::ui_theme_save_replaces));
         }
 
-        bool can_save = !name.empty() && !builtin;
+        bool can_save = !name.empty();
         ImGui::BeginDisabled(!can_save);
         if ((retro_ui_button(piccolo_text(strings, Str::ui_theme_save_button)) || enter) && can_save)
         {

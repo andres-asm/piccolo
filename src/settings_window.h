@@ -50,7 +50,8 @@ struct SettingsWindow
     bool         save_theme_open = false;      // the SAVE THEME popup (asks for the name)
     char         save_theme_name[48] = {};
     std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
-    std::string  theme_choice;                 // the theme last picked or saved: THEME shows it first when several match
+    std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match
+    bool         theme_custom = false;         // THEME was set to CUSTOM (else CUSTOM only when no shipped theme matches)
 };
 
 // What the window needs from piccolo this frame.

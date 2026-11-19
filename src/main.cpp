@@ -1572,7 +1572,8 @@ static void draw_settings(App* app)
         }
         else
         {
-            app->settings_window.theme_choice = name;   // THEME shows the saved theme
+            app->settings_window.theme_choice = name;   // CUSTOM THEME shows the saved theme
+            app->settings_window.theme_custom = true;
         }
     }
 

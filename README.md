@@ -141,8 +141,13 @@ CONFIG > INTERFACE sets the look. THEME sets everything at once:
 
 More themes can be added as files: `themes/<name>.cfg`, next to the program or
 in piccolo's folder, with the same `ui_` keys as `settings/piccolo.cfg`. THEME
-lists every theme, built-in or from a file, sorted by name.
+lists the built-in themes and these, sorted by name, then CUSTOM.
 `themes/example.cfg` (GRAY) comes with piccolo and explains each key.
+
+SAVE THEME... saves the colors as they are as one of your own themes, asking
+for its name: `themes/<name>-custom.cfg` in piccolo's folder (the `-custom`
+ending keeps it from replacing a theme that comes with piccolo). Your own
+themes are in CUSTOM THEME, which works when THEME is CUSTOM.
 
 Every color can also be changed on its own (THEME then shows CUSTOM), as
 can MENU TITLE BOXES, DROP SHADOWS and THEME CURSOR (piccolo draws its own

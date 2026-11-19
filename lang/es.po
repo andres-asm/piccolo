@@ -986,13 +986,29 @@ msgctxt "ui_theme_help"
 msgid "Sets every color below at once. Change them one by one for your own."
 msgstr "Cambia todos los colores de abajo a la vez. Cámbialos uno por uno para hacer el tuyo."
 
+msgctxt "ui_custom_theme"
+msgid "CUSTOM THEME"
+msgstr "TEMA PROPIO"
+
+msgctxt "ui_custom_theme_help"
+msgid "Your own themes, saved with SAVE THEME. Set THEME to CUSTOM to pick one."
+msgstr "Tus temas, guardados con GUARDAR TEMA. Pon TEMA en PERSONALIZADO para elegir uno."
+
+msgctxt "ui_custom_theme_unsaved"
+msgid "UNSAVED"
+msgstr "SIN GUARDAR"
+
+msgctxt "ui_custom_theme_none"
+msgid "NONE SAVED"
+msgstr "NINGUNO GUARDADO"
+
 msgctxt "ui_theme_save"
 msgid "SAVE THEME..."
 msgstr "GUARDAR TEMA..."
 
 msgctxt "ui_theme_save_help"
-msgid "Saves the colors as they are now as a theme of your own (in the themes folder in piccolo's folder), listed in THEME by its name."
-msgstr "Guarda los colores tal como están como un tema tuyo (en la carpeta themes de la carpeta de piccolo), que aparece en TEMA con su nombre."
+msgid "Saves the colors as they are now as a theme of your own (in the themes folder in piccolo's folder), listed in CUSTOM THEME by its name."
+msgstr "Guarda los colores tal como están como un tema tuyo (en la carpeta themes de la carpeta de piccolo), que aparece en TEMA PROPIO con su nombre."
 
 msgctxt "ui_theme_save_title"
 msgid "SAVE THEME"
@@ -1005,10 +1021,6 @@ msgstr "NOMBRE"
 msgctxt "ui_theme_save_replaces"
 msgid "REPLACES YOUR THEME WITH THIS NAME"
 msgstr "REEMPLAZA TU TEMA CON ESTE NOMBRE"
-
-msgctxt "ui_theme_save_builtin"
-msgid "A BUILT-IN THEME HAS THIS NAME"
-msgstr "UN TEMA INCLUIDO TIENE ESTE NOMBRE"
 
 msgctxt "ui_theme_save_button"
 msgid "SAVE"
