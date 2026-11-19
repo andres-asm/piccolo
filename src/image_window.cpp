@@ -56,6 +56,18 @@ static void draw_preview(const SettingsUiContext* context, const ImageWindowSour
     }
     ImVec2 keep_min(top_left.x + left, top_left.y + top);
     ImVec2 keep_max(bottom_right.x - right, bottom_right.y - bottom);
+
+    // Pass 0's result is the part the game shows. When it matches the kept
+    // part (it may not: editing a scope whose crop isn't the one in use),
+    // it's drawn there, so the picture controls show on the preview.
+    float keep_width = keep_max.x - keep_min.x;
+    float keep_height = keep_max.y - keep_min.y;
+    if (source->processed_texture_id != 0 && static_cast<float>(source->processed_width) * factor == keep_width &&
+        static_cast<float>(source->processed_height) * factor == keep_height)
+    {
+        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(source->processed_texture_id)), keep_min, keep_max,
+                            ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f));
+    }
     draw_list->AddRectFilled(top_left, ImVec2(bottom_right.x, keep_min.y), CROP_SHADE);
     draw_list->AddRectFilled(ImVec2(top_left.x, keep_max.y), bottom_right, CROP_SHADE);
     draw_list->AddRectFilled(ImVec2(top_left.x, keep_min.y), ImVec2(keep_min.x, keep_max.y), CROP_SHADE);
@@ -65,7 +77,7 @@ static void draw_preview(const SettingsUiContext* context, const ImageWindowSour
 
 // The image controls, in the column right of the picture. Each group is a
 // collapsible section; more join them later.
-static void draw_controls(const SettingsUiContext* context)
+static void draw_controls(const SettingsUiContext* context, const ImageWindowSource* source)
 {
     char header[200] = {};
     std::snprintf(header, sizeof(header), "%s###crop", piccolo_text(context->strings, Str::image_section_crop));
@@ -74,6 +86,20 @@ static void draw_controls(const SettingsUiContext* context)
         for (int32_t i = 0; i < CROP_KEY_COUNT; i++)
         {
             settings_ui_row(context, CROP_KEYS[i], nullptr);
+        }
+    }
+
+    std::snprintf(header, sizeof(header), "%s###controls", piccolo_text(context->strings, Str::image_section_controls));
+    if (retro_ui_collapsing_header(header, ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (!source->controls_available)
+        {
+            // Without librashader there's no pass 0: the values are kept, not used.
+            ImGui::TextDisabled("%s", piccolo_text(context->strings, Str::image_controls_unavailable));
+        }
+        for (uint32_t i = 0; i < PICCOLO_PASS0_CONTROL_COUNT; i++)
+        {
+            settings_ui_row(context, PICCOLO_PASS0_CONTROLS[i].key, nullptr);
         }
     }
 }
@@ -94,7 +120,10 @@ void image_window_draw(bool* open, const SettingsUiContext* context, const Image
     // in piccolo's window.
     const ImGuiStyle& style = ImGui::GetStyle();
     float controls_width = 190.0f * block;
-    float controls_height = static_cast<float>(CROP_KEY_COUNT + 1) * ImGui::GetFrameHeightWithSpacing();
+    // Both sections' rows and headers (and the note); taller than the window
+    // allows, the column scrolls.
+    float controls_height = static_cast<float>(CROP_KEY_COUNT + static_cast<int32_t>(PICCOLO_PASS0_CONTROL_COUNT) + 3) *
+                            ImGui::GetFrameHeightWithSpacing();
     float chrome_x = style.WindowPadding.x * 2.0f + style.ItemSpacing.x;
     float chrome_y = style.WindowPadding.y * 2.0f + ImGui::GetFrameHeight() +   // title bar
                      ImGui::GetTextLineHeightWithSpacing();                      // "EDITING: ..."
@@ -152,7 +181,7 @@ void image_window_draw(bool* open, const SettingsUiContext* context, const Image
             // A child has its own draw list: the pixel font needs nearest sampling here too.
             const ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
             ImGui::GetWindowDrawList()->AddCallback(platform_io.DrawCallback_SetSamplerNearest, nullptr);
-            draw_controls(context);
+            draw_controls(context, source);
             ImGui::GetWindowDrawList()->AddCallback(platform_io.DrawCallback_SetSamplerLinear, nullptr);
         }
         ImGui::EndChild();

@@ -72,6 +72,11 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     settings_ui_row(ui, PICCOLO_VIDEO_SCALING, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_MAX_OFFSCREEN, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_FILTER, nullptr);
+    settings_ui_row(ui, PICCOLO_VIDEO_SHADER_PRESET, piccolo_text(ui->strings, Str::shader_preset_none));
+    if (context->image != nullptr && !context->image->controls_available)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::shader_unavailable));
+    }
     settings_ui_row(ui, PICCOLO_VIDEO_POSITION, nullptr);
 
     // The crop (and more image settings later) live in their own window.

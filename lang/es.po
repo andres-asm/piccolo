@@ -266,6 +266,22 @@ msgctxt "image_section_crop"
 msgid "OVERSCAN CROP"
 msgstr "RECORTE DE OVERSCAN"
 
+msgctxt "image_section_controls"
+msgid "PICTURE CONTROLS"
+msgstr "CONTROLES DE IMAGEN"
+
+msgctxt "image_controls_unavailable"
+msgid "NEEDS LIBRASHADER (NOT FOUND):\nSAVED, NOT USED"
+msgstr "NECESITA LIBRASHADER (NO ESTÁ):\nSE GUARDAN, NO SE USAN"
+
+msgctxt "shader_preset_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "shader_unavailable"
+msgid "LIBRASHADER NOT FOUND: SHADERS ARE OFF"
+msgstr "LIBRASHADER NO ESTÁ: SHADERS APAGADOS"
+
 msgctxt "setting_language"
 msgid "LANGUAGE"
 msgstr "IDIOMA"

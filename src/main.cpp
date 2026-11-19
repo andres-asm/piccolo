@@ -1567,7 +1567,19 @@ static void draw_settings(App* app)
         streaming_texture_uv_max(&session->texture, &image.uv_max_x, &image.uv_max_y);
         image.frame_width = session->texture.content_width;
         image.frame_height = session->texture.content_height;
+        // Pass 0's result (the shown part, after the crop): drawn over the
+        // preview so the picture controls show. Only once the chain has
+        // written it (a new image is still UNDEFINED while the UI is built).
+        const ShaderChain* chain = &app->shader_chain;
+        if (chain->ready && chain->stages[0].chain != nullptr && chain->middle.texture_id != 0 &&
+            chain->middle.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            image.processed_texture_id = chain->middle.texture_id;
+            image.processed_width = chain->middle.width;
+            image.processed_height = chain->middle.height;
+        }
     }
+    image.controls_available = app->shader_library.loaded;
     SettingsWindowContext context = {};
     context.settings = &app->settings;
     context.paths = &app->paths;

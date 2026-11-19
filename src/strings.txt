@@ -159,6 +159,10 @@ image_title = IMAGE SETTINGS
 image_editing = EDITING
 image_no_picture = START A GAME TO\nSEE ITS PICTURE HERE
 image_section_crop = OVERSCAN CROP
+image_section_controls = PICTURE CONTROLS
+image_controls_unavailable = NEEDS LIBRASHADER (NOT FOUND):\nSAVED, NOT USED
+shader_preset_none = NONE
+shader_unavailable = LIBRASHADER NOT FOUND: SHADERS ARE OFF
 
 # Settings: General
 setting_language = LANGUAGE
