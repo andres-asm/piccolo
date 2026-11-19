@@ -32,6 +32,12 @@ constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CON
 // picked in the quick menu's CONTROLS; kept per core (or game).
 constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "input_port2_device", "input_port3_device",
                                                        "input_port4_device"};
+// Network (netcode milestone 1): listen for piccoletto / other piccolos on one
+// UDP port and answer LAN discovery. Off by default; no UI yet (edited in
+// piccolo.cfg), it comes with pairing.
+constexpr const char* PICCOLO_NET_ENABLED = "net_enabled";
+constexpr const char* PICCOLO_NET_PORT = "net_port";
+constexpr const char* PICCOLO_NET_NAME = "net_name";   // what discovery shows
 constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";

@@ -45,7 +45,7 @@ jobs:
         run: |
           git submodule update --init --recursive --depth 1 \
             deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
-            deps/gamemode deps/miniz deps/7zip \
+            deps/gamemode deps/miniz deps/7zip deps/enet \
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
 

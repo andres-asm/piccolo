@@ -242,7 +242,7 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
-target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
+target_link_libraries(piccolo PRIVATE frontend_libretro frontend_net piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
 # tools/make_app_icon.py from the same PNGs as the window icon).

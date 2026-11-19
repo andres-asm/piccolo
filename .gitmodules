@@ -41,3 +41,6 @@
 	path = deps/7zip
 	url = https://github.com/ip7z/7zip.git
 	shallow = true
+[submodule "deps/enet"]
+	path = deps/enet
+	url = https://github.com/lsalzman/enet.git

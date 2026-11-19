@@ -46,6 +46,7 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
+#include "net_host.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -92,6 +93,11 @@ struct App
 
     CoreSession session = {};
     CoreCatalog catalog = {};
+
+    // Network listener (settings net_*), started at launch when enabled.
+    // Nothing is authenticated yet: connections are closed right away.
+    bool    net_ready = false;   // net_init() succeeded
+    NetHost net = {};
     FilePicker  picker  = {};
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -1664,6 +1670,50 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
+// The network listener, if SETTINGS has it on (net_enabled, read at launch).
+static void net_start(App* app)
+{
+    if (!settings_get_bool(&app->settings, PICCOLO_NET_ENABLED))
+    {
+        return;
+    }
+    app->net_ready = net_init();
+    if (!app->net_ready)
+    {
+        return;
+    }
+    uint16_t port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    net_host_create_listener(&app->net, port, settings_get_text(&app->settings, PICCOLO_NET_NAME));
+}
+
+// Once per loop: discovery requests are answered inside net_host_poll.
+// Connections are closed until pairing and encryption exist (milestones 2-3):
+// nothing a peer sends may be acted on before that.
+static void net_update(App* app)
+{
+    NetEvent event;
+    while (net_host_poll(&app->net, &event))
+    {
+        char address[64];
+        net_address_to_text(event.address, address, sizeof(address));
+        if (event.type == NetEventType::connected)
+        {
+            SDL_Log("Network: connection from %s closed (pairing doesn't exist yet)", address);
+            net_host_disconnect(&app->net, event.peer);
+        }
+    }
+}
+
+static void net_stop(App* app)
+{
+    net_host_destroy(&app->net);
+    if (app->net_ready)
+    {
+        net_shutdown();
+        app->net_ready = false;
+    }
+}
+
 int main(int argc, char** argv)
 {
     (void)argc;
@@ -1785,11 +1835,13 @@ int main(int argc, char** argv)
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audio subsystem: %s", SDL_GetError());
     }
     refresh_audio_devices(app);
+    net_start(app);
 
     app->running = true;
     while (app->running)
     {
         app_handle_events(app);
+        net_update(app);
         if (app->pending_close_game)
         {
             app->pending_close_game = false;
@@ -2044,6 +2096,7 @@ int main(int argc, char** argv)
         input_config_save(&app->input, app->input_config_path.c_str());
     }
     input_sdl_shutdown(&app->input_sdl);
+    net_stop(app);
     app_shell_destroy(&app->shell);
     delete app;
     return 0;

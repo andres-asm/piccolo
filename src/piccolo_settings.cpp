@@ -160,6 +160,10 @@ static const SettingDescriptor SETTINGS[] = {
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_GAME_MODE, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_game_mode), .help = text_id(Str::setting_game_mode_help)},
+    // Network: no labels yet (no UI until pairing); 55420 = NET_DEFAULT_PORT.
+    {.key = PICCOLO_NET_ENABLED, .type = SettingType::boolean, .default_value = "false"},
+    {.key = PICCOLO_NET_PORT, .type = SettingType::integer, .default_value = "55420", .min = 1024, .max = 65535},
+    {.key = PICCOLO_NET_NAME, .type = SettingType::text, .default_value = "piccolo"},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
      .help = text_id(Str::setting_path_cores_help)},
     {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),
