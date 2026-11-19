@@ -1,0 +1,81 @@
+# Builds piccolo for Windows (x86_64) natively with MSYS2's UCRT64 toolchain
+# (GCC + libstdc++ + the Universal CRT), the same one used to build it by hand
+# on Windows, runs the tests, and uploads the piccolo folder (GitHub serves it
+# as a zip).
+# The C/C++ runtimes are linked statically, so piccolo.exe only needs Windows'
+# own DLLs and vulkan-1.dll (installed with the GPU driver).
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows (UCRT64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      # Checked out with LF endings: the themes, layouts and translations are
+      # copied as they are.
+      - run: git config --global core.autocrlf false
+        shell: pwsh
+
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-vulkan-devel
+
+      # Only the submodules the build uses (deps/librashader isn't built yet
+      # and brings many submodules of its own; deps/test-libretro is optional).
+      - name: Submodules
+        run: |
+          git submodule update --init --recursive --depth 1 \
+            deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
+            deps/speexdsp deps/gamemode \
+            deps/common/hosts-common deps/common/frontends-common \
+            deps/libretro/host-libretro deps/libretro/frontend-libretro
+
+      # Release without warnings as errors (GCC -O2 gives two harmless ones).
+      # MULTITAP_PICCOLO_DIR is the folder that's uploaded: the build copies
+      # piccolo.exe, lang/, layouts/ and themes/ there.
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMULTITAP_PICCOLO_DIR="$PWD/dist/piccolo" \
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      # Fails if piccolo.exe still needs a DLL from MSYS2 (anything besides
+      # Windows' own and vulkan-1.dll).
+      - name: Check DLL dependencies
+        run: |
+          objdump -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
+          if grep -iE 'libstdc|libgcc|libwinpthread|SDL3' dlls.txt; then
+            echo "piccolo.exe depends on MSYS2 DLLs"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piccolo-windows-x86_64
+          path: dist/
