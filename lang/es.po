@@ -90,6 +90,14 @@ msgctxt "picker_core"
 msgid "CORE"
 msgstr "CORE"
 
+msgctxt "picker_folder"
+msgid "FOLDER"
+msgstr "CARPETA"
+
+msgctxt "picker_home"
+msgid "HOME"
+msgstr "INICIO"
+
 msgctxt "picker_no_cores"
 msgid "NO CORES FOUND"
 msgstr "NO HAY CORES"
@@ -353,6 +361,26 @@ msgstr "ESTADOS"
 msgctxt "setting_path_states_help"
 msgid "Folder for savestates. Empty: the states folder in piccolo's folder."
 msgstr "Carpeta para los estados guardados. Vacía: la carpeta states dentro de la de piccolo."
+
+msgctxt "setting_path_games"
+msgid "GAME FOLDER"
+msgstr "CARPETA DE JUEGOS"
+
+msgctxt "setting_path_games_help"
+msgid "A folder with games. LOAD GAME offers it as a place to start, and devices with FULL access can browse and load games from it over the network (never from outside these folders)."
+msgstr "Una carpeta con juegos. CARGAR JUEGO la ofrece como punto de partida, y los dispositivos con acceso COMPLETO pueden explorarla y cargar juegos de ella por la red (nunca de fuera de estas carpetas)."
+
+msgctxt "section_game_folders"
+msgid "GAME FOLDERS"
+msgstr "CARPETAS DE JUEGOS"
+
+msgctxt "game_folder_add_help"
+msgid "Adds a game folder."
+msgstr "Agrega una carpeta de juegos."
+
+msgctxt "game_folder_remove_help"
+msgid "Removes this folder from the list. Nothing is deleted."
+msgstr "Quita esta carpeta de la lista. No se borra nada."
 
 msgctxt "setting_aspect"
 msgid "ASPECT RATIO"

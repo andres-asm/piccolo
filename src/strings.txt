@@ -39,6 +39,8 @@ status_not_there_yet = NOT THERE YET
 # LOAD GAME window
 picker_title = LOAD GAME
 picker_core = CORE
+picker_folder = FOLDER
+picker_home = HOME
 picker_no_cores = NO CORES FOUND
 picker_nothing_here = NOTHING THIS CORE LOADS HERE
 picker_show_all = SHOW ALL FILES
@@ -185,6 +187,11 @@ setting_path_saves = SAVES
 setting_path_saves_help = Folder for save RAM. Empty: the saves folder in piccolo's folder.
 setting_path_states = STATES
 setting_path_states_help = Folder for savestates. Empty: the states folder in piccolo's folder.
+setting_path_games = GAME FOLDER
+setting_path_games_help = A folder with games. LOAD GAME offers it as a place to start, and devices with FULL access can browse and load games from it over the network (never from outside these folders).
+section_game_folders = GAME FOLDERS
+game_folder_add_help = Adds a game folder.
+game_folder_remove_help = Removes this folder from the list. Nothing is deleted.
 
 # Settings: Picture
 setting_aspect = ASPECT RATIO

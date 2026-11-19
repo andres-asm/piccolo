@@ -175,6 +175,22 @@ static const SettingDescriptor SETTINGS[] = {
      .help = text_id(Str::setting_path_saves_help)},
     {.key = PICCOLO_PATH_STATES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_states),
      .help = text_id(Str::setting_path_states_help)},
+    {.key = PICCOLO_PATH_GAMES[0], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[1], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[2], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[3], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[4], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[5], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[6], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[7], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
 
     // Video: Picture (overridable per core / game)
     {.key = PICCOLO_VIDEO_ASPECT, .type = SettingType::enumeration, .default_value = "core", .overridable = true,
@@ -387,6 +403,45 @@ void piccolo_settings_viewport(const Settings* settings, ViewportInput* input)
 TimingMode piccolo_settings_timing(const Settings* settings)
 {
     return settings_get_enum(settings, PICCOLO_VIDEO_TIMING) == 0 ? TimingMode::vsync : TimingMode::exact;
+}
+
+void piccolo_settings_game_folders(const Settings* settings, std::vector<std::string>* folders)
+{
+    folders->clear();
+    for (uint32_t i = 0; i < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        std::string folder = settings_get_text(settings, PICCOLO_PATH_GAMES[i]);
+        if (folder.empty())
+        {
+            continue;   // a file edited by hand may have gaps: skipped
+        }
+        host_fs_forward_slashes(&folder[0]);
+        folders->push_back(folder);
+    }
+}
+
+bool piccolo_settings_remove_game_folder(Settings* settings, uint32_t index)
+{
+    if (index >= PICCOLO_GAME_FOLDER_MAX ||
+        settings_get_layer(settings, SettingLayer::global, PICCOLO_PATH_GAMES[index]) == nullptr)
+    {
+        return false;
+    }
+    for (uint32_t i = index; i + 1 < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        const char* next = settings_get_layer(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i + 1]);
+        if (next == nullptr || next[0] == '\0')
+        {
+            settings_reset(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i]);
+        }
+        else
+        {
+            std::string moved = next;   // the next set below may move the text it points into
+            settings_set(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i], moved.c_str());
+        }
+    }
+    settings_reset(settings, SettingLayer::global, PICCOLO_PATH_GAMES[PICCOLO_GAME_FOLDER_MAX - 1]);
+    return true;
 }
 
 double piccolo_settings_window_aspect(const Settings* settings)

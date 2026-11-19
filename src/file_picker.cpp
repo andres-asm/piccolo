@@ -246,9 +246,73 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
 // Public functions
 // ---------------------------------------------------------------------------
 
-void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path)
+static bool is_directory(const char* path)
+{
+    SDL_PathInfo info = {};
+    return path[0] != '\0' && SDL_GetPathInfo(path, &info) && info.type == SDL_PATHTYPE_DIRECTORY;
+}
+
+static void go_home(FilePicker* picker)
+{
+    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+    std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
+    host_fs_forward_slashes(picker->directory);
+}
+
+// Is `directory` `folder` or inside it ("/roms" holds "/roms/snes" and
+// "/roms/a.7z#x", not "/roms2")? Forward slashes on both.
+static bool folder_holds(const std::string* folder, const char* directory)
+{
+    size_t length = folder->size();
+    while (length > 1 && (*folder)[length - 1] == '/')
+    {
+        length--;
+    }
+    if (std::strncmp(directory, folder->c_str(), length) != 0)
+    {
+        return false;
+    }
+    char next = directory[length];
+    return next == '\0' || next == '/' || (length > 0 && (*folder)[length - 1] == '/');
+}
+
+// FOLDER's text: the game folder we're in (the longest, if they nest),
+// else HOME when we're right there, else where we are.
+static const char* folder_preview(const FilePicker* picker, const Localization* strings)
+{
+    int32_t best = -1;
+    for (size_t i = 0; i < picker->game_folders.size(); i++)
+    {
+        if (folder_holds(&picker->game_folders[i], picker->directory) &&
+            (best < 0 || picker->game_folders[i].size() > picker->game_folders[static_cast<size_t>(best)].size()))
+        {
+            best = static_cast<int32_t>(i);
+        }
+    }
+    if (best >= 0)
+    {
+        return picker->game_folders[static_cast<size_t>(best)].c_str();
+    }
+    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+    if (home != nullptr)
+    {
+        char home_path[LIBRETRO_PATH_MAX] = {};
+        std::snprintf(home_path, sizeof(home_path), "%s", home);
+        host_fs_forward_slashes(home_path);
+        std::string home_folder = home_path;
+        if (folder_holds(&home_folder, picker->directory) && home_folder.size() + 1 >= std::strlen(picker->directory))
+        {
+            return piccolo_text(strings, Str::picker_home);   // the home folder itself (with or without its trailing '/')
+        }
+    }
+    return picker->directory;
+}
+
+void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path,
+                      const std::vector<std::string>* game_folders)
 {
     picker->open = true;
+    picker->game_folders = *game_folders;
     picker->listing_stale = true;
 
     picker->archive_path.clear();   // the archive may have changed since: read it again
@@ -265,13 +329,20 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
     if (usable)
     {
         std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
+        host_fs_forward_slashes(picker->directory);   // so the files picked from it don't mix separators
     }
     else
     {
-        const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
-        std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
+        go_home(picker);
+        for (size_t i = 0; i < picker->game_folders.size(); i++)
+        {
+            if (is_directory(picker->game_folders[i].c_str()))
+            {
+                std::snprintf(picker->directory, sizeof(picker->directory), "%s", picker->game_folders[i].c_str());
+                break;
+            }
+        }
     }
-    host_fs_forward_slashes(picker->directory);   // so the files picked from it don't mix separators
 
     // The given core if it's in the catalog, else the first usable one that
     // needs content (the catalog lists usable cores first).
@@ -414,9 +485,15 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         char preview[LIBRETRO_INFO_TEXT_MAX * 2 + 8] = {};
         std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : piccolo_text(strings, Str::picker_no_cores),
                       core != nullptr ? core->version : "");
+        const char* core_label = piccolo_text(strings, Str::picker_core);
+        const char* folder_label = piccolo_text(strings, Str::picker_folder);
+        float label_width = ImGui::CalcTextSize(core_label).x;
+        float folder_label_width = ImGui::CalcTextSize(folder_label).x;
+        label_width = (label_width > folder_label_width ? label_width : folder_label_width) + ImGui::GetStyle().ItemSpacing.x;
+        float combo_x = ImGui::GetCursorPosX() + label_width;
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(piccolo_text(strings, Str::picker_core));
-        ImGui::SameLine();
+        ImGui::TextUnformatted(core_label);
+        ImGui::SameLine(combo_x);
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (retro_ui_begin_combo("##core", preview))
         {
@@ -435,6 +512,33 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
                     picker->listing_stale = true;
                 }
             }
+            ImGui::EndCombo();
+        }
+
+        // Where to start: a game folder or HOME.
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(folder_label);
+        ImGui::SameLine(combo_x);
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (retro_ui_begin_combo("##folder", folder_preview(picker, strings)))
+        {
+            for (size_t i = 0; i < picker->game_folders.size(); i++)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::Selectable(picker->game_folders[i].c_str()))
+                {
+                    std::snprintf(picker->directory, sizeof(picker->directory), "%s", picker->game_folders[i].c_str());
+                    picker->listing_stale = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::PushID("home");
+            if (ImGui::Selectable(piccolo_text(strings, Str::picker_home)))
+            {
+                go_home(picker);
+                picker->listing_stale = true;
+            }
+            ImGui::PopID();
             ImGui::EndCombo();
         }
 

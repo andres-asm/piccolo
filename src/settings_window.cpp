@@ -10,6 +10,7 @@
 
 #include "game_mode.h"
 #include "imgui.h"
+#include "libretro_host.h"   // LIBRETRO_PATH_MAX
 
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -42,7 +43,103 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
                       &window->choose_scope);
 }
 
-static void draw_general(const SettingsUiContext* ui, const SettingsWindowContext* context)
+// GAME FOLDERS: one row per folder set, each with "-" (remove), then "+"
+// for one more. "+" shows an empty row; typing a folder there keeps it.
+// Global only, like the other folders (shown, greyed out, in other scopes).
+static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
+{
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_game_folders));
+    bool global = ui->scope == SettingLayer::global;
+    if (!global)
+    {
+        ImGui::BeginDisabled();
+    }
+    uint32_t set = 0;
+    while (set < PICCOLO_GAME_FOLDER_MAX && settings_get_text(ui->settings, PICCOLO_PATH_GAMES[set])[0] != '\0')
+    {
+        set++;
+    }
+    if (set == PICCOLO_GAME_FOLDER_MAX)
+    {
+        window->adding_game_folder = false;
+    }
+    uint32_t rows = set + (window->adding_game_folder ? 1u : 0u);
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float remove_width = ImGui::CalcTextSize("-").x + padding;
+    const char* label = piccolo_text(ui->strings, Str::setting_path_games);
+    int32_t remove = -1;
+    for (uint32_t i = 0; i < rows; i++)
+    {
+        ImGui::PushID(PICCOLO_PATH_GAMES[i]);
+        ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column, so rows line up with the others
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        float start = ImGui::GetCursorPosX();
+        ImGui::TextUnformatted(label);
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::setting_path_games_help));
+        ImGui::SameLine(start + ui->label_width);
+
+        // As path_widget (settings_ui.cpp): ImGui keeps its own copy while
+        // the field is edited; the value is set when editing ends.
+        char buffer[LIBRETRO_PATH_MAX] = {};
+        std::snprintf(buffer, sizeof(buffer), "%s", settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]));
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - remove_width - spacing);
+        retro_ui_push_field_text();
+        ImGui::InputText("##value", buffer, sizeof(buffer));
+        retro_ui_pop_field_text();
+        if (ImGui::IsItemDeactivatedAfterEdit())
+        {
+            if (buffer[0] == '\0')
+            {
+                remove = static_cast<int32_t>(i);   // emptied: the same as "-"
+            }
+            else if (settings_set(ui->settings, SettingLayer::global, PICCOLO_PATH_GAMES[i], buffer) && i == set)
+            {
+                window->adding_game_folder = false;   // the new row now holds a folder
+            }
+        }
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
+        if (retro_ui_button("-"))
+        {
+            remove = static_cast<int32_t>(i);
+        }
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_remove_help));
+        ImGui::PopID();
+    }
+    if (remove >= 0)
+    {
+        if (static_cast<uint32_t>(remove) == set)
+        {
+            window->adding_game_folder = false;   // the empty row: nothing stored
+        }
+        else
+        {
+            piccolo_settings_remove_game_folder(ui->settings, static_cast<uint32_t>(remove));
+        }
+    }
+    ImGui::Dummy(ImGui::CalcTextSize("C"));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(rows >= PICCOLO_GAME_FOLDER_MAX);
+    ImGui::PushID("add_game_folder");
+    if (retro_ui_button("+"))
+    {
+        window->adding_game_folder = true;
+    }
+    ImGui::PopID();
+    ImGui::EndDisabled();
+    retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_add_help));
+    if (!global)
+    {
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            retro_ui_tooltip(piccolo_text(ui->strings, Str::global_only_help));
+        }
+    }
+}
+
+static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_LANGUAGE, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
@@ -59,6 +156,7 @@ static void draw_general(const SettingsUiContext* ui, const SettingsWindowContex
     settings_ui_row(ui, PICCOLO_PATH_SAVES, context->paths->saves.c_str());
     settings_ui_row(ui, PICCOLO_PATH_STATES, context->paths->states.c_str());
     ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+    draw_game_folders(window, ui);
 }
 
 static long crop_at_scope(const SettingsUiContext* ui, const char* key)
@@ -582,7 +680,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     {
         window->tab = SettingsTab::general;
         begin_tab_content();
-        draw_general(ui, context);
+        draw_general(window, ui, context);
         end_tab_content();
         ImGui::EndTabItem();
     }

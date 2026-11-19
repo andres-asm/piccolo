@@ -673,9 +673,13 @@ static void handle_menu_action(App* app, MenuAction action)
         case MenuAction::none:
             return;
         case MenuAction::load_game:
+        {
             core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
-            file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core);
+            std::vector<std::string> game_folders;
+            piccolo_settings_game_folders(&app->settings, &game_folders);
+            file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core, &game_folders);
             break;
+        }
         case MenuAction::reset:
             if (game_running(app))
             {

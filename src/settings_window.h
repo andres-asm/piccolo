@@ -53,6 +53,7 @@ struct SettingsWindow
     std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
     std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match
     bool         theme_custom = false;         // THEME was set to CUSTOM (else CUSTOM only when no shipped theme matches)
+    bool         adding_game_folder = false;   // "+" was pressed: an empty GAME FOLDER row is shown
 };
 
 // What the window needs from piccolo this frame.

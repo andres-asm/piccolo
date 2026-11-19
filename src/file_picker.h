@@ -3,7 +3,8 @@
 // piccolo's "load game" window, in the retro style (retro_ui theme):
 //
 //   +- LOAD GAME ------------------------------------------+
-//   | CORE  [ Snes9x 1.63                              v ] |
+//   | CORE   [ Snes9x 1.63                             v ] |
+//   | FOLDER [ /home/user/roms                         v ] |
 //   | +- files -----------------------+ +- folders -----+ |
 //   | | Super Mario World (USA).sfc   | | ..            | |
 //   | | ...                           | | Nintendo - .. | |
@@ -23,6 +24,9 @@
 //   - else, exactly one file inside the core can load: that file
 //     ("a.7z#dir/Game.sfc", extracted by the core session);
 //   - else: opens it as a folder, like BROWSE, which always does that.
+// FOLDER jumps to one of the game folders (SETTINGS > GENERAL) or HOME, and
+// shows the one we're in. The picker isn't limited to them: they're only
+// places to start (the network is limited to them, not the local user).
 // Esc or the window's close button closes the picker.
 
 #include <cstdint>
@@ -44,6 +48,7 @@ struct FilePicker
     char directory[LIBRETRO_PATH_MAX] = {};
 
     int32_t core_index = -1;   // index into the catalog; -1 = none chosen yet
+    std::vector<std::string> game_folders;   // FOLDER's choices (copied at open), then HOME
     bool    show_all   = false;
 
     // Current folder's contents, sorted (case-insensitive). Re-read when the
@@ -74,8 +79,10 @@ struct FilePickerChoice
 };
 
 // Opens the window in `directory` with `core_path` preselected (either may be
-// "" or not exist: then the home folder / the first usable core).
-void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path);
+// "" or not exist: then the first game folder that exists, else the home
+// folder / the first usable core).
+void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path,
+                      const std::vector<std::string>* game_folders);
 
 // Draws the window if open. Returns true on the frame the user picked
 // something; the picker closes itself then.

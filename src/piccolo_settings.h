@@ -41,6 +41,14 @@ constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";
 constexpr const char* PICCOLO_PATH_STATES = "path_states";
+// Game folders (SETTINGS > GENERAL, "+" adds one): LOAD GAME offers them as
+// places to start, and they're the only folders a network client may browse
+// and load games from. Global only; kept in order, no gaps (an emptied slot
+// is filled by the ones after it).
+constexpr uint32_t PICCOLO_GAME_FOLDER_MAX = 8;
+constexpr const char* PICCOLO_PATH_GAMES[PICCOLO_GAME_FOLDER_MAX] = {
+    "path_games1", "path_games2", "path_games3", "path_games4",
+    "path_games5", "path_games6", "path_games7", "path_games8"};
 constexpr const char* PICCOLO_VIDEO_ASPECT = "video_aspect";
 constexpr const char* PICCOLO_VIDEO_SCALING = "video_scaling";
 constexpr const char* PICCOLO_VIDEO_MAX_OFFSCREEN = "video_max_offscreen";
@@ -118,6 +126,13 @@ uint32_t piccolo_settings_count();
 void piccolo_settings_viewport(const Settings* settings, ViewportInput* input);
 
 TimingMode piccolo_settings_timing(const Settings* settings);
+
+// The game folders that are set, in order (forward slashes).
+void piccolo_settings_game_folders(const Settings* settings, std::vector<std::string>* folders);
+
+// Removes game folder `index`; the ones after it move up one. True if it
+// was set.
+bool piccolo_settings_remove_game_folder(Settings* settings, uint32_t index);
 
 // The language to show: an index for piccolo_language_code() (piccolo_text.h).
 // "auto" picks the first of the system's preferred languages piccolo has,
