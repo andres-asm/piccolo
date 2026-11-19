@@ -87,5 +87,5 @@ modules:
           - build
           - build-flatpak
           - .flatpak-builder
-          - deps/librashader
           - deps/test-libretro
+          # deps/librashader stays: shader_chain.h includes its C headers.
