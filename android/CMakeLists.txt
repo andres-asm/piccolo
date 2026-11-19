@@ -24,10 +24,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# piccolo is a submodule of multitap: deps/ is three levels up.
-set(MULTITAP_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
-if(NOT EXISTS "${MULTITAP_ROOT}/deps/SDL/CMakeLists.txt")
-    message(FATAL_ERROR "deps/SDL not found at ${MULTITAP_ROOT}/deps/SDL (piccolo must be inside multitap)")
+# piccolo's own deps/ (submodules), one level up.
+set(PICCOLO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
+if(NOT EXISTS "${PICCOLO_ROOT}/deps/SDL/CMakeLists.txt")
+    message(FATAL_ERROR "deps/SDL not found at ${PICCOLO_ROOT}/deps/SDL. Run: git submodule update --init --recursive")
 endif()
 
 # SDL3 as a static library inside libmain.so: one .so in the APK. SDL's Java
@@ -37,7 +37,7 @@ set(SDL_STATIC       ON  CACHE BOOL "" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
 set(SDL_EXAMPLES     OFF CACHE BOOL "" FORCE)
 set(SDL_ANDROID_JAR  OFF CACHE BOOL "" FORCE)
-add_subdirectory("${MULTITAP_ROOT}/deps/SDL" sdl EXCLUDE_FROM_ALL SYSTEM)
+add_subdirectory("${PICCOLO_ROOT}/deps/SDL" sdl EXCLUDE_FROM_ALL SYSTEM)
 
 # SDLActivity loads "libmain.so" and calls SDL_main in it.
 add_library(main SHARED
@@ -45,7 +45,7 @@ add_library(main SHARED
 )
 target_link_libraries(main PRIVATE SDL3::SDL3-static android log)
 
-# Same warnings as multitap_set_project_flags() in multitap's root CMakeLists.
+# Same warnings as multitap_set_project_flags() (hosts-common's cmake/multitap.cmake).
 target_compile_options(main PRIVATE
     -Wall -Wextra -Wpedantic
     -Wconversion -Wsign-conversion -Wshadow

@@ -4,10 +4,14 @@ A small libretro frontend for **playing games**, with a retro-style UI in the
 spirit of classic emulator GUIs: a menu bar, a LOAD GAME window, and a 5x5
 pixel font drawn from scratch for piccolo.
 
-piccolo is part of [Multitap](https://github.com/andres-asm/multitap) and is
-built inside it (as the `frontends/piccolo` submodule): it uses Multitap's
-libretro host, its shared frontend libraries (window, Vulkan, audio, the core
-session) and its CMake helpers. It doesn't build on its own.
+piccolo is part of the [Multitap](https://github.com/andres-asm/multitap)
+project and builds on its own: Multitap's libraries come in as submodules,
+with every other dependency, in `deps/`:
+
+- `deps/common/hosts-common`: code shared by core hosts, and the CMake helpers;
+- `deps/libretro/host-libretro`: the libretro host;
+- `deps/common/frontends-common`: window, Vulkan, audio, settings, input;
+- `deps/libretro/frontend-libretro`: the core session, core options, cores.
 
 ## What it does so far
 
@@ -189,15 +193,27 @@ old `~/.host-libretro/` folder if there is one. The old folder is left as it is.
 
 ## Building
 
-Clone Multitap with its submodules and build it; piccolo is one of its targets:
+Clone piccolo with its submodules and build it:
 
 ```sh
-git clone --recursive https://github.com/andres-asm/multitap.git
-cd multitap
+git clone --recursive https://github.com/andres-asm/piccolo.git
+cd piccolo
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ~/.local/share/piccolo/piccolo     # normal builds copy it there
+ctest --test-dir build             # the tests (piccolo's and its libraries')
 ```
+
+Optional: the Test libretro core (`deps/test-libretro`, not cloned by
+default) is built and copied into piccolo's `cores/`, and adds the host's
+checks with it to the tests:
+
+```sh
+git submodule update --init --recursive --checkout deps/test-libretro
+```
+
+A change to one of Multitap's libraries is made in its submodule (commit and
+push it there first), then piccolo's pointer to it is committed.
 
 ## Layout
 

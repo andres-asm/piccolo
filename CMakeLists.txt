@@ -1,5 +1,152 @@
-# piccolo: basic libretro frontend built on host-libretro.
-# Plays games through frontend_libretro's core session, with a retro-style UI
+# piccolo: a libretro frontend, minimal in looks (inspired by classic emulator
+# frontends of the 90s). Self-contained: every dependency is a submodule in
+# deps/ (third-party ones, and multitap's libraries in deps/common and
+# deps/libretro). Build:
+#   git clone --recursive https://github.com/andres-asm/piccolo.git
+#   cmake -S piccolo -B piccolo/build -G Ninja && cmake --build piccolo/build
+
+cmake_minimum_required(VERSION 3.25)
+
+# ccache as a compiler launcher when it's installed. Better than putting its
+# wrapper folder first on PATH: on MSYS2 those wrappers are bash scripts, and
+# ninja (a native Windows program) can't run them.
+# Only when it actually runs (a half-updated MSYS2 can leave a ccache.exe that
+# doesn't start, and then every compile fails).
+find_program(MULTITAP_CCACHE ccache)
+if(MULTITAP_CCACHE)
+    execute_process(COMMAND "${MULTITAP_CCACHE}" --version
+                    RESULT_VARIABLE _ccache_result OUTPUT_QUIET ERROR_QUIET)
+    if(_ccache_result EQUAL 0)
+        set(CMAKE_C_COMPILER_LAUNCHER   "${MULTITAP_CCACHE}" CACHE STRING "")
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${MULTITAP_CCACHE}" CACHE STRING "")
+    else()
+        message(WARNING "ccache (${MULTITAP_CCACHE}) doesn't run; building without it")
+    endif()
+endif()
+
+project(piccolo LANGUAGES C CXX)
+
+# ---------------------------------------------------------------------------
+# Options (the MULTITAP_ names are the project's: its libraries read them)
+# ---------------------------------------------------------------------------
+option(MULTITAP_SYSTEM_SDL3        "Use the system SDL3 instead of deps/SDL" OFF)
+option(MULTITAP_WARNINGS_AS_ERRORS "Treat warnings in our own code as errors"    OFF)
+option(MULTITAP_SANITIZE           "Build our own code with ASan + UBSan"         OFF)
+option(MULTITAP_BUILD_TESTS        "Build tests and register CTest tests"         ON)
+
+# Where builds are copied so they're easy to find and run: piccolo's own
+# folder, the same one it uses for its data (frontends-common's app_paths.h).
+# Linux: $XDG_DATA_HOME/piccolo (default ~/.local/share/piccolo). macOS:
+# ~/Library/Application Support/piccolo. Windows: portable (its data goes next
+# to the .exe), so any folder works; default %USERPROFILE%/piccolo.
+# Only from normal builds: sanitizer builds need the ASan runtime (an ASan core
+# can't be loaded by a normal frontend), so they keep everything in the build
+# folder. Empty = don't copy.
+if(MULTITAP_SANITIZE)
+    set(_programs_base "")
+elseif(WIN32)
+    set(_programs_base "$ENV{USERPROFILE}")
+elseif(APPLE)
+    set(_programs_base "$ENV{HOME}/Library/Application Support")
+elseif(DEFINED ENV{XDG_DATA_HOME} AND IS_ABSOLUTE "$ENV{XDG_DATA_HOME}")
+    set(_programs_base "$ENV{XDG_DATA_HOME}")
+else()
+    set(_programs_base "$ENV{HOME}/.local/share")
+endif()
+set(_piccolo_dir_default "")
+if(_programs_base)
+    set(_piccolo_dir_default "${_programs_base}/piccolo")
+endif()
+set(MULTITAP_PICCOLO_DIR "${_piccolo_dir_default}" CACHE PATH "Copy piccolo here after building (empty = don't)")
+
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# ---------------------------------------------------------------------------
+# Submodule check
+# ---------------------------------------------------------------------------
+foreach(_dep imgui/imgui.cpp libretro-common/include/libretro.h libsamplerate/src/samplerate.c
+             common/hosts-common/CMakeLists.txt common/frontends-common/CMakeLists.txt
+             libretro/host-libretro/CMakeLists.txt libretro/frontend-libretro/CMakeLists.txt)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${_dep}")
+        message(FATAL_ERROR "deps/${_dep} is missing. Run: git submodule update --init --recursive")
+    endif()
+endforeach()
+
+# ---------------------------------------------------------------------------
+# Third-party dependencies (built with their own defaults, not our warnings)
+# ---------------------------------------------------------------------------
+find_package(Vulkan REQUIRED)
+
+if(MULTITAP_SYSTEM_SDL3)
+    find_package(SDL3 CONFIG REQUIRED)
+else()
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/SDL/CMakeLists.txt")
+        message(FATAL_ERROR "deps/SDL is empty. Run: git submodule update --init --recursive")
+    endif()
+    set(SDL_SHARED       OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC       ON  CACHE BOOL "" FORCE)
+    set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+    set(SDL_EXAMPLES     OFF CACHE BOOL "" FORCE)
+    add_subdirectory(deps/SDL EXCLUDE_FROM_ALL SYSTEM)
+endif()
+
+# Dear ImGui core + SDL3 platform backend + Vulkan renderer backend.
+# Sources come straight from the submodule; nothing is copied or patched.
+set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui")
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+)
+target_include_directories(imgui SYSTEM PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan)
+
+# libretro API header. Only include/libretro*.h is used; none of
+# libretro-common's .c files are compiled (see CLAUDE.md).
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/libretro-common/include/libretro.h")
+    message(FATAL_ERROR "deps/libretro-common is empty. Run: git submodule update --init --recursive")
+endif()
+add_library(libretro_api INTERFACE)
+target_include_directories(libretro_api SYSTEM INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/deps/libretro-common/include")
+
+if(MULTITAP_BUILD_TESTS)
+    enable_testing()
+endif()
+
+# ---------------------------------------------------------------------------
+# multitap's libraries (submodules). hosts-common first: it brings the
+# project's CMake helpers (multitap_set_project_flags, ...).
+# ---------------------------------------------------------------------------
+set(MULTITAP_DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps")
+add_subdirectory(deps/common/hosts-common)
+# Test libretro (optional submodule, not cloned by default:
+#   git submodule update --init --recursive --checkout deps/test-libretro
+# ): into piccolo's cores folder, and host-libretro's tests run with it.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/test-libretro/CMakeLists.txt")
+    add_subdirectory(deps/test-libretro)
+    if(MULTITAP_PICCOLO_DIR)
+        multitap_copy_after_build(test_libretro "${MULTITAP_PICCOLO_DIR}/cores")
+    endif()
+endif()
+add_subdirectory(deps/libretro/host-libretro)
+add_subdirectory(deps/common/frontends-common)
+add_subdirectory(deps/libretro/frontend-libretro)
+
+# ---------------------------------------------------------------------------
+# piccolo
+# ---------------------------------------------------------------------------
+# Plays games through frontend-libretro's core session, with a retro-style UI
 # (themed ImGui widgets with piccolo's pixel font).
 
 # piccolo's own pixel font (5x5, drawn for piccolo; see src/pixel_font.h).
@@ -83,7 +230,7 @@ if(WIN32)
     set_source_files_properties("${PICCOLO_GENERATED}/piccolo.rc" PROPERTIES OBJECT_DEPENDS "${PICCOLO_ICO}")
 endif()
 
-# piccolo's version (docs/roadmap-piccolo.md in multitap): piccolo_version.h,
+# piccolo's version: piccolo_version.h,
 # PICCOLO_VERSION. The branch suffix is piccolo's own branch.
 set(PICCOLO_VERSION_BASE 0.3)
 multitap_version(PICCOLO_VERSION ${PICCOLO_VERSION_BASE} "${CMAKE_CURRENT_SOURCE_DIR}")

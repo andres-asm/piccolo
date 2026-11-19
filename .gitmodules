@@ -1,0 +1,39 @@
+[submodule "deps/SDL"]
+	path = deps/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "deps/imgui"]
+	path = deps/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "deps/libretro-common"]
+	path = deps/libretro-common
+	url = https://github.com/libretro/libretro-common.git
+	shallow = true
+[submodule "deps/libsamplerate"]
+	path = deps/libsamplerate
+	url = https://github.com/libsndfile/libsamplerate.git
+[submodule "deps/speexdsp"]
+	path = deps/speexdsp
+	url = https://github.com/xiph/speexdsp.git
+[submodule "deps/gamemode"]
+	path = deps/gamemode
+	url = https://github.com/FeralInteractive/gamemode.git
+[submodule "deps/librashader"]
+	path = deps/librashader
+	url = https://github.com/SnowflakePowered/librashader.git
+	shallow = true
+[submodule "deps/common/hosts-common"]
+	path = deps/common/hosts-common
+	url = https://github.com/andres-asm/hosts-common.git
+[submodule "deps/common/frontends-common"]
+	path = deps/common/frontends-common
+	url = https://github.com/andres-asm/frontends-common.git
+[submodule "deps/libretro/host-libretro"]
+	path = deps/libretro/host-libretro
+	url = https://github.com/andres-asm/host-libretro.git
+[submodule "deps/libretro/frontend-libretro"]
+	path = deps/libretro/frontend-libretro
+	url = https://github.com/andres-asm/frontend-libretro.git
+[submodule "deps/test-libretro"]
+	path = deps/test-libretro
+	url = https://github.com/andres-asm/test-libretro.git
+	update = none

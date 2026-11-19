@@ -21,7 +21,7 @@
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
-multitap_root=$(cd "$here/../../.." && pwd)
+piccolo_root=$(cd "$here/.." && pwd)
 build="$here/build"
 apk_dir="$build/apk"
 
@@ -46,7 +46,7 @@ echo "== java"
 rm -rf "$apk_dir"
 mkdir -p "$apk_dir/classes" "$apk_dir/dex" "$apk_dir/lib/arm64-v8a"
 # SDL's Java side straight from the submodule, plus our activity.
-find "$multitap_root/deps/SDL/android-project/app/src/main/java" "$here/java" -name '*.java' > "$apk_dir/sources.txt"
+find "$piccolo_root/deps/SDL/android-project/app/src/main/java" "$here/java" -name '*.java' > "$apk_dir/sources.txt"
 # Java 8 bytecode against android.jar as the boot class path (not the JDK's
 # classes): only Android APIs can be used. d8 handles the rest.
 "$JAVA_HOME/bin/javac" -nowarn -Xlint:-options -source 8 -target 8 -bootclasspath "$ANDROID_JAR" \
