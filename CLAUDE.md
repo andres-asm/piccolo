@@ -38,7 +38,7 @@ cores, no GUI) and **frontends** (GUI).
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
-used by test-libretro). Later: piccolette (streaming companion, Android first),
+used by test-libretro). Later: piccoletto (streaming companion, Android first),
 Multitap (modern multi-host frontend).
 
 **A library change:** edit it in its submodule (the four are on `main`), build
@@ -185,7 +185,7 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 - Untested on hardware: SN30 over USB (unknown pad), Genesis / Saturn layouts,
   Shield touchpad pointer, mouse grab, lightguns (Zapper, Super Scope).
 - Next: shaders (milestone 6): librashader is in deps/, not wired yet.
-- Release plan (early December): piccolo + piccolette (Android: remote input,
+- Release plan (early December): piccolo + piccoletto (Android: remote input,
   streaming). Branches `android`, `big-picture` still need adapting to deps/.
 - Known: Release builds fail with warnings-as-errors (GCC -O2 only:
   `instance_layer_available` unused outside Debug, a -Wformat-truncation in a
