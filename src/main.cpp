@@ -112,6 +112,19 @@ struct App
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
     bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
+    // stream_tuning (net_stream.h): what streaming devices asked for, kept only
+    // here (never in the settings or the files: a crash leaves nothing changed).
+    bool            stream_tuning_set[NET_MAX_PEERS] = {};
+    NetStreamTuning stream_tuning_asked[NET_MAX_PEERS];
+    uint64_t        stream_tuning_order[NET_MAX_PEERS] = {};   // the newest request wins
+    uint64_t        stream_tuning_count = 0;
+    bool            stream_tuning_on = false;   // one applies now (`stream_tuning`)
+    NetStreamTuning stream_tuning;
+    int32_t         stream_tuning_from = -1;    // the peer whose request applies
+    AutoFrameDelay  stream_auto_delay = {};     // AUTO for the stream: its own, never saved
+    uint64_t        stream_delay_last_ns = 0;
+    NetStreamTuning stream_tuning_sent[NET_MAX_PEERS];   // the result each was last told
+    bool            stream_tuning_told[NET_MAX_PEERS] = {};
     uint32_t   stream_loop = 0;          // the loop number the stream carries
     uint64_t   stream_serial = 0;        // the core frame last handed over (a repeat isn't sent again)
     NetService net_service;              // the listener on its own thread (net_service.h); its NetAccess:
@@ -849,8 +862,57 @@ static void search_frame_delay_again(App* app)
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: searching again (automatic)");
 }
 
+// Does a streaming device's tuning decide the frame delay now (not "host")?
+static bool stream_delay_overrides(const App* app)
+{
+    return app->stream_tuning_on && app->stream_tuning.delay != NetStreamDelay::host;
+}
+
+// The frame delay a streaming device asked for (stream_tuning): OFF, N ms or
+// AUTO with its own search. Only in memory: nothing is saved, and the game's
+// local AUTO isn't fed (its minute starts over, as for a pause).
+static void stream_frame_delay(App* app)
+{
+    auto_frame_delay_interrupt(&app->auto_delay);
+    app->frame_delay_ms = 0;
+    bool applies = game_running(app) && !app->session.paused && !core_session_fast_forwarding(&app->session) &&
+                   app->session.timing.effective == TimingMode::vsync &&
+                   app->stream_tuning.delay != NetStreamDelay::off;
+    if (!applies)
+    {
+        app->stream_delay_last_ns = 0;
+        auto_frame_delay_interrupt(&app->stream_auto_delay);
+        return;
+    }
+    uint32_t use = app->stream_tuning.delay_ms;
+    if (app->stream_tuning.delay == NetStreamDelay::automatic)
+    {
+        // The player is on the phone: focus doesn't matter here, the menu does.
+        if (app->menu_visible || app->picker.open || app->settings_window.open || app->settings_window.image_open)
+        {
+            auto_frame_delay_interrupt(&app->stream_auto_delay);
+        }
+        uint64_t now = SDL_GetTicksNS();
+        double elapsed =
+            app->stream_delay_last_ns > 0 ? static_cast<double>(now - app->stream_delay_last_ns) / 1e9 : 0.0;
+        app->stream_delay_last_ns = now;
+        use = auto_frame_delay_update(&app->stream_auto_delay, app->session.timing.missed, elapsed,
+                                      auto_frame_delay_start_ms(app->session.timing.display_hz));
+    }
+    app->frame_delay_ms = use;
+    if (use > 0)
+    {
+        SDL_DelayPrecise(static_cast<Uint64>(use) * 1000000u);
+    }
+}
+
 static void frame_delay(App* app)
 {
+    if (stream_delay_overrides(app))
+    {
+        stream_frame_delay(app);
+        return;
+    }
     bool automatic = settings_get_bool(&app->settings, PICCOLO_LATENCY_FRAME_DELAY_AUTO);
     int32_t manual_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
     bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
@@ -2165,6 +2227,7 @@ static void net_follow_remote(App* app)
                 app->net_speed_receiver.active = false;
             }
             net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
+            app->stream_tuning_set[i] = false;
         }
     }
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
@@ -2427,6 +2490,60 @@ static void net_speed_update(App* app)
     }
 }
 
+// Which streaming device's stream_tuning applies (the newest request of the
+// ones still streaming), and what it gives: told to the devices that asked,
+// again whenever it changes (AUTO coming down).
+static void net_follow_stream_tuning(App* app)
+{
+    int32_t from = -1;
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        if (app->stream_tuning_set[peer] && app->net_service.stream.flags[peer] != 0 &&
+            (from < 0 || app->stream_tuning_order[peer] > app->stream_tuning_order[from]))
+        {
+            from = static_cast<int32_t>(peer);
+        }
+    }
+    bool changed = from != app->stream_tuning_from ||
+                   (from >= 0 && (app->stream_tuning_asked[from].delay != app->stream_tuning.delay ||
+                                  app->stream_tuning_asked[from].delay_ms != app->stream_tuning.delay_ms));
+    if (changed)
+    {
+        app->stream_auto_delay = AutoFrameDelay{};   // a new request searches from the top
+        app->stream_delay_last_ns = 0;
+    }
+    app->stream_tuning_from = from;
+    app->stream_tuning_on = from >= 0;
+    if (from >= 0)
+    {
+        app->stream_tuning = app->stream_tuning_asked[from];
+    }
+    // What applies, as each asking device should hear it.
+    NetStreamTuning result;
+    result.delay = app->stream_tuning_on ? app->stream_tuning.delay : NetStreamDelay::host;
+    result.delay_ms = static_cast<uint8_t>(app->frame_delay_ms < 255 ? app->frame_delay_ms : 255);
+    result.run_ahead = 0;   // not in piccolo yet
+    result.flags = app->shell.renderer.wait_for_present ? NET_STREAM_TUNING_WAITS_FOR_PRESENT : 0;
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        if (!app->stream_tuning_set[peer])
+        {
+            continue;
+        }
+        const NetStreamTuning* sent = &app->stream_tuning_sent[peer];
+        if (app->stream_tuning_told[peer] && sent->delay == result.delay && sent->delay_ms == result.delay_ms &&
+            sent->run_ahead == result.run_ahead && sent->flags == result.flags)
+        {
+            continue;
+        }
+        uint8_t out[8];
+        size_t size = net_stream_write_tuning(out, sizeof(out), NET_STREAM_TUNING_RESULT, &result);
+        net_access_send(&app->net_service.access, peer, NetChannel::control, out, size);
+        app->stream_tuning_sent[peer] = result;
+        app->stream_tuning_told[peer] = true;
+    }
+}
+
 // stream_start / stream_stop / keyframe_request (net_stream.h; net_access let
 // them through only for STREAM devices).
 static void net_stream_message(App* app, const NetAccessEvent* event, const char* device)
@@ -2446,11 +2563,26 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     else if (type == NET_STREAM_STOP && event->size == 1)
     {
         net_service_set_stream(&app->net_service, event->peer, 0);
+        if (event->peer < NET_MAX_PEERS)
+        {
+            app->stream_tuning_set[event->peer] = false;
+        }
         SDL_Log("Network: %s stopped remote play", device);
     }
     else if (type == NET_STREAM_KEYFRAME_REQUEST && event->size == 1)
     {
         net_service_request_keyframe(&app->net_service, event->peer);
+    }
+    else if (event->peer < NET_MAX_PEERS &&
+             net_stream_read_tuning(event->data, event->size, NET_STREAM_TUNING, &app->stream_tuning_asked[event->peer]))
+    {
+        app->stream_tuning_set[event->peer] = true;
+        app->stream_tuning_order[event->peer] = ++app->stream_tuning_count;
+        app->stream_tuning_told[event->peer] = false;   // answered with what applies, below
+        SDL_Log("Network: %s asks for frame delay mode %u (%u ms), run-ahead %u", device,
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].delay),
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].delay_ms),
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].run_ahead));
     }
 }
 
@@ -2720,6 +2852,10 @@ static void net_update_locked(App* app)
             net_service_set_stream(&app->net_service, event.peer, 0);   // its stream ends with it
             if (event.peer < NET_MAX_PEERS)
             {
+                app->stream_tuning_set[event.peer] = false;   // and what it asked for
+            }
+            if (event.peer < NET_MAX_PEERS)
+            {
                 app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
                 app->net_peer_language[event.peer][0] = '\0';
                 if (app->net_paused && app->net_paused_by == event.peer)
@@ -2796,6 +2932,7 @@ static void net_update_locked(App* app)
         app->session.captured_audio.reserve(16384);   // once: a few frames' worth
     }
     app->session.capture_audio = app->net_streaming;
+    net_follow_stream_tuning(app);
 }
 
 int main(int argc, char** argv)
@@ -2961,7 +3098,11 @@ int main(int argc, char** argv)
                                  static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
-        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
+        // A streaming device's frame delay needs present waits (piccolo's
+        // frame delay works only that way): turned on here, in memory only.
+        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
+                                               (stream_delay_overrides(app) &&
+                                                app->stream_tuning.delay != NetStreamDelay::off);
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
         apply_learned_latency(app);
         // Held for the whole game, paused or not: a request is a D-Bus call
