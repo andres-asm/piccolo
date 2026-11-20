@@ -1,7 +1,9 @@
-# Builds piccolo for Windows (x86_64) natively with MSYS2's UCRT64 toolchain
-# (GCC + libstdc++ + the Universal CRT), the same one used to build it by hand
-# on Windows, runs the tests, and uploads the piccolo folder (GitHub serves it
-# as a zip).
+# Builds piccolo for Windows natively with MSYS2, runs the tests, and uploads
+# the piccolo folder (GitHub serves it as a zip):
+#   x86_64: UCRT64 (GCC + libstdc++ + the Universal CRT), the toolchain used to
+#           build it by hand on Windows.
+#   ARM64:  CLANGARM64 (clang + libc++ + the Universal CRT) on GitHub's
+#           Windows ARM runner; MSYS2 has no GCC for ARM64.
 # The C/C++ runtimes are linked statically, so piccolo.exe only needs Windows'
 # own DLLs and vulkan-1.dll (installed with the GPU driver).
 name: Windows
@@ -15,8 +17,18 @@ on:
 
 jobs:
   windows:
-    name: Windows (UCRT64)
-    runs-on: windows-latest
+    name: Windows (${{ matrix.msystem }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: UCRT64
+            arch: x86_64
+            runner: windows-latest
+          - msystem: CLANGARM64
+            arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: msys2 {0}
@@ -30,14 +42,15 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: >-
-            git
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-vulkan-devel
+          # pacboy adds the environment's prefix; cc is GCC on UCRT64, clang on CLANGARM64.
+          install: git
+          pacboy: >-
+            cc:p
+            cmake:p
+            ninja:p
+            vulkan-devel:p
 
       # Only the submodules the build uses (deps/librashader isn't built yet
       # and brings many submodules of its own; deps/test-libretro is optional).
@@ -69,13 +82,14 @@ jobs:
       # Windows' own and vulkan-1.dll).
       - name: Check DLL dependencies
         run: |
-          objdump -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
-          if grep -iE 'libstdc|libgcc|libwinpthread|SDL3' dlls.txt; then
+          objdump=$(command -v objdump || command -v llvm-objdump)
+          "$objdump" -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
+          if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind|SDL3' dlls.txt; then
             echo "piccolo.exe depends on MSYS2 DLLs"
             exit 1
           fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: piccolo-windows-x86_64
+          name: piccolo-windows-${{ matrix.arch }}
           path: dist/
