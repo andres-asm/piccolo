@@ -127,12 +127,14 @@ src/
   core_options_ui.* safe_start_window.*
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
-tools/                    pixel_font_preview, strings_check, recent_games_test, lsan-suppressions.txt
+tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
+                          codec on real games), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
                               vk_* (context, swapchain, texture, barrier), renderer, debug_ui, audio_output (+DRC),
-                              frame_timing, frame_delay, rate_control, settings_file / settings (layers global ->
+                              frame_timing, frame_delay, rate_control, frame_delta (lossless
+                              frame codec for remote play), settings_file / settings (layers global ->
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
@@ -185,7 +187,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-63 tests with test-libretro (44 without). Before calling a larger change done:
+64 tests with test-libretro (45 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
