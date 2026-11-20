@@ -108,10 +108,12 @@ TextInputChoice text_input_window_draw(TextInputWindow* window, const LibretroTe
                                           ImGuiInputTextFlags_CallbackCharFilter;
         // The request isn't changed through UserData; Dear ImGui only takes a void*.
         void* user_data = const_cast<LibretroTextInput*>(request);
+        retro_ui_push_field_text();
         if (ImGui::InputText("##text", window->buffer, sizeof(window->buffer), field_flags, field_callback, user_data))
         {
             choice = TextInputChoice::ok;   // Enter
         }
+        retro_ui_pop_field_text();
         ImGui::Spacing();
         if (retro_ui_button(piccolo_text(strings, Str::text_input_ok)))
         {
