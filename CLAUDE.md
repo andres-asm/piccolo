@@ -145,7 +145,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_settings (settings and actions described by the host), net_speed (speed
+                              net_service (the network on its own thread), net_settings (settings and
+                              actions described by the host), net_speed (speed
                               test), net_wire (fields);
                               tools/strings_generator, net_probe; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
@@ -187,7 +188,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-64 tests with test-libretro (45 without). Before calling a larger change done:
+65 tests with test-libretro (46 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless

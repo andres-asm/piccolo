@@ -48,6 +48,7 @@
 #include "map_window.h"
 #include "input_net.h"
 #include "net_access.h"
+#include "net_service.h"
 #include "net_games.h"
 #include "net_remote.h"
 #include "net_speed.h"
@@ -110,7 +111,8 @@ struct App
     NetKeypair net_identity = {};
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
-    NetAccess  net = {};
+    NetService net_service;              // the listener on its own thread (net_service.h); its NetAccess:
+                                         // net_service.access, used between net_service_lock / _unlock
     InputNet   input_net = {};           // paired devices' pads, in the input router
     NetGames   net_games = {};           // games from devices with FULL access (net_games.h)
     bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
@@ -1682,7 +1684,7 @@ static void draw_settings(App* app)
     NetWindowContext network;
     network.settings = &app->settings;
     network.strings = &app->strings;
-    network.access = app->net_running ? &app->net : nullptr;
+    network.access = app->net_running ? &app->net_service.access : nullptr;
     network.listen_failed = app->net_listen_failed;
     network.this_device = app->net_fingerprint;
     network.speed = &app->net_speed_results;
@@ -1772,7 +1774,18 @@ static void draw_settings(App* app)
     }
     context.frame_delay = frame_delay_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
+    // The NETWORK tab reads and changes the NetAccess (pairing, levels,
+    // FORGET): the network thread waits meanwhile.
+    bool network_locked = app->net_running;
+    if (network_locked)
+    {
+        net_service_lock(&app->net_service);
+    }
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
+    if (network_locked)
+    {
+        net_service_unlock(&app->net_service);
+    }
     choose_folder_start(app);
     if (app->settings_window.search_frame_delay)
     {
@@ -1880,9 +1893,9 @@ static void net_send_game_state(App* app, uint32_t peer)
                                         app->net_sent_content.c_str());
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
-        if ((peer == NET_NO_PEER || peer == i) && app->net.peers[i].state == NetAccessPeerState::authorized)
+        if ((peer == NET_NO_PEER || peer == i) && app->net_service.access.peers[i].state == NetAccessPeerState::authorized)
         {
-            net_access_send(&app->net, i, NetChannel::control, app->net_games.reply.data(), size);
+            net_access_send(&app->net_service.access, i, NetChannel::control, app->net_games.reply.data(), size);
         }
     }
 }
@@ -1915,12 +1928,12 @@ static NetRemoteGame net_remote_game(const App* app)
 
 static NetAccessLevel net_peer_access(const App* app, uint32_t peer)
 {
-    int32_t device = app->net.peers[peer].device;
-    if (device < 0 || static_cast<size_t>(device) >= app->net.trust.devices.size())
+    int32_t device = app->net_service.access.peers[peer].device;
+    if (device < 0 || static_cast<size_t>(device) >= app->net_service.access.trust.devices.size())
     {
         return NetAccessLevel::gamepad;
     }
-    return app->net.trust.devices[static_cast<size_t>(device)].access;
+    return app->net_service.access.trust.devices[static_cast<size_t>(device)].access;
 }
 
 // The actions one authorized peer may trigger (`id` 0: sent unasked), or
@@ -1934,12 +1947,12 @@ static void net_send_actions(App* app, uint32_t peer, uint32_t id)
     NetRemoteGame game = net_remote_game(app);
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
-        if ((peer == NET_NO_PEER || peer == i) && app->net.peers[i].state == NetAccessPeerState::authorized)
+        if ((peer == NET_NO_PEER || peer == i) && app->net_service.access.peers[i].state == NetAccessPeerState::authorized)
         {
             app->net_actions_level[i] = net_peer_access(app, i);
             size_t size = net_remote_write_actions(&app->net_remote, id, app->net_peer_language[i],
                                                    app->paths.root.c_str(), app->net_actions_level[i], &game);
-            net_access_send(&app->net, i, NetChannel::control, app->net_remote.reply.data(), size);
+            net_access_send(&app->net_service.access, i, NetChannel::control, app->net_remote.reply.data(), size);
         }
     }
 }
@@ -2054,7 +2067,7 @@ static void net_send_controllers(App* app, uint32_t peer, uint32_t id)
     net_controllers_for(app, peer, &controllers);
     size_t size = net_settings_write_controllers(app->net_remote.reply.data(), app->net_remote.reply.size(), id,
                                                  &controllers);
-    net_access_send(&app->net, peer, NetChannel::control, app->net_remote.reply.data(), size);
+    net_access_send(&app->net_service.access, peer, NetChannel::control, app->net_remote.reply.data(), size);
     app->net_controllers_sent[peer] = net_controllers_summary(app, peer);
 }
 
@@ -2102,10 +2115,10 @@ static void net_follow_remote(App* app)
     {
         for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
         {
-            if (app->net.peers[i].state == NetAccessPeerState::authorized &&
+            if (app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
                 net_peer_access(app, i) == NetAccessLevel::full)
             {
-                net_access_send(&app->net, i, NetChannel::control, app->net_remote.reply.data(), size);
+                net_access_send(&app->net_service.access, i, NetChannel::control, app->net_remote.reply.data(), size);
             }
         }
         size = net_remote_next_change(&app->net_remote, &app->settings);
@@ -2121,7 +2134,7 @@ static void net_follow_remote(App* app)
     // than GAMEPAD: pause, fast forward, its pads.)
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
-        if (app->net.peers[i].state != NetAccessPeerState::authorized ||
+        if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
             net_peer_access(app, i) == app->net_actions_level[i])
         {
             continue;
@@ -2143,7 +2156,7 @@ static void net_follow_remote(App* app)
     }
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
-        if (app->net.peers[i].state == NetAccessPeerState::authorized &&
+        if (app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
             net_controllers_summary(app, i) != app->net_controllers_sent[i])
         {
             net_send_controllers(app, i, 0);   // a pad joined or left a port, another game, another device
@@ -2238,7 +2251,7 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
                                              &app->audio_devices, event->data, event->size);
     if (size > 0)
     {
-        net_access_send(&app->net, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
         uint32_t request_id = 0;
         uint32_t start = 0;
         std::string language;
@@ -2267,7 +2280,7 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
         NetRemoteGame game = net_remote_game(app);
         size = net_remote_write_actions(&app->net_remote, id, language.c_str(), app->paths.root.c_str(),
                                         net_peer_access(app, event->peer), &game);
-        net_access_send(&app->net, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
         return;
     }
     std::string key;
@@ -2323,12 +2336,12 @@ static void net_speed_request(App* app, const NetAccessEvent* event)
 static void net_speed_result(App* app, const NetAccessEvent* event)
 {
     NetSpeedResult result;
-    if (event->device < 0 || static_cast<size_t>(event->device) >= app->net.trust.devices.size() ||
+    if (event->device < 0 || static_cast<size_t>(event->device) >= app->net_service.access.trust.devices.size() ||
         !net_speed_read_result(event->data, event->size, &result))
     {
         return;
     }
-    const uint8_t* key = app->net.trust.devices[static_cast<size_t>(event->device)].key;
+    const uint8_t* key = app->net_service.access.trust.devices[static_cast<size_t>(event->device)].key;
     NetSpeedSummary* summary = nullptr;
     for (size_t i = 0; i < app->net_speed_results.size() && summary == nullptr; i++)
     {
@@ -2372,7 +2385,7 @@ static void net_speed_update(App* app)
         for (uint32_t i = 0; i < due; i++)
         {
             size_t size = net_speed_write_data(packet, sizeof(packet), sender->id, sender->sent);
-            net_access_send(&app->net, sender->peer, NetChannel::input, packet, size);
+            net_access_send(&app->net_service.access, sender->peer, NetChannel::input, packet, size);
             net_speed_sender_sent(sender, size);   // counted as sent even if ENet dropped it here: that's loss too
         }
         app->net_speed_reporting = !sender->active;
@@ -2387,7 +2400,7 @@ static void net_speed_update(App* app)
         report.bytes = sender->sent_bytes;
         report.seconds = sender->duration;
         size_t size = net_speed_write_report(out, sizeof(out), &report);
-        net_access_send(&app->net, sender->peer, NetChannel::control, out, size);
+        net_access_send(&app->net_service.access, sender->peer, NetChannel::control, out, size);
         app->net_speed_reporting = false;
     }
     NetSpeedReceiver* receiver = &app->net_speed_receiver;
@@ -2396,7 +2409,7 @@ static void net_speed_update(App* app)
         NetSpeedReport report;
         net_speed_receiver_report(receiver, NetSpeedDirection::up, &report);
         size_t size = net_speed_write_report(out, sizeof(out), &report);
-        net_access_send(&app->net, receiver->peer, NetChannel::control, out, size);
+        net_access_send(&app->net_service.access, receiver->peer, NetChannel::control, out, size);
         receiver->active = false;
     }
 }
@@ -2411,7 +2424,10 @@ static void net_answer_load(App* app, NetContentStatus status)
     }
     uint8_t reply[16];
     size_t size = net_content_write_load_result(reply, sizeof(reply), app->net_load_id, status);
-    net_access_send(&app->net, app->net_load_peer, NetChannel::control, reply, size);
+    // Called from the main loop, outside net_update: the lock is ours to take.
+    net_service_lock(&app->net_service);
+    net_access_send(&app->net_service.access, app->net_load_peer, NetChannel::control, reply, size);
+    net_service_unlock(&app->net_service);
 }
 
 // A control message from a paired device (net_games.h). Folders and cores
@@ -2431,7 +2447,7 @@ static void net_games_message(App* app, const NetAccessEvent* event, const char*
     size_t size = net_games_answer(&app->net_games, &app->catalog, event->data, event->size);
     if (size > 0)
     {
-        net_access_send(&app->net, event->peer, NetChannel::control, app->net_games.reply.data(), size);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_games.reply.data(), size);
         return;
     }
     uint32_t id = 0;
@@ -2449,7 +2465,7 @@ static void net_games_message(App* app, const NetAccessEvent* event, const char*
         }
         uint8_t reply[16];
         size_t reply_size = net_content_write_load_result(reply, sizeof(reply), id, status);
-        net_access_send(&app->net, event->peer, NetChannel::control, reply, reply_size);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, reply, reply_size);
         return;
     }
     SDL_Log("Network: %s starts %s %s", device, choice.core_path, choice.content_path);
@@ -2492,17 +2508,16 @@ static void net_start(App* app)
         net_key_fingerprint(app->net_identity.public_key, app->net_fingerprint, sizeof(app->net_fingerprint));
         SDL_Log("Network: this device is %s", app->net_fingerprint);
     }
-    app->net = NetAccess{};
+    app->net_service.access = NetAccess{};
     net_games_init(&app->net_games);
     if (!app->net_remote_ready)
     {
         app->net_remote_ready = net_remote_init(&app->net_remote, &app->settings);
     }
     std::string devices_path = app->paths.settings + "/net_devices.cfg";
-    if (!net_access_create(&app->net, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
+    if (!net_service_start(&app->net_service, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
                            &app->net_identity, devices_path.c_str()))
     {
-        net_access_destroy(&app->net);
         return;
     }
     app->net_listen_failed = false;
@@ -2517,7 +2532,7 @@ static void net_stop(App* app)
         {
             input_net_peer_gone(&app->input_net, &app->input, peer);   // their pads are unplugged
         }
-        net_access_destroy(&app->net);
+        net_service_stop(&app->net_service);
         app->net_running = false;
     }
 }
@@ -2536,6 +2551,8 @@ static void net_shutdown_all(App* app)
 // Once per loop, before the input is read: follow the settings, then the
 // network's events. Paired devices are let in and their pads join the input
 // router (input_net); everyone else needs the pairing code.
+static void net_update_locked(App* app);
+
 static void net_update(App* app)
 {
     bool enabled = settings_get_bool(&app->settings, PICCOLO_NET_ENABLED);
@@ -2558,21 +2575,30 @@ static void net_update(App* app)
     {
         return;
     }
+    // The network thread polls; this loop handles what it queued, holding
+    // the lock for all of it (the NetAccess, its peers and lists).
+    net_service_lock(&app->net_service);
+    net_update_locked(app);
+    net_service_unlock(&app->net_service);
+}
+
+static void net_update_locked(App* app)
+{
     // A new NAME is used at once (discovery and pairing show it).
     const char* name = settings_get_text(&app->settings, PICCOLO_NET_NAME);
-    if (app->net.name != name)
+    if (app->net_service.access.name != name)
     {
-        app->net.name = name;
-        app->net.session.host.name = name;
+        app->net_service.access.name = name;
+        app->net_service.access.session.host.name = name;
     }
 
     NetAccessEvent event;
-    while (net_access_poll(&app->net, &event))
+    while (net_service_next(&app->net_service, &event))
     {
         char address[64];
         net_address_to_text(event.address, address, sizeof(address));
-        const char* device = event.device >= 0 && static_cast<size_t>(event.device) < app->net.trust.devices.size()
-                                 ? app->net.trust.devices[static_cast<size_t>(event.device)].name.c_str()
+        const char* device = event.device >= 0 && static_cast<size_t>(event.device) < app->net_service.access.trust.devices.size()
+                                 ? app->net_service.access.trust.devices[static_cast<size_t>(event.device)].name.c_str()
                                  : "?";
         switch (event.type)
         {
@@ -2647,7 +2673,7 @@ static void net_update(App* app)
             }
             else if (event.channel == NetChannel::input && event.device >= 0)
             {
-                const NetTrustedDevice* paired = &app->net.trust.devices[static_cast<size_t>(event.device)];
+                const NetTrustedDevice* paired = &app->net_service.access.trust.devices[static_cast<size_t>(event.device)];
                 input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
                                   event.data, event.size);
             }
