@@ -22,6 +22,9 @@
 #   D8_JAR            the r8/d8 jar (default ~/Android/r8/r8.jar)
 #   JAVA_HOME         a JDK for javac/java (default /usr/lib/jvm/java-21-openjdk-arm64)
 #   BUILD_TYPE        CMake build type (default Debug)
+#   MULTITAP_LLVM_ROOT clang, lld and llvm-ar for Android (default /usr/lib/llvm-21; CI: the NDK's own)
+#   CARGO             cargo with the aarch64-linux-android target (default ~/.cargo/bin/cargo, then cargo)
+#                     (rustup target add aarch64-linux-android), for librashader
 #
 # Release or debug, decided by the key:
 #   PICCOLO_KEYSTORE set: a release build, signed with the release key in that
@@ -47,6 +50,17 @@ AAPT_ANDROID_JAR=${AAPT_ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-32/a
 D8_JAR=${D8_JAR:-$HOME/Android/r8/r8.jar}
 JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}
 BUILD_TYPE=${BUILD_TYPE:-Debug}
+ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-$HOME/Android/ndk/android-ndk-r30}
+MULTITAP_LLVM_ROOT=${MULTITAP_LLVM_ROOT:-/usr/lib/llvm-21}
+export ANDROID_NDK_ROOT MULTITAP_LLVM_ROOT   # the CMake toolchain reads them too
+# rustup's cargo (it has the Android target) before a distro one, which may not.
+if [ -z "${CARGO:-}" ]; then
+    if [ -x "$HOME/.cargo/bin/cargo" ]; then
+        CARGO="$HOME/.cargo/bin/cargo"
+    else
+        CARGO=cargo
+    fi
+fi
 MIN_API=28
 if [ -n "${PICCOLO_KEYSTORE:-}" ]; then
     variant=release
@@ -81,6 +95,49 @@ cmake --build "$native" --target piccolo
 
 # Version: piccolo's (the build's piccolo_version.h) as versionName; the
 # number of commits as versionCode, which only grows on one branch.
+echo "== librashader"
+# Shader presets (frontends-common shader_chain): librashader's C API with the
+# Vulkan runtime only, as in the Flatpak, built by cargo for Android. piccolo
+# loads it at run time (lib/arm64-v8a/librashader.so: dlopen finds a bare
+# name among the APK's libraries); without it presets are off. cargo's output
+# goes to android/build (deps/librashader is read-only). Its C++ crates
+# (glslang, SPIRV-Cross) and the link use the same clang + NDK sysroot as
+# libmain.so, through small wrapper scripts; libc++ is linked in statically.
+librashader=""
+if [ -f "$root/deps/librashader/Cargo.toml" ]; then
+    rust_build="$build/librashader"
+    mkdir -p "$rust_build"
+    ndk_prebuilt="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64"
+    target_flags="--target=aarch64-linux-android$MIN_API --sysroot=$ndk_prebuilt/sysroot -resource-dir=$native/clang-resource"
+    # The linker's name ends in "clang": rustc tells the kind of linker by its
+    # name, and passes linker options as -Wl,... only to a compiler driver.
+    # Our flags go last: cc-rs passes its own --target without the API level,
+    # which the NDK's headers refuse; the last --target wins.
+    printf '#!/bin/sh\nexec "%s/bin/clang" "$@" %s\n' "$MULTITAP_LLVM_ROOT" "$target_flags" > "$rust_build/cc"
+    printf '#!/bin/sh\nexec "%s/bin/clang++" "$@" %s\n' "$MULTITAP_LLVM_ROOT" "$target_flags" > "$rust_build/cxx"
+    printf '#!/bin/sh\nexec "%s/bin/clang++" "$@" %s %s\n' "$MULTITAP_LLVM_ROOT" "$target_flags" \
+        "-fuse-ld=lld -rtlib=compiler-rt -unwindlib=libunwind -Wl,-z,max-page-size=16384 -l:libc++_static.a -l:libc++abi.a" > "$rust_build/linker-clang"
+    chmod +x "$rust_build/cc" "$rust_build/cxx" "$rust_build/linker-clang"
+    # CXXSTDLIB empty: the cc crate adds no libc++ of its own. rustc links
+    # with -nodefaultlibs, so the link wrapper names the NDK's static libc++
+    # and libc++abi itself (nothing to ship next to it, no libc++_shared.so).
+    # cargo's own folder first in PATH: rustup's cargo would otherwise run a
+    # distro rustc found first, which has no Android standard library.
+    (cd "$root/deps/librashader" && \
+        PATH="$(dirname "$(command -v "$CARGO")"):$PATH" \
+        CARGO_TARGET_DIR="$rust_build/target" \
+        CC_aarch64_linux_android="$rust_build/cc" CXX_aarch64_linux_android="$rust_build/cxx" \
+        AR_aarch64_linux_android="$MULTITAP_LLVM_ROOT/bin/llvm-ar" CXXSTDLIB_aarch64_linux_android= \
+        CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$rust_build/linker-clang" \
+        "$CARGO" build -p librashader-capi --release --locked --no-default-features --features runtime-vulkan \
+            --target aarch64-linux-android)
+    librashader="$rust_build/librashader.so"
+    "$MULTITAP_LLVM_ROOT/bin/llvm-strip" --strip-unneeded -o "$librashader" \
+        "$rust_build/target/aarch64-linux-android/release/liblibrashader_capi.so"
+else
+    echo "deps/librashader not checked out: no shader presets in this APK"
+fi
+
 version_name=$(sed -n 's/^#define PICCOLO_VERSION "\(.*\)"$/\1/p' "$native/generated/piccolo_version.h")
 version_code=$(git -C "$root" rev-list --count HEAD)
 echo "piccolo $version_name (versionCode $version_code, $variant)"
@@ -104,7 +161,17 @@ echo "== package"
 # Assets: on Android SDL's base path is the APK's assets, so piccolo finds
 # lang/ there like next to the program; layouts/ and themes/ are copied out at
 # start (src/bundled_files_android.cpp).
-cp -r "$root/lang" "$root/layouts" "$root/themes" "$apk_dir/assets/"
+cp -r "$root/lang" "$root/layouts" "$root/themes" "$root/shaders" "$apk_dir/assets/"
+# The curated shader presets (deps/piccolo-shaders, optional), where the
+# desktop build puts them: shaders/presets. Copied out at start like the rest.
+if [ -e "$root/deps/piccolo-shaders/LICENSES" ]; then
+    cmake -DSOURCE="$root/deps/piccolo-shaders" -DDESTINATION="$apk_dir/assets/shaders/presets" \
+        -P "$root/cmake/copy_presets.cmake"
+fi
+if [ -n "$librashader" ]; then
+    mkdir -p "$apk_dir/assets/licenses"
+    cp "$root/deps/librashader/LICENSE.md" "$apk_dir/assets/licenses/librashader-LICENSE.md"
+fi
 # Resources: the name, launcher icon and TV banner (android/res, exported
 # from assets/branding). Debug builds lay android/res-debug over them (the
 # later -R wins) and rename the package; aapt2 keeps the activities' class
@@ -128,6 +195,10 @@ cp "$native/libmain.so" "$apk_dir/lib/arm64-v8a/libmain.so"
 if [ -f "$native/test_libretro.so" ]; then
     cp "$native/test_libretro.so" "$apk_dir/lib/arm64-v8a/libtest_libretro.so"
     libs="$libs lib/arm64-v8a/libtest_libretro.so"
+fi
+if [ -n "$librashader" ]; then
+    cp "$librashader" "$apk_dir/lib/arm64-v8a/librashader.so"
+    libs="$libs lib/arm64-v8a/librashader.so"
 fi
 # Paths inside the APK are relative to the folder zip runs in.
 (cd "$apk_dir/dex" && zip -q "$apk_dir/unaligned.apk" classes.dex)
