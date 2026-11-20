@@ -506,6 +506,11 @@ static void update_pause(App* app)
 // AUTO latency per core: a game starts its automatic target where this core
 // ended last time, and where it goes is recorded as it moves (saved with the
 // other state: at each game start and on quit).
+// A learned AUTO latency at or above this is taken for an anomaly, not this
+// core's need, and learned again (AUTO settles around 50 ms on the RK3588,
+// 112 ms at worst without GameMode).
+constexpr uint32_t LEARNED_LATENCY_ANOMALY_MS = 120;
+
 static void apply_learned_latency(App* app)
 {
     AudioOutputConfig* config = &app->session.audio_config;
@@ -522,6 +527,14 @@ static void apply_learned_latency(App* app)
         const char* value = settings_file_get(&app->audio_learned, "", app->core_name);
         long ms = value != nullptr ? std::strtol(value, nullptr, 10) : 0;
         app->learned_start_ms = ms > 0 && ms <= static_cast<long>(RATE_CONTROL_MAX_TARGET_MS) ? static_cast<uint32_t>(ms) : 0;
+        if (app->learned_start_ms >= LEARNED_LATENCY_ANOMALY_MS)
+        {
+            // An anomaly (a session that struggled: a heavy shader in a debug
+            // build, a busy machine): learned again from AUTO's own start.
+            SDL_Log("Audio latency: learned %u ms for %s ignored (%u ms or more), learning again",
+                    app->learned_start_ms, app->core_name, LEARNED_LATENCY_ANOMALY_MS);
+            app->learned_start_ms = 0;
+        }
         app->learned_recorded_ms = app->learned_start_ms;
     }
     if (app->learned_start_ms > 0)
