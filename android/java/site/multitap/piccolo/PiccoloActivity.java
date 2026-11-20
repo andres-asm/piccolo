@@ -33,9 +33,11 @@ public class PiccoloActivity extends SDLActivity {
         // user folders on Android.
         String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
         nativeSetenv("MULTITAP_HOME_DIR", sdcard);
-        // Debug builds (package site.multitap.piccolo.debug, see build-apk.sh)
-        // keep their own folder: their cores are in their own private storage.
-        String folder = getPackageName().endsWith(".debug") ? "piccolo-debug" : "piccolo";
+        // Each package keeps its own folder (their cores are in their own
+        // private storage, and they install side by side; see build-apk.sh):
+        // site.multitap.piccolo -> piccolo, .debug -> piccolo-debug,
+        // .legacy -> piccolo-legacy, .legacy.debug -> piccolo-legacy-debug.
+        String folder = getPackageName().replaceFirst("^site\\.multitap\\.", "").replace('.', '-');
         nativeSetenv("PICCOLO_FOLDER_NAME", folder);
         if (StartActivity.hasSharedStorageAccess(this)) {
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);

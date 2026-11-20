@@ -7,8 +7,10 @@
 #   android/build-apk.sh --legacy  -> android/build/piccolo-legacy.apk: Android 5+ on
 #       32-bit ARM, OpenGL ES 2 only (the SHIELD Portable, Tegra 4). No Vulkan in
 #       it (Android 5 has no libvulkan.so), so it's a separate build: armeabi-v7a,
-#       minSdk 21, MULTITAP_GPU_VULKAN=OFF, MULTITAP_GL_ES2=ON. Same package
-#       name as the main APK (a device takes one or the other).
+#       minSdk 21, MULTITAP_GPU_VULKAN=OFF, MULTITAP_GL_ES2=ON. Its own package
+#       (site.multitap.piccolo.legacy), name ("piccolo legacy"), banner (a
+#       LEGACY tag, android/res-legacy) and folder (/sdcard/piccolo-legacy): it
+#       installs next to the main APK, on a device that takes both.
 #   adb install -r android/build/piccolo.apk
 #   adb logcat -s piccolo SDL
 #
@@ -36,7 +38,10 @@
 #     site.multitap.piccolo.debug, named "piccolo debug", banner with a DEBUG
 #     tag (android/res-debug). It installs next to a release build instead of
 #     clashing with it (Android refuses an update signed by another key).
-# The debug build's folder is /sdcard/piccolo-debug (PiccoloActivity.java).
+#     With --legacy: site.multitap.piccolo.legacy.debug, "piccolo legacy
+#     debug", both tags (android/res-legacy-debug).
+# The folder follows the package (PiccoloActivity.java): /sdcard/piccolo,
+# piccolo-debug, piccolo-legacy, piccolo-legacy-debug.
 
 set -eu
 
@@ -144,11 +149,28 @@ if [ "$legacy" = 1 ]; then
     grep -q 'android:minSdkVersion="21"' "$manifest" || { echo "legacy manifest: minSdkVersion not set" >&2; exit 1; }
 fi
 aapt2 compile --dir "$here/res" -o "$apk_dir/res.zip"
+# The overlay (name, banner) and the package for this build.
+package=site.multitap.piccolo
+overlay=""
+if [ "$legacy" = 1 ]; then
+    package="$package.legacy"
+    overlay=res-legacy
+fi
 if [ "$variant" = debug ]; then
-    aapt2 compile --dir "$here/res-debug" -o "$apk_dir/res-debug.zip"
-    variant_flags="-R $apk_dir/res-debug.zip --rename-manifest-package site.multitap.piccolo.debug"
-else
-    variant_flags=""
+    package="$package.debug"
+    if [ "$legacy" = 1 ]; then
+        overlay=res-legacy-debug
+    else
+        overlay=res-debug
+    fi
+fi
+variant_flags=""
+if [ -n "$overlay" ]; then
+    aapt2 compile --dir "$here/$overlay" -o "$apk_dir/$overlay.zip"
+    variant_flags="-R $apk_dir/$overlay.zip"
+fi
+if [ "$package" != site.multitap.piccolo ]; then
+    variant_flags="$variant_flags --rename-manifest-package $package"
 fi
 # shellcheck disable=SC2086 # $variant_flags is a list of words without spaces
 aapt2 link --manifest "$manifest" -I "$AAPT_ANDROID_JAR" -R "$apk_dir/res.zip" $variant_flags \

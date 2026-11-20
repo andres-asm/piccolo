@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A debug build of the legacy APK: both tags on the banner
+     (assets/branding/piccolo-banner-tv-legacy-debug.svg). Package
+     site.multitap.piccolo.legacy.debug, folder /sdcard/piccolo-legacy-debug. -->
+<resources>
+    <string name="app_name">piccolo legacy debug</string>
+</resources>
