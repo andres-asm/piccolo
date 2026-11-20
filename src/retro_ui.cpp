@@ -643,6 +643,67 @@ bool retro_ui_button_sized(const char* label, float width, float height)
     return pressed;
 }
 
+// The arrow pointing right; the other directions are it turned.
+static const char* const ARROW_RIGHT[9] = {
+    "....#....",
+    "....##...",
+    "....###..",
+    "########.",
+    "#########",
+    "########.",
+    "....###..",
+    "....##...",
+    "....#....",
+};
+
+static bool arrow_pixel(RetroUiArrow direction, int32_t x, int32_t y)
+{
+    switch (direction)
+    {
+    case RetroUiArrow::right:
+        return ARROW_RIGHT[y][x] == '#';
+    case RetroUiArrow::left:
+        return ARROW_RIGHT[y][8 - x] == '#';
+    case RetroUiArrow::down:
+        return ARROW_RIGHT[x][y] == '#';
+    case RetroUiArrow::up:
+        return ARROW_RIGHT[x][8 - y] == '#';
+    }
+    return false;
+}
+
+bool retro_ui_arrow_button(const char* id, RetroUiArrow direction, float width, float height)
+{
+    float block = retro_pixel();
+    bool pressed = ImGui::Button(id, ImVec2(width, height));
+    ImVec2 min = ImGui::GetItemRectMin();
+    ImVec2 max = ImGui::GetItemRectMax();
+    bool held = ImGui::IsItemActive() && ImGui::IsItemHovered();
+    draw_button_face(min, max, held);
+    if (!held)
+    {
+        draw_raised(min, max, block);
+    }
+    bool disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
+    ImU32 color = to_imgui_u32(disabled ? g_palette.text_disabled : g_palette.button_text);
+    float x0 = static_cast<float>(static_cast<int32_t>(min.x + (max.x - min.x - 9.0f * block) * 0.5f));
+    float y0 = static_cast<float>(static_cast<int32_t>(min.y + (max.y - min.y - 9.0f * block) * 0.5f)) +
+               (held ? block : 0.0f);
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    for (int32_t y = 0; y < 9; y++)
+    {
+        for (int32_t x = 0; x < 9; x++)
+        {
+            if (arrow_pixel(direction, x, y))
+            {
+                ImVec2 a(x0 + static_cast<float>(x) * block, y0 + static_cast<float>(y) * block);
+                draw_list->AddRectFilled(a, ImVec2(a.x + block, a.y + block), color);
+            }
+        }
+    }
+    return pressed;
+}
+
 bool retro_ui_choice_buttons(const char* id, const char* const* labels, uint32_t count, uint32_t* current)
 {
     float block = retro_pixel();

@@ -125,6 +125,19 @@ void retro_ui_raised_item_edge();
 bool retro_ui_button(const char* label);
 bool retro_ui_button_sized(const char* label, float width, float height);
 
+// piccolo's own arrow (not a font glyph): 9 x 9 retro pixels, a shaft and
+// a head, on a raised button of `width` x `height`. The arrow is the button
+// text's color, the disabled text's inside BeginDisabled. For copying
+// things from one side to the other (SHARE); up / down for a portrait layout.
+enum class RetroUiArrow
+{
+    right,
+    left,
+    up,
+    down,
+};
+bool retro_ui_arrow_button(const char* id, RetroUiArrow direction, float width, float height);
+
 // A choice among a few values as a row of buttons (not a combo): the chosen
 // one stays pressed in (sunken, the highlight color, its label down a pixel),
 // the others raised. True when another one was clicked (*current changed).
