@@ -22,6 +22,9 @@
 constexpr const char* PICCOLO_LANGUAGE = "language";
 constexpr const char* PICCOLO_PAUSE_IN_MENU = "pause_in_menu";
 constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
+// Pause when the last gamepad playing goes away (not when the keyboard was
+// what played); START (joining a port, or on one) resumes.
+constexpr const char* PICCOLO_PAUSE_ON_DISCONNECT = "pause_on_disconnect";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";

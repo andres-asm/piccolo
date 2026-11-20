@@ -138,6 +138,8 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_pause_in_menu), .help = text_id(Str::setting_pause_in_menu_help)},
     {.key = PICCOLO_PAUSE_ON_FOCUS_LOSS, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_pause_on_focus_loss), .help = text_id(Str::setting_pause_on_focus_loss_help)},
+    {.key = PICCOLO_PAUSE_ON_DISCONNECT, .type = SettingType::boolean, .default_value = "true",
+     .label = text_id(Str::setting_pause_on_disconnect), .help = text_id(Str::setting_pause_on_disconnect_help)},
     {.key = PICCOLO_SCREENSAVER_WHEN_PAUSED, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_screensaver),
      .help = text_id(Str::setting_screensaver_help)},

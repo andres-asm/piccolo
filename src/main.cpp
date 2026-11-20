@@ -119,6 +119,9 @@ struct App
     NetRemote  net_remote = {};          // settings and actions from devices (net_remote.h)
     bool       net_remote_ready = false;
     bool       net_paused = false;       // PAUSE from a device
+    // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
+    bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
+    bool       disconnect_paused = false;     // START resumes
     uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
@@ -433,7 +436,7 @@ static void update_pause(App* app)
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
-    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused);
+    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused || app->disconnect_paused);
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
@@ -1337,6 +1340,65 @@ static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
 
 // Once per loop, after the events: what the controllers say (ports,
 // hotkeys), handed to the core session before it runs frames.
+
+// Is a connected gamepad (local or remote) on any port?
+static bool gamepad_on_a_port(const App* app)
+{
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (device != nullptr && device->connected && device->kind == InputDeviceKind::gamepad &&
+            input_controller_port(&app->input, static_cast<uint32_t>(c)) != INPUT_NO_PORT)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// PAUSE WHEN CONTROLLERS DISCONNECT: notes whether a gamepad or the keyboard
+// played last (a RetroPad input held in the game), and resumes on START.
+static void follow_what_plays(App* app, const InputFrame* frame)
+{
+    uint32_t pad_actions = static_cast<uint32_t>(InputAction::pad_turbo);   // the RetroPad's buttons and sticks
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputController* controller = &app->input.controllers[c];
+        if (controller->layer != InputLayer::game)
+        {
+            continue;
+        }
+        bool playing = false;
+        for (uint32_t a = 0; a < pad_actions && !playing; a++)
+        {
+            playing = controller->held_last[a];
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, controller->device_id);
+        if (playing && device != nullptr)
+        {
+            app->played_with_gamepad = device->kind == InputDeviceKind::gamepad;
+        }
+    }
+    if (!app->disconnect_paused)
+    {
+        return;
+    }
+    bool start = frame->joined_port != INPUT_NO_PORT;
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT && !start; p++)
+    {
+        start = (frame->pad_buttons[p] & (1u << 3)) != 0;   // RETRO_DEVICE_ID_JOYPAD_START
+    }
+    if (start || !game_running(app))
+    {
+        app->disconnect_paused = false;
+        if (start)
+        {
+            set_status(app, piccolo_text(&app->strings, Str::status_resumed));
+            SDL_Log("Resumed: START");
+        }
+    }
+}
+
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
@@ -1372,11 +1434,17 @@ static void app_update_input(App* app)
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
         set_status(app, message);
         SDL_Log("%s", message);
-        if (game_running(app) && !app->quick_menu.open)
+        // No CONTROLS here (Andrés): joining again is just START. The game
+        // pauses if that was the last gamepad playing (the setting).
+        if (game_running(app) && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_DISCONNECT) &&
+            app->played_with_gamepad && !gamepad_on_a_port(app))
         {
-            quick_menu_open_controls(&app->quick_menu, app->session.state_slot);   // rearrange the ports
+            app->disconnect_paused = true;
+            set_status(app, piccolo_text(&app->strings, Str::status_paused_disconnected));
+            SDL_Log("Paused: the last gamepad playing went away");
         }
     }
+    follow_what_plays(app, &frame);
     app_handle_hotkeys(app, &frame);
     drive_ui_with_gamepads(app, &frame, ui_up);
     if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])

@@ -139,6 +139,7 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
     settings_ui_row(ui, PICCOLO_LANGUAGE, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_ON_FOCUS_LOSS, nullptr);
+    settings_ui_row(ui, PICCOLO_PAUSE_ON_DISCONNECT, nullptr);
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
     if (game_mode_supported())   // Linux only: nothing to turn on elsewhere
     {

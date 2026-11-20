@@ -330,6 +330,18 @@ msgctxt "setting_pause_on_focus_loss_help"
 msgid "Pause while another window is active."
 msgstr "Pausa mientras otra ventana está activa."
 
+msgctxt "setting_pause_on_disconnect"
+msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
+msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
+
+msgctxt "setting_pause_on_disconnect_help"
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START resumes."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START reanuda."
+
+msgctxt "status_paused_disconnected"
+msgid "PAUSED: CONTROLLER DISCONNECTED. START TO GO ON"
+msgstr "EN PAUSA: CONTROL DESCONECTADO. START PARA SEGUIR"
+
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
 msgstr "PERMITIR PROTECTOR DE PANTALLA EN PAUSA"
