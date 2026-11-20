@@ -44,7 +44,7 @@ static bool on_visibility_change(int event_type, const EmscriptenVisibilityChang
     (void)data;
     if (event->hidden && g_loop.save != nullptr)
     {
-        g_loop.save(g_loop.save_data);
+        g_loop.save(g_loop.save_data, false);
     }
     return false;
 }
@@ -56,7 +56,7 @@ static const char* on_before_unload(int event_type, const void* reserved, void* 
     (void)data;
     if (g_loop.save != nullptr)
     {
-        g_loop.save(g_loop.save_data);
+        g_loop.save(g_loop.save_data, true);
     }
     return nullptr;   // no "leave this page?" question
 }

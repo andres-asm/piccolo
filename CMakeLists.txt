@@ -139,6 +139,11 @@ if(MULTITAP_GL_ES2)
     find_library(MULTITAP_GLESV2_LIBRARY NAMES GLESv2 REQUIRED)
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES2)
     target_link_libraries(imgui PUBLIC ${MULTITAP_GLESV2_LIBRARY})
+elseif(EMSCRIPTEN)
+    # The browser: WebGL 2. ImGui's backend would pick ES 2 ("#version 100")
+    # by itself under Emscripten; gl_context makes an ES 3.0 context and
+    # gives ImGui "#version 300 es", so both are told ES 3.
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3)
 elseif(ANDROID)
     # On Android ImGui's backend picks GLES 3 itself and calls libGLESv3 directly.
     target_link_libraries(imgui PUBLIC GLESv3)
