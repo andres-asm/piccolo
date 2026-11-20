@@ -27,8 +27,8 @@
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
-#include "picture.h"
-#include "shader_chain.h"
+#include "shader_chain.h"   // ShaderLibrary
+#include "video_output.h"
 #include "piccolo_version.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -62,7 +62,6 @@
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
-#include "vk_swapchain.h"
 
 // Files extracted from zip / 7z archives (content_cache.h) are kept up to
 // this much: room for several disc images, small next to what the games
@@ -172,9 +171,8 @@ struct App
 
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
-    Picture     picture = {};   // the game on screen (viewport + filter)
     ShaderLibrary shader_library = {};   // librashader, when it's there
-    ShaderChain   shader_chain = {};     // pass 0 + the shader preset on the picture (instead of `picture`)
+    VideoOutput   video = {};            // the game on screen: pass 0 + the shader preset, or plain (viewport + filter)
     // piccolo's own presets (shaders/): pass 0, and the final scale per
     // filter (nearest, bilinear, sharp bilinear) when no preset is chosen.
     std::string   shader_pass0_path;
@@ -1699,15 +1697,11 @@ static bool shader_failed_before(const App* app, const std::string& path)
 
 static void load_shader_stage(App* app, uint32_t stage, const std::string& path)
 {
-    if (app->shader_chain.stages[stage].preset_path == path || shader_failed_before(app, path))
+    if (video_output_stage_preset(&app->video, stage) == path || shader_failed_before(app, path))
     {
         return;
     }
-    if (path.empty())
-    {
-        shader_chain_clear(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage);
-    }
-    else if (!shader_chain_load(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage, path.c_str()))
+    if (!video_output_load_stage(&app->video, &app->shader_library, &app->shell, stage, path.c_str()))
     {
         app->shader_failed.push_back(path);
     }
@@ -1740,7 +1734,7 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         load_shader_stage(app, 1, *scale);
     }
 
-    if (app->shader_chain.stages[0].chain == nullptr)
+    if (!video_output_stage_loaded(&app->video, 0))
     {
         return;
     }
@@ -1749,7 +1743,7 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         float value = static_cast<float>(settings_get_real(&app->settings, PICCOLO_PASS0_CONTROLS[i].key));
         if (app->pass0_stale || value != app->pass0_applied[i])
         {
-            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
+            video_output_set_param(&app->video, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
             app->pass0_applied[i] = value;
         }
     }
@@ -1759,7 +1753,7 @@ static void update_shader_stages(App* app, ViewportFilter filter)
     {
         if (app->pass0_stale || profile[i] != app->profile_applied[i])
         {
-            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
+            video_output_set_param(&app->video, &app->shader_library, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
             app->profile_applied[i] = profile[i];
         }
     }
@@ -1769,10 +1763,9 @@ static void update_shader_stages(App* app, ViewportFilter filter)
 static void draw_game(App* app)
 {
     CoreSession* session = &app->session;
-    app->picture.ready = false;
-    app->shader_chain.ready = false;
+    video_output_skip(&app->video);
     app->input.view_width = 0.0f;   // (until it is drawn)
-    if (!game_running(app) || !session->texture.has_content || session->texture_id == 0)
+    if (!game_running(app) || !session->texture.has_content || session->texture.imgui_id == 0)
     {
         return;
     }
@@ -1788,16 +1781,10 @@ static void draw_game(App* app)
     update_shader_stages(app, input.filter);
 
     ViewportResult viewport = {};
-    bool shaded = false;
     bool shown = false;
     if (viewport_compute(&input, &viewport))
     {
-        shaded = shader_chain_prepare(&app->shader_chain, &app->shell.vulkan, &session->texture, &viewport);
-        shown = shaded || picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport);
-    }
-    if (shaded)
-    {
-        app->picture.ready = false;   // the chain draws it; the picture records nothing
+        shown = video_output_prepare(&app->video, &app->shell, &session->texture, &viewport);
     }
     if (shown)
     {
@@ -1813,15 +1800,7 @@ static void draw_game(App* app)
         app->view_frame[0] = input.frame_width;
         app->view_frame[1] = input.frame_height;
         // The background draw list is behind every window, menu bar included.
-        if (shaded)
-        {
-            shader_chain_draw(&app->shader_chain, ImGui::GetBackgroundDrawList(), 0.0f, 0.0f);
-        }
-        else
-        {
-            picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f,
-                         0.0f);
-        }
+        video_output_draw(&app->video, ImGui::GetBackgroundDrawList(), &session->texture, 0.0f, 0.0f);
     }
 }
 
@@ -1916,23 +1895,16 @@ static void draw_settings(App* app)
 {
     const CoreSession* session = &app->session;
     ImageWindowSource image = {};
-    if (game_running(app) && session->texture.has_content && session->texture_id != 0)
+    if (game_running(app) && session->texture.has_content && session->texture.imgui_id != 0)
     {
-        image.texture_id = session->texture_id;
-        streaming_texture_uv_max(&session->texture, &image.uv_max_x, &image.uv_max_y);
+        image.texture_id = session->texture.imgui_id;
+        video_texture_uv_max(&session->texture, &image.uv_max_x, &image.uv_max_y);
         image.frame_width = session->texture.content_width;
         image.frame_height = session->texture.content_height;
         // Pass 0's result (the shown part, after the crop): drawn over the
-        // preview so the picture controls show. Only once the chain has
-        // written it (a new image is still UNDEFINED while the UI is built).
-        const ShaderChain* chain = &app->shader_chain;
-        if (chain->ready && chain->stages[0].chain != nullptr && chain->middle.texture_id != 0 &&
-            chain->middle.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
-        {
-            image.processed_texture_id = chain->middle.texture_id;
-            image.processed_width = chain->middle.width;
-            image.processed_height = chain->middle.height;
-        }
+        // preview so the picture controls show.
+        video_output_stage0_result(&app->video, &image.processed_texture_id, &image.processed_width,
+                                   &image.processed_height);
     }
     image.controls_available = app->shader_library.loaded;
     SettingsWindowContext context = {};
@@ -1970,7 +1942,7 @@ static void draw_settings(App* app)
                       app->window.target_height);
     }
     context.window_size = window_size;
-    context.present_wait = piccolo_text(&app->strings, app->shell.vulkan.present_wait_version > 0
+    context.present_wait = piccolo_text(&app->strings, app_shell_waits_for_screen(&app->shell)
                                                            ? Str::present_wait_screen
                                                            : Str::present_wait_gpu);
     context.audio_devices = app->audio_device_pointers.data();
@@ -2155,19 +2127,17 @@ static void save_after_options_windows(App* app)
 static void app_draw_debug_ui(App* app)
 {
     const ImGuiIO& io = ImGui::GetIO();
-    const VkPhysicalDeviceProperties* gpu = &app->shell.vulkan.physical_device_properties;
-    const VulkanSwapchain* swapchain = &app->shell.swapchain;
+    AppShellGpuInfo gpu = {};
+    app_shell_gpu_info(&app->shell, &gpu);
 
     ImGui::SetNextWindowPos(ImVec2(40.0f, 80.0f), ImGuiCond_FirstUseEver);
     ImGui::Begin("piccolo", &app->show_debug_window);
 
     ImGui::Text("piccolo %s, host-libretro %s", PICCOLO_VERSION, HOST_LIBRETRO_VERSION);
-    ImGui::Text("GPU: %s", gpu->deviceName);
-    ImGui::Text("Vulkan %u.%u.%u", VK_API_VERSION_MAJOR(gpu->apiVersion), VK_API_VERSION_MINOR(gpu->apiVersion),
-                VK_API_VERSION_PATCH(gpu->apiVersion));
-    ImGui::Text("Swapchain: %ux%u, %u images, %s", swapchain->extent.width, swapchain->extent.height,
-                swapchain->image_count, vk_present_mode_to_string(swapchain->present_mode));
-    ImGui::Text("Validation: %s", app->shell.vulkan.validation_enabled ? "on" : "off");
+    ImGui::Text("GPU: %s", gpu.device);
+    ImGui::Text("%s", gpu.api);
+    ImGui::Text("Swapchain: %s", gpu.swapchain);
+    ImGui::Text("%s", gpu.validation);
     ImGui::Text("Retro UI scale: %dx", app->ui_scale);
     ImGui::Separator();
     ImGui::Text("%.3f ms/frame (%.1f FPS)", static_cast<double>(1000.0f / io.Framerate), static_cast<double>(io.Framerate));
@@ -2892,7 +2862,7 @@ static void net_follow_stream_tuning(App* app)
     result.run_ahead = app->session.host != nullptr && game_running(app)
                            ? static_cast<uint8_t>(libretro_host_run_ahead_applied(app->session.host))
                            : 0;
-    result.flags = app->shell.renderer.wait_for_present ? NET_STREAM_TUNING_WAITS_FOR_PRESENT : 0;
+    result.flags = app_shell_wait_for_present(&app->shell) ? NET_STREAM_TUNING_WAITS_FOR_PRESENT : 0;
     for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
     {
         if (!app->stream_tuning_set[peer])
@@ -3502,8 +3472,7 @@ int main(int argc, char** argv)
         ClearColor background = {static_cast<float>((back >> 16) & 0xFFu) / 255.0f,
                                  static_cast<float>((back >> 8) & 0xFFu) / 255.0f,
                                  static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
-        renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
-                                      piccolo_settings_frames_in_flight(&app->settings));
+        app_shell_set_frames_in_flight(&app->shell, piccolo_settings_frames_in_flight(&app->settings));
         // RUN-AHEAD: the setting, or a streaming device's tuning (in memory
         // only) when it isn't "host's".
         {
@@ -3519,9 +3488,10 @@ int main(int argc, char** argv)
         }
         // A streaming device's frame delay needs present waits (piccolo's
         // frame delay works only that way): turned on here, in memory only.
-        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
-                                               (stream_delay_overrides(app) &&
-                                                app->stream_tuning.delay != NetStreamDelay::off);
+        app_shell_set_wait_for_present(&app->shell,
+                                       settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
+                                           (stream_delay_overrides(app) &&
+                                            app->stream_tuning.delay != NetStreamDelay::off));
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
         apply_learned_latency(app);
         // Held for the whole game, paused or not: a request is a D-Bus call
@@ -3754,9 +3724,7 @@ int main(int argc, char** argv)
             quick_menu_upload(&app->quick_menu, &app->shell);
             if (app_shell_acquire(&app->shell))
             {
-                picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
-                shader_chain_record(&app->shader_chain, &app->shader_library,
-                                    renderer_command_buffer(&app->shell.renderer), &app->session.texture);
+                video_output_record(&app->video, &app->shader_library, &app->shell, &app->session.texture);
             }
             if (!app_shell_present(&app->shell, background))
             {
@@ -3782,8 +3750,7 @@ int main(int argc, char** argv)
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
-    picture_destroy(&app->picture, &app->shell.vulkan);
-    shader_chain_destroy(&app->shader_chain, &app->shader_library, &app->shell.vulkan);
+    video_output_destroy(&app->video, &app->shader_library, &app->shell);
     shader_library_unload(&app->shader_library);
     if (!app->input_config_path.empty())
     {

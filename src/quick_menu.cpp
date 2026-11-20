@@ -10,7 +10,6 @@
 #include "imgui.h"
 
 #include "app_shell.h"
-#include "debug_ui.h"
 #include "input_window.h"
 #include "pad_picture.h"
 #include "piccolo_settings.h"
@@ -110,21 +109,20 @@ void quick_menu_upload(QuickMenu* menu, AppShell* shell)
     {
         return;
     }
-    if (menu->texture.image == VK_NULL_HANDLE)
+    if (!video_texture_created(&menu->texture))
     {
-        if (!streaming_texture_create(&menu->texture, &shell->vulkan, THUMBNAIL_CAPACITY, THUMBNAIL_CAPACITY))
+        if (!video_texture_create(&menu->texture, shell, THUMBNAIL_CAPACITY, THUMBNAIL_CAPACITY,
+                                  FramePixelFormat::xrgb8888, false))
         {
             menu->upload_pending = false;
             return;
         }
-        menu->texture_id = debug_ui_add_texture(menu->texture.view);
     }
     if (!app_shell_acquire(shell))
     {
         return;   // try on the next frame
     }
-    if (streaming_texture_upload(&menu->texture, renderer_command_buffer(&shell->renderer),
-                                 renderer_frame_index(&shell->renderer), menu->pixels.data(), menu->width, menu->height))
+    if (video_texture_upload(&menu->texture, shell, menu->pixels.data(), menu->width, menu->height))
     {
         menu->has_picture = true;
     }
@@ -133,16 +131,7 @@ void quick_menu_upload(QuickMenu* menu, AppShell* shell)
 
 void quick_menu_destroy(QuickMenu* menu, AppShell* shell)
 {
-    if (menu->texture.image != VK_NULL_HANDLE)
-    {
-        vkDeviceWaitIdle(shell->vulkan.device);
-        if (menu->texture_id != 0)
-        {
-            debug_ui_remove_texture(menu->texture_id);
-        }
-        streaming_texture_destroy(&menu->texture, &shell->vulkan);
-    }
-    menu->texture_id = 0;
+    video_texture_destroy(&menu->texture, shell);   // waits for the GPU
 }
 
 // The nine slot buttons; the focused one (arrows) or the clicked one is the selection.
@@ -218,8 +207,8 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     room.y = static_cast<float>(static_cast<int>(room.y - ImGui::GetStyle().ItemSpacing.y));
     room.x = room.x > 160.0f * block ? room.x : 160.0f * block;
     room.y = room.y > 120.0f * block ? room.y : 120.0f * block;
-    bool showing = menu->has_picture && menu->shown_slot == menu->slot && menu->texture_id != 0 && menu->width > 0 &&
-                   menu->height > 0;
+    bool showing = menu->has_picture && menu->shown_slot == menu->slot && menu->texture.imgui_id != 0 &&
+                   menu->width > 0 && menu->height > 0;
     ImVec2 box(room.x, room.x * 3.0f / 4.0f);   // no picture: a 4:3 box
     if (box.y > room.y)
     {
@@ -256,10 +245,10 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     {
         float u = 0.0f;
         float v = 0.0f;
-        streaming_texture_uv_max(&menu->texture, &u, &v);
+        video_texture_uv_max(&menu->texture, &u, &v);
         const ImGuiPlatformIO& platform_io = ImGui::GetPlatformIO();
         draw_list->AddCallback(platform_io.DrawCallback_SetSamplerNearest, nullptr);
-        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(menu->texture_id)), corner,
+        draw_list->AddImage(ImTextureRef(static_cast<ImTextureID>(menu->texture.imgui_id)), corner,
                             ImVec2(corner.x + box.x, corner.y + box.y), ImVec2(0.0f, 0.0f), ImVec2(u, v));
         draw_list->AddCallback(platform_io.DrawCallback_SetSamplerLinear, nullptr);
     }

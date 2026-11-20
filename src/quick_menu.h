@@ -28,7 +28,7 @@
 #include "input_sdl.h"
 #include "settings.h"
 #include "localization.h"
-#include "vk_texture.h"
+#include "video_texture.h"
 
 struct AppShell;
 struct ImFont;
@@ -95,8 +95,7 @@ struct QuickMenu
     bool          focus_slot = false;   // move the keyboard focus to `slot` on the next draw (picked by 1-9)
 
     // The selected slot's thumbnail: loaded from its PNG, uploaded on the next frame.
-    StreamingTexture      texture;
-    uint64_t              texture_id = 0;
+    VideoTexture          texture;   // texture.imgui_id: what ImGui draws
     std::vector<uint32_t> pixels;
     uint32_t              width = 0;
     uint32_t              height = 0;
