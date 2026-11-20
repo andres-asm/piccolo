@@ -69,9 +69,8 @@ jobs:
           git submodule update --init --recursive --checkout --depth 1 deps/test-libretro
 
       # Shared and module libraries (test_libretro.dll is a MODULE) get the
-      # static runtime too. No curl: MSYS2's comes in with cmake, but it's a
-      # DLL the zip doesn't carry; the core downloader on Windows waits for a
-      # curl built with Schannel (frontends-common's CMakeLists).
+      # static runtime too. The core downloader uses WinHTTP (Windows' own),
+      # never MSYS2's curl: the DLL check below rejects libcurl.
       # Release without warnings as errors (GCC -O2 gives two harmless ones).
       # MULTITAP_PICCOLO_DIR is the folder that's uploaded: the build copies
       # piccolo.exe, lang/, layouts/, themes/ and shaders/ there.
@@ -82,8 +81,7 @@ jobs:
             -DMULTITAP_PICCOLO_DIR="$PWD/dist/piccolo" \
             -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
             -DCMAKE_SHARED_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
-            -DCMAKE_MODULE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
-            -DCMAKE_DISABLE_FIND_PACKAGE_CURL=ON
+            -DCMAKE_MODULE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build
         run: cmake --build build
