@@ -1,0 +1,12 @@
+# nginx: piccolo unzipped into /srv/piccolo, served at /piccolo/ (any path
+# works: everything in the zip is relative). See README.txt.
+location /piccolo/ {
+    alias /srv/piccolo/;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    types {
+        application/wasm wasm;
+        application/manifest+json webmanifest;
+    }
+}
