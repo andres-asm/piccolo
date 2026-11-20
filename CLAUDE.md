@@ -38,7 +38,7 @@ cores, no GUI) and **frontends** (GUI).
                                      Rebased on upstream: tag the pinned commit (piccolo-YYYY-MM-DD) first
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (zpl-c's ENet: UDP connections, IPv6 dual-stack), `deps/monocypher`
   (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
   signatures); libcurl from the system (Linux) for the core downloader
 
