@@ -145,7 +145,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_service (the network on its own thread), net_settings (settings and
+                              net_service (the network on its own thread; remote play is coded and sent
+                              there), net_stream (remote play packets), net_settings (settings and
                               actions described by the host), net_speed (speed
                               test), net_wire (fields);
                               tools/strings_generator, net_probe; tests/
@@ -188,7 +189,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-65 tests with test-libretro (46 without). Before calling a larger change done:
+66 tests with test-libretro (47 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -216,7 +217,8 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
   gamepad / stream / full; remote pads (standard pads remapped here, or RetroPad mapped
   on the phone), what runs, actions (save / load state, slot, fast forward, pause,
   reset, close), settings, controllers per port, game folders browsed and games loaded
-  from the client. SETTINGS > NETWORK. Remote play (streaming) not started.
+  from the client. SETTINGS > NETWORK. Remote play: lossless frames (frame_delta) and audio streamed
+  from the network thread; piccoletto's side not written yet.
 - Next: shaders (milestone 6): librashader is in deps/, not wired yet.
 - Release plan (early December): piccolo + piccoletto (Android: remote input,
   streaming). Branches `android`, `big-picture` still need adapting to deps/.

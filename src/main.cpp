@@ -111,6 +111,9 @@ struct App
     NetKeypair net_identity = {};
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
+    bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
+    uint32_t   stream_loop = 0;          // the loop number the stream carries
+    uint64_t   stream_serial = 0;        // the core frame last handed over (a repeat isn't sent again)
     NetService net_service;              // the listener on its own thread (net_service.h); its NetAccess:
                                          // net_service.access, used between net_service_lock / _unlock
     InputNet   input_net = {};           // paired devices' pads, in the input router
@@ -437,7 +440,10 @@ static void update_pause(App* app)
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
-    bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
+    // Not while a device streams: whoever plays is looking at the phone, not
+    // at this window.
+    bool pause_for_focus = !app->window_focused && !app->net_streaming &&
+                           settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
     bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused || app->disconnect_paused);
     if (pause && !app->session.paused)
     {
@@ -2152,6 +2158,7 @@ static void net_follow_remote(App* app)
             {
                 app->net_speed_receiver.active = false;
             }
+            net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
         }
     }
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
@@ -2414,6 +2421,82 @@ static void net_speed_update(App* app)
     }
 }
 
+// stream_start / stream_stop / keyframe_request (net_stream.h; net_access let
+// them through only for STREAM devices).
+static void net_stream_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    if (event->size == 0)
+    {
+        return;
+    }
+    uint8_t type = event->data[0];
+    uint8_t flags = 0;
+    if (net_stream_read_start(event->data, event->size, &flags))
+    {
+        net_service_set_stream(&app->net_service, event->peer, flags);
+        SDL_Log("Network: %s started remote play%s%s", device, (flags & NET_STREAM_WANT_VIDEO) != 0 ? " (video)" : "",
+                (flags & NET_STREAM_WANT_AUDIO) != 0 ? " (audio)" : "");
+    }
+    else if (type == NET_STREAM_STOP && event->size == 1)
+    {
+        net_service_set_stream(&app->net_service, event->peer, 0);
+        SDL_Log("Network: %s stopped remote play", device);
+    }
+    else if (type == NET_STREAM_KEYFRAME_REQUEST && event->size == 1)
+    {
+        net_service_request_keyframe(&app->net_service, event->peer);
+    }
+}
+
+// After the frames of this loop ran: the frame shown and the audio heard go
+// to the network thread (it codes and sends; this loop never waits for it).
+// With run-ahead (later) this stays the shown frame and the real timeline's
+// audio, numbered by this loop.
+static void net_stream_frame(App* app)
+{
+    if (!app->net_streaming || !game_running(app))
+    {
+        app->session.captured_audio.clear();
+        return;
+    }
+    app->stream_loop++;
+    const LibretroHost* host = app->session.host;
+    if (!app->session.captured_audio.empty())
+    {
+        net_service_submit_audio(&app->net_service, app->session.captured_audio.data(),
+                                 app->session.captured_audio.size() / 2, app->stream_loop);
+        app->session.captured_audio.clear();
+    }
+    const LibretroVideoFrame* video = &host->video;
+    FramePixelFormat format = FramePixelFormat::xrgb8888;
+    if (video->format == RETRO_PIXEL_FORMAT_RGB565)
+    {
+        format = FramePixelFormat::rgb565;
+    }
+    else if (video->format == RETRO_PIXEL_FORMAT_0RGB1555)
+    {
+        format = FramePixelFormat::xrgb1555;
+    }
+    else if (video->format != RETRO_PIXEL_FORMAT_XRGB8888)
+    {
+        return;   // the HDR formats aren't streamed
+    }
+    if (video->pixels == nullptr || video->width == 0 || video->height == 0 || video->serial == app->stream_serial)
+    {
+        return;   // nothing new to show
+    }
+    app->stream_serial = video->serial;
+    NetStreamInfo info;
+    info.width = video->width;
+    info.height = video->height;
+    info.format = format;
+    info.aspect = static_cast<double>(host->av_info.geometry.aspect_ratio);
+    info.fps = host->av_info.timing.fps;
+    info.sample_rate = host->av_info.timing.sample_rate;
+    net_service_submit_frame(&app->net_service, video->pixels, video->width, video->height, format, app->stream_loop,
+                             &info);
+}
+
 // The load_result for the load_request waiting in pending_start.
 static void net_answer_load(App* app, NetContentStatus status)
 {
@@ -2628,6 +2711,7 @@ static void net_update_locked(App* app)
             {
                 app->net_speed_receiver.active = false;
             }
+            net_service_set_stream(&app->net_service, event.peer, 0);   // its stream ends with it
             if (event.peer < NET_MAX_PEERS)
             {
                 app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
@@ -2687,6 +2771,7 @@ static void net_update_locked(App* app)
                 {
                     net_speed_result(app, &event);
                 }
+                net_stream_message(app, &event, device);
                 net_games_message(app, &event, device);   // net_access let through only what its level covers
                 net_remote_message(app, &event, device);
             }
@@ -2698,6 +2783,13 @@ static void net_update_locked(App* app)
     net_follow_game_state(app);
     net_follow_remote(app);
     net_speed_update(app);
+    // Remote play: frames and audio are handed over only while someone streams.
+    app->net_streaming = net_service_streaming(&app->net_service);
+    if (app->net_streaming && !app->session.capture_audio)
+    {
+        app->session.captured_audio.reserve(16384);   // once: a few frames' worth
+    }
+    app->session.capture_audio = app->net_streaming;
 }
 
 int main(int argc, char** argv)
@@ -2881,6 +2973,10 @@ int main(int argc, char** argv)
         }
         app_update_input(app);
         CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, &app->cursor_input, game_has_keyboard(app));
+        if (ran == CoreSessionFrame::ran)
+        {
+            net_stream_frame(app);
+        }
         if (ran != CoreSessionFrame::skipped || !game_running(app))
         {
             input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
