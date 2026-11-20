@@ -60,6 +60,7 @@
 #include "net_trust.h"
 #include "net_window.h"
 #include "file_picker.h"
+#include "headless.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
@@ -146,6 +147,7 @@ struct App
     // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
     bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
     bool       disconnect_paused = false;     // START, a controller joining, or closing the menu resumes
+    Headless   headless;                      // GO HEADLESS: a streaming device has the game (headless.h)
     bool       menu_was_open = false;         // last loop: for "closing the menu resumes"
     uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
@@ -491,6 +493,10 @@ static void update_pause(App* app)
     // The text box always pauses (the core's text isn't typed into a running game).
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
                           text_input_pending(app);
+    if (app->headless.on)
+    {
+        pause_for_menu = text_input_pending(app);   // nobody sees the menus here; the core's text box still waits
+    }
     // Not while a device streams: whoever plays is looking at the phone, not
     // at this window.
     bool pause_for_focus = !app->window_focused && !app->net_streaming &&
@@ -2267,6 +2273,45 @@ static NetAccessLevel net_peer_access(const App* app, uint32_t peer)
     return app->net_service.access.trust.devices[static_cast<size_t>(device)].access;
 }
 
+// GO HEADLESS (headless.h, net_stream.h): the state, to every authorized
+// device that may stream (each learns whether it's the one holding it).
+static void headless_tell(App* app)
+{
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
+            !net_access_allows(net_peer_access(app, i), NetAccessLevel::stream))
+        {
+            continue;
+        }
+        uint8_t out[4];
+        size_t size = net_stream_write_headless_state(out, sizeof(out), app->headless.on,
+                                                      app->headless.on && app->headless.peer == i);
+        net_access_send(&app->net_service.access, i, NetChannel::control, out, size);
+    }
+}
+
+// Back on piccolo's window. `pause`: the device that had the game is gone
+// (or stopped streaming), so nobody plays it: paused until someone here does.
+static void headless_back(App* app, bool pause)
+{
+    if (!app->headless.on)
+    {
+        return;
+    }
+    headless_leave(&app->headless, app->shell.window);
+    if (pause && game_running(app))
+    {
+        app->disconnect_paused = true;
+        set_status(app, piccolo_text(&app->strings, Str::status_headless_paused));
+    }
+    else
+    {
+        set_status(app, piccolo_text(&app->strings, Str::status_headless_back));
+    }
+    SDL_Log("Headless: back on the window%s", pause ? " (paused)" : "");
+}
+
 // The actions one authorized peer may trigger (`id` 0: sent unasked), or
 // to all of them (NET_NO_PEER), each with its own level.
 static void net_send_actions(App* app, uint32_t peer, uint32_t id)
@@ -2580,6 +2625,11 @@ static void net_follow_remote(App* app)
         if (!net_access_allows(level, NetAccessLevel::stream))
         {
             app->net_fast_forward[i] = false;
+            if (app->headless.on && app->headless.peer == i)
+            {
+                headless_back(app, true);   // remote play (and so the game) needs STREAM
+                headless_tell(app);
+            }
             if (app->net_paused && app->net_paused_by == i)
             {
                 app->net_paused = false;   // it can't resume it any more
@@ -2938,6 +2988,7 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     }
     uint8_t type = event->data[0];
     uint8_t flags = 0;
+    bool headless_on = false;
     if (net_stream_read_start(event->data, event->size, &flags))
     {
         net_service_set_stream(&app->net_service, event->peer, flags);
@@ -2946,6 +2997,11 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     }
     else if (type == NET_STREAM_STOP && event->size == 1)
     {
+        if (app->headless.on && app->headless.peer == event->peer)
+        {
+            headless_back(app, true);   // it no longer sees the game
+            headless_tell(app);
+        }
         net_service_set_stream(&app->net_service, event->peer, 0);
         if (event->peer < NET_MAX_PEERS)
         {
@@ -2956,6 +3012,25 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     else if (type == NET_STREAM_KEYFRAME_REQUEST && event->size == 1)
     {
         net_service_request_keyframe(&app->net_service, event->peer);
+    }
+    else if (net_stream_read_go_headless(event->data, event->size, &headless_on))
+    {
+        // Taken only by a device streaming a running game, and only if no
+        // other device holds it; given back only by the one holding it.
+        bool streaming = event->peer < NET_MAX_PEERS && app->net_service.stream.flags[event->peer] != 0;
+        if (headless_on && !app->headless.on && game_running(app) && streaming)
+        {
+            headless_enter(&app->headless, app->shell.window, event->peer, &app_icon_images[2],
+                           piccolo_text(&app->strings, Str::headless_tooltip),
+                           piccolo_text(&app->strings, Str::headless_show),
+                           piccolo_text(&app->strings, Str::headless_play_here));
+            SDL_Log("Headless: %s took the game", device);
+        }
+        else if (!headless_on && app->headless.on && app->headless.peer == event->peer)
+        {
+            headless_back(app, false);
+        }
+        headless_tell(app);   // the asker learns the result either way
     }
     else if (event->peer < NET_MAX_PEERS &&
              net_stream_read_tuning(event->data, event->size, NET_STREAM_TUNING, &app->stream_tuning_asked[event->peer]))
@@ -3179,6 +3254,7 @@ static void net_update(App* app)
     }
     if (!app->net_running)
     {
+        headless_back(app, false);   // networking went off: nobody streams
         return;
     }
     // INTERNET and BEACON SERVER: the service resolves the name on its own
@@ -3200,6 +3276,12 @@ static void net_update(App* app)
 
 static void net_update_locked(App* app)
 {
+    // GO HEADLESS ends from the tray, or when no game runs any more.
+    if (app->headless.on && (app->headless.back_asked || !game_running(app)))
+    {
+        headless_back(app, false);
+        headless_tell(app);
+    }
     // A new NAME is used at once (discovery and pairing show it).
     const char* name = settings_get_text(&app->settings, PICCOLO_NET_NAME);
     if (app->net_service.access.name != name)
@@ -3235,6 +3317,11 @@ static void net_update_locked(App* app)
             break;
         }
         case NetAccessEventType::closed:
+            if (app->headless.on && app->headless.peer == event.peer)
+            {
+                headless_back(app, true);   // the device that had the game left
+                headless_tell(app);
+            }
             if (event.peer < NET_MAX_PEERS && app->net_speed_sender.peer == event.peer)
             {
                 app->net_speed_sender.active = false;   // its test ends with it
@@ -3525,6 +3612,12 @@ int main(int argc, char** argv)
         }
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
+        if (app->headless.on)
+        {
+            // No presents (a hidden window gets no frame callbacks): the
+            // Exact timer paces the core, frames only go to the stream.
+            app->session.timing.mode = TimingMode::exact;
+        }
         app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
         update_window(app);
         update_language(app);
@@ -3557,6 +3650,10 @@ int main(int argc, char** argv)
                                                (stream_delay_overrides(app) &&
                                                 app->stream_tuning.delay != NetStreamDelay::off);
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
+        if (app->headless.on)
+        {
+            app->session.audio_config.muted = true;   // the device plays it
+        }
         apply_learned_latency(app);
         // Held for the whole game, paused or not: a request is a D-Bus call
         // that may block, so not on every pause and resume.
@@ -3589,7 +3686,7 @@ int main(int argc, char** argv)
             remove_running_marker(app);   // the core shut down on its own: a proper end
         }
 
-        if (app_shell_begin_frame(&app->shell))
+        if (!app->headless.on && app_shell_begin_frame(&app->shell))
         {
             app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
@@ -3821,6 +3918,7 @@ int main(int argc, char** argv)
         core_session_wait(&app->session);
     }
 
+    headless_leave(&app->headless, app->shell.window);   // the tray icon goes, the window comes back for its size
     piccolo_window_capture(&app->window, app->shell.window);
     save_last_used(app);
     save_settings(app);

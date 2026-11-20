@@ -134,6 +134,7 @@ src/
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
+  headless.*              GO HEADLESS: a streaming device takes the game (window hidden behind a tray icon)
   core_options_ui.* safe_start_window.*
   text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
