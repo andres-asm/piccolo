@@ -4,8 +4,9 @@
 
 // Files that come inside piccolo's package, found where each platform puts them.
 //
-// Desktop: next to the program (SDL_GetBasePath); nothing to install
-// (bundled_files.cpp).
+// Desktop (bundled_files.cpp): next to the program (SDL_GetBasePath); shipped
+// cores (Test libretro) in its cores/ folder, copied into piccolo's cores
+// folder when that's somewhere else (Flatpak).
 //
 // Android (bundled_files_android.cpp): the APK carries cores as
 // lib/<abi>/lib<name>_libretro.so (Android only extracts files named lib*.so),
@@ -14,7 +15,8 @@
 
 // Copies the cores shipped in the package into piccolo's cores folder as
 // <name>_libretro.so, replacing older copies, so the core catalog lists them
-// like any other core. Call before the catalog first looks. Desktop: nothing.
+// like any other core. Call before the catalog first looks. Unchanged files
+// aren't rewritten on desktop.
 void bundled_files_install_cores(const char* cores_directory);
 
 // The folder that holds the shipped layouts/ and themes/, ending with a

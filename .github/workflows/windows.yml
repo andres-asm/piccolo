@@ -52,7 +52,7 @@ jobs:
             ninja:p
             vulkan-devel:p
 
-      # Only the submodules the build uses (deps/test-libretro is optional).
+      # Only the submodules the build uses.
       # deps/librashader without --recursive: its own submodules are tests.
       - name: Submodules
         run: |
@@ -63,6 +63,10 @@ jobs:
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
           git submodule update --init --depth 1 deps/librashader
+          # Test libretro ships in every package. Its nested submodules
+          # (imguisw's) have SSH URLs: fetched over HTTPS instead.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive --checkout --depth 1 deps/test-libretro
 
       # Release without warnings as errors (GCC -O2 gives two harmless ones).
       # MULTITAP_PICCOLO_DIR is the folder that's uploaded: the build copies
@@ -72,7 +76,8 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DMULTITAP_PICCOLO_DIR="$PWD/dist/piccolo" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build
         run: cmake --build build
@@ -103,6 +108,12 @@ jobs:
           "$objdump" -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
           if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind|SDL3' dlls.txt; then
             echo "piccolo.exe depends on MSYS2 DLLs"
+            exit 1
+          fi
+          # Test libretro ships in every package, in piccolo's cores folder.
+          "$objdump" -p dist/piccolo/cores/test_libretro.dll | grep 'DLL Name' | tee test-core-dlls.txt
+          if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind' test-core-dlls.txt; then
+            echo "test_libretro.dll depends on MSYS2 DLLs"
             exit 1
           fi
           "$objdump" -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
