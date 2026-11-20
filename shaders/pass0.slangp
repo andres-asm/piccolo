@@ -1,0 +1,6 @@
+# piccolo's pass 0 (pass0.slang): at the core's resolution, nearest.
+shaders = 1
+shader0 = pass0.slang
+filter_linear0 = false
+scale_type0 = source
+scale0 = 1.0

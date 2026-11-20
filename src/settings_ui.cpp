@@ -387,6 +387,44 @@ bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, c
     return clicked;
 }
 
+bool settings_ui_path_row_with_button(const SettingsUiContext* context, const char* key, const char* hint,
+                                      const char* button, bool* button_clicked)
+{
+    *button_clicked = false;
+    const SettingDescriptor* descriptor = settings_find(context->settings, key);
+    if (descriptor == nullptr || descriptor->type != SettingType::path || !descriptor->overridable)
+    {
+        return false;   // only for paths every scope can set (no "global only" handling here)
+    }
+    const char* value = settings_get_at(context->settings, context->scope, key, nullptr);
+    bool changed = false;
+
+    ImGui::PushID(key);
+    settings_ui_marker(context, key);
+    label_column(context, descriptor);
+    // The field leaves room for the button, like path_widget for the reset.
+    float button_width = ImGui::CalcTextSize(button).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    char buffer[LIBRETRO_PATH_MAX] = {};
+    std::snprintf(buffer, sizeof(buffer), "%s", value);
+    ImGui::SetNextItemWidth(widget_width(context) - button_width - ImGui::GetStyle().ItemSpacing.x);
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer));
+    retro_ui_pop_field_text();
+    if (ImGui::IsItemDeactivatedAfterEdit())
+    {
+        changed = buffer[0] == '\0' ? settings_reset(context->settings, context->scope, key)   // empty = default
+                                    : settings_set(context->settings, context->scope, key, buffer);
+    }
+    ImGui::SameLine();
+    *button_clicked = retro_ui_button(button);
+    if (settings_ui_reset_button(context, key))
+    {
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 bool settings_ui_text_choice_row(const SettingsUiContext* context, const char* key, const char* const* choices,
                                  uint32_t choice_count, const char* empty_label, const char* missing_label)
 {

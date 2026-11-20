@@ -41,6 +41,11 @@
 	path = deps/7zip
 	url = https://github.com/ip7z/7zip.git
 	shallow = true
+[submodule "deps/piccolo-shaders"]
+	path = deps/piccolo-shaders
+	url = https://github.com/multitap-org/piccolo-shaders.git
+	branch = piccolo
+	shallow = true
 [submodule "deps/enet"]
 	path = deps/enet
 	url = https://github.com/lsalzman/enet.git

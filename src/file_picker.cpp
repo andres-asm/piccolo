@@ -188,6 +188,30 @@ static void list_archive(FilePicker* picker, const LibretroCoreInfo* core, const
     }
 }
 
+// A shader preset: "*.slangp", any case.
+static bool is_shader_preset(const char* name)
+{
+    size_t length = std::strlen(name);
+    return length > 7 && SDL_strcasecmp(name + length - 7, ".slangp") == 0;
+}
+
+// Whether a file goes in the list.
+static bool listed_file(const FilePicker* picker, const LibretroCoreInfo* core, const char* name)
+{
+    if (picker->mode == FilePickerMode::folder)
+    {
+        return false;   // folders only
+    }
+    if (picker->mode == FilePickerMode::shader_preset)
+    {
+        return is_shader_preset(name);
+    }
+    // Only what the chosen core says it loads (its own extension list), and
+    // every archive: what's inside is only known later.
+    return picker->show_all || core == nullptr || libretro_core_info_accepts(core, name) ||
+           archive_format(name) != ArchiveFormat::none;
+}
+
 static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
 {
     picker->folder_count = 0;
@@ -225,15 +249,9 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
         {
             add_folder(picker, name);
         }
-        else if (info.type == SDL_PATHTYPE_FILE && picker->mode == FilePickerMode::game)
+        else if (info.type == SDL_PATHTYPE_FILE && listed_file(picker, core, name))
         {
-            // Only what the chosen core says it loads (its own extension
-            // list), and every archive: what's inside is only known later.
-            if (picker->show_all || core == nullptr || libretro_core_info_accepts(core, name) ||
-                archive_format(name) != ArchiveFormat::none)
-            {
-                add_file(picker, name);
-            }
+            add_file(picker, name);
         }
     }
     if (names != nullptr)
@@ -344,6 +362,28 @@ void file_picker_open_folder(FilePicker* picker, const char* directory, const st
     }
 }
 
+void file_picker_open_shader(FilePicker* picker, const char* directory)
+{
+    picker->open = true;
+    picker->mode = FilePickerMode::shader_preset;
+    picker->core_index = -1;
+    picker->show_all = false;
+    picker->game_folders.clear();
+    picker->listing_stale = true;
+    picker->selected_file = -1;
+    picker->archive_path.clear();
+    picker->archive_entries.clear();
+    if (directory != nullptr && is_directory(directory))
+    {
+        std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
+        host_fs_forward_slashes(picker->directory);   // so the presets picked from it don't mix separators
+    }
+    else
+    {
+        go_home(picker);
+    }
+}
+
 void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path,
                       const std::vector<std::string>* game_folders)
 {
@@ -396,12 +436,13 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
 }
 
 // The selected file, if it's an archive in a real folder (archives inside
-// archives are plain files: they aren't browsed).
+// archives are plain files: they aren't browsed). Only in LOAD GAME.
 static bool selected_archive(const FilePicker* picker)
 {
     std::string archive;
     std::string folder;
-    return picker->selected_file >= 0 && !archive_split_path(picker->directory, &archive, &folder) &&
+    return picker->mode == FilePickerMode::game && picker->selected_file >= 0 &&
+           !archive_split_path(picker->directory, &archive, &folder) &&
            archive_format(picker->files[picker->selected_file]) != ArchiveFormat::none;
 }
 
@@ -455,11 +496,27 @@ static bool choose(FilePicker* picker, const CoreCatalog* catalog, const char* f
     return true;
 }
 
+// A shader preset (`file_name`), or NONE (nullptr).
+static bool choose_shader(FilePicker* picker, const char* file_name, FilePickerChoice* choice)
+{
+    *choice = FilePickerChoice{};
+    if (file_name != nullptr && !join_path(picker->directory, file_name, choice->content_path, sizeof(choice->content_path)))
+    {
+        return false;
+    }
+    picker->open = false;
+    return true;
+}
+
 // LOAD (or a double click) on the selected file: an archive follows the
 // rules in file_picker.h. True if something was picked.
 static bool load_selected(FilePicker* picker, const CoreCatalog* catalog, FilePickerChoice* choice)
 {
     const char* name = picker->files[picker->selected_file];
+    if (picker->mode == FilePickerMode::shader_preset)
+    {
+        return choose_shader(picker, name, choice);
+    }
     if (!selected_archive(picker) || content_archive_core_takes_whole(selected_core(picker, catalog), name))
     {
         return choose(picker, catalog, name, choice);
@@ -471,6 +528,111 @@ static bool load_selected(FilePicker* picker, const CoreCatalog* catalog, FilePi
     }
     browse_selected(picker);
     return false;
+}
+
+// CHOOSE FOLDER's bottom row: USE THIS FOLDER (the folder shown) at the right.
+static bool draw_folder_buttons(FilePicker* picker, const Localization* strings, FilePickerChoice* choice)
+{
+    bool picked = false;
+    const char* use = piccolo_text(strings, Str::picker_use_folder);
+    float use_width = ImGui::CalcTextSize(use).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - use_width);
+    ImGui::PushID("use_folder");
+    if (retro_ui_button(use))
+    {
+        *choice = FilePickerChoice{};
+        std::snprintf(choice->content_path, sizeof(choice->content_path), "%s", picker->directory);
+        picker->open = false;
+        picked = true;
+    }
+    ImGui::PopID();
+    return picked;
+}
+
+// The shader picker's bottom row: NONE and USE at the right.
+static bool draw_shader_buttons(FilePicker* picker, const Localization* strings, FilePickerChoice* choice)
+{
+    bool picked = false;
+    const char* none = piccolo_text(strings, Str::shader_preset_none);
+    const char* use = piccolo_text(strings, Str::shader_picker_use);
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float right = ImGui::CalcTextSize(none).x + ImGui::CalcTextSize(use).x + padding * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - right);
+    ImGui::PushID("none");
+    bool none_clicked = retro_ui_button(none);
+    ImGui::PopID();
+    if (none_clicked)
+    {
+        picked = choose_shader(picker, nullptr, choice);
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(picker->selected_file < 0);
+    ImGui::PushID("use");
+    bool use_clicked = retro_ui_button(use);
+    ImGui::PopID();
+    if (use_clicked && picker->selected_file >= 0)
+    {
+        picked = choose_shader(picker, picker->files[picker->selected_file], choice);
+    }
+    ImGui::EndDisabled();
+    return picked;
+}
+
+// LOAD GAME's bottom row: SHOW ALL FILES, then START WITHOUT GAME, BROWSE and
+// LOAD at the right.
+static bool draw_game_buttons(FilePicker* picker, const CoreCatalog* catalog, const LibretroCoreInfo* core,
+                              const Localization* strings, FilePickerChoice* choice)
+{
+    bool picked = false;
+    char show_all[200] = {};
+    std::snprintf(show_all, sizeof(show_all), "%s###show_all", piccolo_text(strings, Str::picker_show_all));
+    if (retro_ui_checkbox(show_all, &picker->show_all))
+    {
+        picker->listing_stale = true;
+    }
+    bool can_run_alone = core != nullptr && core->supports_no_game;
+    const char* load = piccolo_text(strings, Str::picker_load);
+    const char* browse = piccolo_text(strings, Str::picker_browse);
+    const char* alone = piccolo_text(strings, Str::picker_start_without_game);
+    float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float load_width = ImGui::CalcTextSize(load).x + padding;
+    float browse_width = ImGui::CalcTextSize(browse).x + padding;
+    float alone_width = ImGui::CalcTextSize(alone).x + padding;
+    float right = load_width + browse_width + spacing + (can_run_alone ? alone_width + spacing : 0.0f);
+    ImGui::SameLine(ImGui::GetContentRegionMax().x - right);
+    ImGui::PushID("alone");
+    bool start_alone = can_run_alone && retro_ui_button(alone);
+    ImGui::PopID();
+    if (start_alone)
+    {
+        picked = choose(picker, catalog, nullptr, choice);
+    }
+    if (can_run_alone)
+    {
+        ImGui::SameLine();
+    }
+    // BROWSE: the selected archive as a folder, whatever the core.
+    ImGui::BeginDisabled(!selected_archive(picker));
+    ImGui::PushID("browse");
+    bool browse_clicked = retro_ui_button(browse);
+    ImGui::PopID();
+    ImGui::EndDisabled();
+    if (browse_clicked && selected_archive(picker))
+    {
+        browse_selected(picker);
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(picker->selected_file < 0);
+    ImGui::PushID("load");
+    bool load_clicked = retro_ui_button(load);
+    ImGui::PopID();
+    if (load_clicked && picker->selected_file >= 0)
+    {
+        picked = load_selected(picker, catalog, choice);
+    }
+    ImGui::EndDisabled();
+    return picked;
 }
 
 bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pixel_font, int32_t scale,
@@ -501,9 +663,14 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
     char title[200] = {};
     bool choosing_folder = picker->mode == FilePickerMode::folder;
+    bool shader = picker->mode == FilePickerMode::shader_preset;
     if (choosing_folder)
     {
         std::snprintf(title, sizeof(title), "%s###choose_folder", piccolo_text(strings, Str::picker_folder_title));
+    }
+    else if (shader)
+    {
+        std::snprintf(title, sizeof(title), "%s###shader_preset", piccolo_text(strings, Str::shader_picker_title));
     }
     else
     {
@@ -517,25 +684,27 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             keep_open = false;
         }
 
-        // Core first: it decides which files are shown.
+        // Core first: it decides which files are shown. Neither the core nor
+        // the game folders matter when picking a shader preset.
         const LibretroCoreInfo* core = selected_core(picker, catalog);
+        bool core_row = !choosing_folder && !shader;
         char preview[LIBRETRO_INFO_TEXT_MAX * 2 + 8] = {};
         std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : piccolo_text(strings, Str::picker_no_cores),
                       core != nullptr ? core->version : "");
         const char* core_label = piccolo_text(strings, Str::picker_core);
         const char* folder_label = piccolo_text(strings, Str::picker_folder);
-        float label_width = choosing_folder ? 0.0f : ImGui::CalcTextSize(core_label).x;
+        float label_width = core_row ? ImGui::CalcTextSize(core_label).x : 0.0f;
         float folder_label_width = ImGui::CalcTextSize(folder_label).x;
         label_width = (label_width > folder_label_width ? label_width : folder_label_width) + ImGui::GetStyle().ItemSpacing.x;
         float combo_x = ImGui::GetCursorPosX() + label_width;
-        if (!choosing_folder)
+        if (core_row)
         {
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(core_label);
             ImGui::SameLine(combo_x);
             ImGui::SetNextItemWidth(-FLT_MIN);
         }
-        if (!choosing_folder && retro_ui_begin_combo("##core", preview))
+        if (core_row && retro_ui_begin_combo("##core", preview))
         {
             for (int32_t i = 0; i < catalog->count; i++)
             {
@@ -680,80 +849,21 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             ImGui::TextDisabled("%s", picker->directory);
         }
 
+        // Bottom row. (A double click above may have picked already.)
+        bool clicked = false;
         if (choosing_folder)
         {
-            // USE THIS FOLDER: the folder shown above, at the right.
-            const char* use = piccolo_text(strings, Str::picker_use_folder);
-            float use_width = ImGui::CalcTextSize(use).x + ImGui::GetStyle().FramePadding.x * 2.0f;
-            ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - use_width);
-            ImGui::PushID("use_folder");
-            if (retro_ui_button(use))
-            {
-                *choice = FilePickerChoice{};
-                std::snprintf(choice->content_path, sizeof(choice->content_path), "%s", picker->directory);
-                picker->open = false;
-                picked = true;
-            }
-            ImGui::PopID();
-            retro_ui_end_window();
-            ImGui::End();
-            retro_ui_pop_theme();
-            if (!keep_open)
-            {
-                picker->open = false;
-            }
-            return picked;
+            clicked = draw_folder_buttons(picker, strings, choice);
         }
-
-        // Bottom row.
-        char show_all[200] = {};
-        std::snprintf(show_all, sizeof(show_all), "%s###show_all", piccolo_text(strings, Str::picker_show_all));
-        if (retro_ui_checkbox(show_all, &picker->show_all))
+        else if (shader)
         {
-            picker->listing_stale = true;
+            clicked = draw_shader_buttons(picker, strings, choice);
         }
-        bool can_run_alone = core != nullptr && core->supports_no_game;
-        const char* load = piccolo_text(strings, Str::picker_load);
-        const char* browse = piccolo_text(strings, Str::picker_browse);
-        const char* alone = piccolo_text(strings, Str::picker_start_without_game);
-        float padding = ImGui::GetStyle().FramePadding.x * 2.0f;
-        float spacing = ImGui::GetStyle().ItemSpacing.x;
-        float load_width = ImGui::CalcTextSize(load).x + padding;
-        float browse_width = ImGui::CalcTextSize(browse).x + padding;
-        float alone_width = ImGui::CalcTextSize(alone).x + padding;
-        float right = load_width + browse_width + spacing + (can_run_alone ? alone_width + spacing : 0.0f);
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - right);
-        ImGui::PushID("alone");
-        bool start_alone = can_run_alone && retro_ui_button(alone);
-        ImGui::PopID();
-        if (start_alone)
+        else
         {
-            picked = choose(picker, catalog, nullptr, choice);
+            clicked = draw_game_buttons(picker, catalog, core, strings, choice);
         }
-        if (can_run_alone)
-        {
-            ImGui::SameLine();
-        }
-        // BROWSE: the selected archive as a folder, whatever the core.
-        ImGui::BeginDisabled(!selected_archive(picker));
-        ImGui::PushID("browse");
-        bool browse_clicked = retro_ui_button(browse);
-        ImGui::PopID();
-        ImGui::EndDisabled();
-        if (browse_clicked && selected_archive(picker))
-        {
-            browse_selected(picker);
-        }
-        ImGui::SameLine();
-        ImGui::BeginDisabled(picker->selected_file < 0);
-        ImGui::PushID("load");
-        bool load_clicked = retro_ui_button(load);
-        ImGui::PopID();
-        if (load_clicked && picker->selected_file >= 0)
-        {
-            picked = load_selected(picker, catalog, choice);
-        }
-        ImGui::EndDisabled();
+        picked = picked || clicked;
 
         retro_ui_end_window();
     }

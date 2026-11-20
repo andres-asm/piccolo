@@ -52,19 +52,21 @@ jobs:
             ninja:p
             vulkan-devel:p
 
-      # Only the submodules the build uses (deps/librashader isn't built yet
-      # and brings many submodules of its own; deps/test-libretro is optional).
+      # Only the submodules the build uses (deps/test-libretro is optional).
+      # deps/librashader without --recursive: its own submodules are tests.
       - name: Submodules
         run: |
           git submodule update --init --recursive --depth 1 \
             deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
             deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher \
+            deps/piccolo-shaders \
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
+          git submodule update --init --depth 1 deps/librashader
 
       # Release without warnings as errors (GCC -O2 gives two harmless ones).
       # MULTITAP_PICCOLO_DIR is the folder that's uploaded: the build copies
-      # piccolo.exe, lang/, layouts/ and themes/ there.
+      # piccolo.exe, lang/, layouts/, themes/ and shaders/ there.
       - name: Configure
         run: |
           cmake -S . -B build -G Ninja \
@@ -78,14 +80,34 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+      # librashader (shader presets), which piccolo loads at run time from its
+      # own folder: only the C API with the Vulkan runtime. Built with the
+      # runner's Rust (MSVC target; the C API doesn't care which compiler
+      # built piccolo.exe), with the C runtime linked statically so the DLL
+      # needs no Visual C++ redistributable.
+      - name: librashader
+        shell: pwsh
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+          CARGO_TARGET_DIR: ${{ github.workspace }}/build-librashader
+        run: |
+          cargo build --manifest-path deps/librashader/Cargo.toml -p librashader-capi --release --locked --no-default-features --features runtime-vulkan
+          Copy-Item build-librashader/release/librashader_capi.dll dist/piccolo/librashader.dll
+          Copy-Item deps/librashader/LICENSE.md dist/piccolo/librashader-LICENSE.md
+
       # Fails if piccolo.exe still needs a DLL from MSYS2 (anything besides
-      # Windows' own and vulkan-1.dll).
+      # Windows' own and vulkan-1.dll), or librashader.dll a C/C++ runtime DLL.
       - name: Check DLL dependencies
         run: |
           objdump=$(command -v objdump || command -v llvm-objdump)
           "$objdump" -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
           if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind|SDL3' dlls.txt; then
             echo "piccolo.exe depends on MSYS2 DLLs"
+            exit 1
+          fi
+          objdump -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
+          if grep -iE 'vcruntime|msvcp|api-ms-win-crt|libstdc|libgcc' rashader-dlls.txt; then
+            echo "librashader.dll depends on a C/C++ runtime DLL"
             exit 1
           fi
 

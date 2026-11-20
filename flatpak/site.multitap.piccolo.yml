@@ -9,6 +9,8 @@ app-id: site.multitap.piccolo
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable   # cargo, for librashader
 command: piccolo
 finish-args:
   - --share=ipc
@@ -40,16 +42,40 @@ modules:
       - type: dir
         path: ../deps/gamemode
 
+  # librashader (shader presets), which piccolo loads at run time from its own
+  # folder: only the C API with the Vulkan runtime. cargo downloads the crates
+  # pinned in Cargo.lock, so this module needs the network (fine for
+  # flatpak-builder and CI; Flathub would need the crates as sources,
+  # flatpak-cargo-generator).
+  - name: librashader
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      build-args:
+        - --share=network
+      env:
+        CARGO_HOME: /run/build/librashader/cargo
+    build-commands:
+      - cargo build -p librashader-capi --release --locked --no-default-features --features runtime-vulkan
+      - install -Dm755 target/release/liblibrashader_capi.so /app/lib/piccolo/librashader.so
+      - install -Dm644 LICENSE.md /app/share/licenses/org.multitap.piccolo/librashader-LICENSE.md
+    sources:
+      - type: dir
+        path: ../deps/librashader
+        skip:
+          - target
+          - test
+
   - name: piccolo
     buildsystem: simple
     build-commands:
       # MULTITAP_PICCOLO_DIR empty: don't copy the build to ~/.local/share.
       - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_PICCOLO_DIR= -DMULTITAP_BUILD_TESTS=OFF
       - cmake --build build --target piccolo
-      # piccolo reads lang/ and layouts/ next to its program (SDL_GetBasePath,
+      # piccolo reads lang/, layouts/ and shaders/ next to its program (SDL_GetBasePath,
       # which follows the symlink in /app/bin).
       - install -Dm755 build/piccolo /app/lib/piccolo/piccolo
-      - cp -r lang layouts /app/lib/piccolo/
+      - cp -r lang layouts build/shaders /app/lib/piccolo/
       - mkdir -p /app/bin && ln -s ../lib/piccolo/piccolo /app/bin/piccolo
       - install -Dm644 assets/linux/site.multitap.piccolo.desktop /app/share/applications/site.multitap.piccolo.desktop
       - install -Dm644 assets/linux/site.multitap.piccolo.metainfo.xml /app/share/metainfo/site.multitap.piccolo.metainfo.xml
@@ -62,5 +88,5 @@ modules:
           - build
           - build-flatpak
           - .flatpak-builder
-          - deps/librashader
           - deps/test-libretro
+          # deps/librashader stays: shader_chain.h includes its C headers.

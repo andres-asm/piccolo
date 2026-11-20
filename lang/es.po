@@ -306,6 +306,38 @@ msgctxt "image_section_crop"
 msgid "OVERSCAN CROP"
 msgstr "RECORTE DE OVERSCAN"
 
+msgctxt "image_section_profile"
+msgid "COLOR PROFILE"
+msgstr "PERFIL DE COLOR"
+
+msgctxt "image_section_controls"
+msgid "PICTURE CONTROLS"
+msgstr "CONTROLES DE IMAGEN"
+
+msgctxt "image_controls_unavailable"
+msgid "NEEDS LIBRASHADER (NOT FOUND):\nSAVED, NOT USED"
+msgstr "NECESITA LIBRASHADER (NO ESTÁ):\nSE GUARDAN, NO SE USAN"
+
+msgctxt "shader_preset_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "shader_unavailable"
+msgid "LIBRASHADER NOT FOUND: SHADERS ARE OFF"
+msgstr "LIBRASHADER NO ESTÁ: SHADERS APAGADOS"
+
+msgctxt "shader_choose"
+msgid "CHOOSE"
+msgstr "ELEGIR"
+
+msgctxt "shader_picker_title"
+msgid "SHADER PRESET"
+msgstr "PRESET DE SHADER"
+
+msgctxt "shader_picker_use"
+msgid "USE"
+msgstr "USAR"
+
 msgctxt "setting_language"
 msgid "LANGUAGE"
 msgstr "IDIOMA"
@@ -437,6 +469,166 @@ msgstr "FILTRO"
 msgctxt "setting_filter_help"
 msgid "Sharp bilinear: sharp pixels, soft only where a pixel lands between two screen pixels."
 msgstr "Bilineal nítido: píxeles nítidos, suaves solo donde un píxel cae entre dos de la pantalla."
+
+msgctxt "setting_shader_preset"
+msgid "SHADER"
+msgstr "SHADER"
+
+msgctxt "setting_shader_preset_help"
+msgid "A RetroArch shader preset (.slangp). Empty: none."
+msgstr "Un preset de shaders de RetroArch (.slangp). Vacío: ninguno."
+
+msgctxt "setting_image_color_profile"
+msgid "COLOR PROFILE"
+msgstr "PERFIL DE COLOR"
+
+msgctxt "setting_image_color_profile_help"
+msgid "The colors of a screen: a handheld's LCD, or an NTSC TV. NONE: unchanged."
+msgstr "Los colores de una pantalla: el LCD de una portátil, o un televisor NTSC. NINGUNO: sin cambio."
+
+msgctxt "setting_image_profile_strength"
+msgid "PROFILE STRENGTH"
+msgstr "INTENSIDAD DEL PERFIL"
+
+msgctxt "setting_image_profile_strength_help"
+msgid "How much of the profile: 0 none, 1 all of it."
+msgstr "Cuánto del perfil: 0 nada, 1 todo."
+
+msgctxt "value_color_profile_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "value_color_profile_gba"
+msgid "GAME BOY ADVANCE"
+msgstr "GAME BOY ADVANCE"
+
+msgctxt "value_color_profile_gba_sp101"
+msgid "GBA SP (AGS-101)"
+msgstr "GBA SP (AGS-101)"
+
+msgctxt "value_color_profile_gba_nso"
+msgid "GBA (SWITCH ONLINE)"
+msgstr "GBA (SWITCH ONLINE)"
+
+msgctxt "value_color_profile_gbc"
+msgid "GAME BOY COLOR"
+msgstr "GAME BOY COLOR"
+
+msgctxt "value_color_profile_gbc_gambatte"
+msgid "GBC (GAMBATTE)"
+msgstr "GBC (GAMBATTE)"
+
+msgctxt "value_color_profile_gb_micro"
+msgid "GAME BOY MICRO"
+msgstr "GAME BOY MICRO"
+
+msgctxt "value_color_profile_nds"
+msgid "NINTENDO DS"
+msgstr "NINTENDO DS"
+
+msgctxt "value_color_profile_nds_lite"
+msgid "DS LITE"
+msgstr "DS LITE"
+
+msgctxt "value_color_profile_psp"
+msgid "PSP"
+msgstr "PSP"
+
+msgctxt "value_color_profile_switch_oled"
+msgid "SWITCH OLED"
+msgstr "SWITCH OLED"
+
+msgctxt "value_color_profile_palm"
+msgid "PALM"
+msgstr "PALM"
+
+msgctxt "value_color_profile_vba"
+msgid "VISUALBOYADVANCE"
+msgstr "VISUALBOYADVANCE"
+
+msgctxt "value_color_profile_ntsc"
+msgid "NTSC (TV)"
+msgstr "NTSC (TV)"
+
+msgctxt "setting_image_brightness"
+msgid "BRIGHTNESS"
+msgstr "BRILLO"
+
+msgctxt "setting_image_brightness_help"
+msgid "Added to every color. 0: unchanged."
+msgstr "Se suma a cada color. 0: sin cambio."
+
+msgctxt "setting_image_contrast"
+msgid "CONTRAST"
+msgstr "CONTRASTE"
+
+msgctxt "setting_image_contrast_help"
+msgid "Spread around mid grey. 1: unchanged."
+msgstr "Separación alrededor del gris medio. 1: sin cambio."
+
+msgctxt "setting_image_saturation"
+msgid "SATURATION"
+msgstr "SATURACIÓN"
+
+msgctxt "setting_image_saturation_help"
+msgid "Color strength. 0: black and white, 1: unchanged."
+msgstr "Intensidad del color. 0: blanco y negro, 1: sin cambio."
+
+msgctxt "setting_image_hue"
+msgid "HUE"
+msgstr "TONO"
+
+msgctxt "setting_image_hue_help"
+msgid "Turns every color around the color wheel, in degrees. 0: unchanged."
+msgstr "Gira cada color en el círculo cromático, en grados. 0: sin cambio."
+
+msgctxt "setting_image_gamma"
+msgid "GAMMA"
+msgstr "GAMMA"
+
+msgctxt "setting_image_gamma_help"
+msgid "Above 1 darkens the mid tones, below 1 lightens them. 1: unchanged."
+msgstr "Más de 1 oscurece los tonos medios, menos de 1 los aclara. 1: sin cambio."
+
+msgctxt "setting_image_black_level"
+msgid "BLACK LEVEL"
+msgstr "NIVEL DE NEGRO"
+
+msgctxt "setting_image_black_level_help"
+msgid "Lifts (+) or crushes (-) the blacks; white stays white. 0: unchanged."
+msgstr "Levanta (+) o hunde (-) los negros; el blanco sigue blanco. 0: sin cambio."
+
+msgctxt "setting_image_temperature"
+msgid "TEMPERATURE"
+msgstr "TEMPERATURA"
+
+msgctxt "setting_image_temperature_help"
+msgid "Warmer (+, redder) or cooler (-, bluer). 0: unchanged."
+msgstr "Más cálido (+, más rojo) o más frío (-, más azul). 0: sin cambio."
+
+msgctxt "setting_image_gain_red"
+msgid "RED GAIN"
+msgstr "GANANCIA ROJO"
+
+msgctxt "setting_image_gain_red_help"
+msgid "How much red. 1: unchanged."
+msgstr "Cuánto rojo. 1: sin cambio."
+
+msgctxt "setting_image_gain_green"
+msgid "GREEN GAIN"
+msgstr "GANANCIA VERDE"
+
+msgctxt "setting_image_gain_green_help"
+msgid "How much green. 1: unchanged."
+msgstr "Cuánto verde. 1: sin cambio."
+
+msgctxt "setting_image_gain_blue"
+msgid "BLUE GAIN"
+msgstr "GANANCIA AZUL"
+
+msgctxt "setting_image_gain_blue_help"
+msgid "How much blue. 1: unchanged."
+msgstr "Cuánto azul. 1: sin cambio."
 
 msgctxt "setting_position"
 msgid "POSITION"

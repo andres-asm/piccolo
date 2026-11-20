@@ -176,6 +176,17 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     settings_ui_row(ui, PICCOLO_VIDEO_SCALING, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_MAX_OFFSCREEN, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_FILTER, nullptr);
+    bool choose_shader = false;
+    settings_ui_path_row_with_button(ui, PICCOLO_VIDEO_SHADER_PRESET, piccolo_text(ui->strings, Str::shader_preset_none),
+                                     piccolo_text(ui->strings, Str::shader_choose), &choose_shader);
+    if (choose_shader)
+    {
+        window->choose_shader_request = true;
+    }
+    if (context->image != nullptr && !context->image->controls_available)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::shader_unavailable));
+    }
     settings_ui_row(ui, PICCOLO_VIDEO_POSITION, nullptr);
 
     // The crop (and more image settings later) live in their own window.

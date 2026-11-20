@@ -32,6 +32,11 @@
 // The same window chooses a folder (file_picker_open_folder: SETTINGS' game
 // folders): CHOOSE FOLDER, no core, only folders (archives aren't folders
 // here), and USE THIS FOLDER picks the folder shown.
+//
+// It also picks a shader preset (FilePickerMode::shader_preset, from
+// SETTINGS > SHADER > CHOOSE): no core row, only .slangp files, no archives
+// (presets are always plain files), and NONE / USE instead of the game
+// buttons. It can go to any folder (e.g. a full slang-shaders checkout).
 
 #include <cstdint>
 #include <string>
@@ -48,8 +53,9 @@ constexpr size_t  FILE_PICKER_NAME_MAX    = 256;
 
 enum class FilePickerMode
 {
-    game,     // LOAD GAME: a core and a file
-    folder,   // CHOOSE FOLDER: a folder
+    game,            // LOAD GAME: a core and a file
+    folder,          // CHOOSE FOLDER: a folder
+    shader_preset,   // a .slangp for the SHADER setting
 };
 
 struct FilePicker
@@ -83,6 +89,7 @@ struct FilePicker
 };
 
 // What the user chose. CHOOSE FOLDER: the folder in content_path, no core.
+// Shader preset: the preset in content_path, or empty for NONE; no core.
 struct FilePickerChoice
 {
     char core_path[LIBRETRO_PATH_MAX]    = {};
@@ -98,6 +105,10 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
 // Opens CHOOSE FOLDER in `directory` (if it's a folder that exists; else
 // the first game folder that does, else the home folder).
 void file_picker_open_folder(FilePicker* picker, const char* directory, const std::vector<std::string>* game_folders);
+
+// Opens the window to pick a shader preset, in `directory` (if it doesn't
+// exist: the home folder).
+void file_picker_open_shader(FilePicker* picker, const char* directory);
 
 // Draws the window if open. Returns true on the frame the user picked
 // something; the picker closes itself then.

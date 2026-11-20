@@ -61,6 +61,7 @@ struct SettingsWindow
     std::string  save_theme_target;            // the custom theme SAVE replaces; "" = NEW (asks for a name)
     char         save_theme_name[48] = {};
     std::string  save_theme_request;           // SAVE was pressed with this name (piccolo saves it, then clears it)
+    bool         choose_shader_request = false;   // SHADER's CHOOSE was pressed (piccolo opens the picker, then clears it)
     std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match
     bool         theme_custom = false;         // THEME was set to CUSTOM (else CUSTOM only when no shipped theme matches)
     FolderSection folder_section = FolderSection::game_folders;   // GAME FOLDERS open at first

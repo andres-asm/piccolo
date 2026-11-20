@@ -28,6 +28,7 @@
 #include "game_mode.h"
 #include "host_libretro_version.h"
 #include "picture.h"
+#include "shader_chain.h"
 #include "piccolo_version.h"
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -160,6 +161,7 @@ struct App
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
     FilePicker  picker  = {};
+    FilePicker  shader_picker = {};   // SETTINGS > SHADER > CHOOSE
     bool        menu_visible = true;   // only hideable while a game runs
 
     // What the LOAD GAME window picked, started at the top of the NEXT loop:
@@ -171,6 +173,18 @@ struct App
     // piccolo's folder, and what was used last (<settings>/last_used.cfg).
     AppPaths    paths = {};
     Picture     picture = {};   // the game on screen (viewport + filter)
+    ShaderLibrary shader_library = {};   // librashader, when it's there
+    ShaderChain   shader_chain = {};     // pass 0 + the shader preset on the picture (instead of `picture`)
+    // piccolo's own presets (shaders/): pass 0, and the final scale per
+    // filter (nearest, bilinear, sharp bilinear) when no preset is chosen.
+    std::string   shader_pass0_path;
+    std::string   shader_presets_folder;   // the curated presets (shaders/presets/): where CHOOSE opens
+    std::string   shader_scale_paths[3];
+    std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
+    std::string   shader_preset_seen;         // the preset setting those failures are for
+    float         pass0_applied[PICCOLO_PASS0_CONTROL_COUNT] = {};   // what pass 0's parameters hold
+    float         profile_applied[PICCOLO_PROFILE_PARAM_COUNT] = {};  // the same for the color profile's
+    bool          pass0_stale = true;         // set them all (pass 0 was just loaded)
     // The part of the core's frame on screen (a cursor maps from it to the
     // whole frame), and the ports' cursors for the core (mouse, pointer, lightgun).
     uint32_t           view_source[4] = {};      // x, y, width, height in core pixels
@@ -460,7 +474,7 @@ static void set_status(App* app, const char* text)
 // queued audio is dropped so resuming doesn't play stale sound.
 static void update_pause(App* app)
 {
-    bool menu_open = app->menu_visible || app->picker.open || app->settings_window.open ||
+    bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
@@ -1070,9 +1084,9 @@ static void refresh_audio_devices(App* app)
 // A window is open over the menu bar (or the game).
 static bool any_window_open(const App* app)
 {
-    return app->picker.open || app->settings_window.open || app->settings_window.image_open || app->quick_menu.open ||
-           app->core_options_manager || app->cores_window.open || app->safe_start_open || app->show_debug_window ||
-           app->input_window.open ||
+    return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
+           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
+           app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window);
 }
 
@@ -1115,6 +1129,10 @@ static void close_topmost_or_toggle_menu(App* app)
             {
                 app->input_window.open = false;
             }
+        }
+        else if (app->shader_picker.open)   // opened from SETTINGS: closes before it
+        {
+            app->shader_picker.open = false;
         }
         else if (app->picker.open && app->picker.mode == FilePickerMode::folder)
         {
@@ -1663,10 +1681,96 @@ static void app_handle_events(App* app)
 // Drawing
 // ---------------------------------------------------------------------------
 
+// Loads what each shader stage should hold when it changes: stage 0 = pass 0,
+// stage 1 = the preset setting, or piccolo's final scale for `filter` when
+// there's none (or it failed). Then pass 0's parameters from the settings,
+// only the ones that changed. A preset that fails isn't retried every frame.
+static bool shader_failed_before(const App* app, const std::string& path)
+{
+    for (size_t i = 0; i < app->shader_failed.size(); i++)
+    {
+        if (app->shader_failed[i] == path)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void load_shader_stage(App* app, uint32_t stage, const std::string& path)
+{
+    if (app->shader_chain.stages[stage].preset_path == path || shader_failed_before(app, path))
+    {
+        return;
+    }
+    if (path.empty())
+    {
+        shader_chain_clear(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage);
+    }
+    else if (!shader_chain_load(&app->shader_chain, &app->shader_library, &app->shell.vulkan, stage, path.c_str()))
+    {
+        app->shader_failed.push_back(path);
+    }
+    if (stage == 0)
+    {
+        app->pass0_stale = true;
+    }
+}
+
+static void update_shader_stages(App* app, ViewportFilter filter)
+{
+    if (!app->shader_library.loaded)
+    {
+        return;
+    }
+    const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
+    if (app->shader_preset_seen != preset)
+    {
+        app->shader_preset_seen = preset;   // a new choice: everything may be tried again
+        app->shader_failed.clear();
+    }
+    load_shader_stage(app, 0, app->shader_pass0_path);
+    const std::string* scale = &app->shader_scale_paths[static_cast<uint32_t>(filter)];
+    if (preset[0] != '\0' && !shader_failed_before(app, app->shader_preset_seen))
+    {
+        load_shader_stage(app, 1, app->shader_preset_seen);
+    }
+    else
+    {
+        load_shader_stage(app, 1, *scale);
+    }
+
+    if (app->shader_chain.stages[0].chain == nullptr)
+    {
+        return;
+    }
+    for (uint32_t i = 0; i < PICCOLO_PASS0_CONTROL_COUNT; i++)
+    {
+        float value = static_cast<float>(settings_get_real(&app->settings, PICCOLO_PASS0_CONTROLS[i].key));
+        if (app->pass0_stale || value != app->pass0_applied[i])
+        {
+            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
+            app->pass0_applied[i] = value;
+        }
+    }
+    float profile[PICCOLO_PROFILE_PARAM_COUNT] = {};
+    piccolo_color_profile_params(&app->settings, profile);
+    for (uint32_t i = 0; i < PICCOLO_PROFILE_PARAM_COUNT; i++)
+    {
+        if (app->pass0_stale || profile[i] != app->profile_applied[i])
+        {
+            shader_chain_set_param(&app->shader_chain, &app->shader_library, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
+            app->profile_applied[i] = profile[i];
+        }
+    }
+    app->pass0_stale = false;
+}
+
 static void draw_game(App* app)
 {
     CoreSession* session = &app->session;
     app->picture.ready = false;
+    app->shader_chain.ready = false;
     app->input.view_width = 0.0f;   // (until it is drawn)
     if (!game_running(app) || !session->texture.has_content || session->texture_id == 0)
     {
@@ -1681,9 +1785,21 @@ static void draw_game(App* app)
     input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
     piccolo_settings_viewport(&app->settings, &input);
 
+    update_shader_stages(app, input.filter);
+
     ViewportResult viewport = {};
-    if (viewport_compute(&input, &viewport) &&
-        picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport))
+    bool shaded = false;
+    bool shown = false;
+    if (viewport_compute(&input, &viewport))
+    {
+        shaded = shader_chain_prepare(&app->shader_chain, &app->shell.vulkan, &session->texture, &viewport);
+        shown = shaded || picture_prepare(&app->picture, &app->shell.vulkan, &session->texture, &viewport);
+    }
+    if (shaded)
+    {
+        app->picture.ready = false;   // the chain draws it; the picture records nothing
+    }
+    if (shown)
     {
         // Where the cursors live (window pixels), and the part of the frame it shows.
         app->input.view_x = static_cast<float>(viewport.x);
@@ -1697,7 +1813,15 @@ static void draw_game(App* app)
         app->view_frame[0] = input.frame_width;
         app->view_frame[1] = input.frame_height;
         // The background draw list is behind every window, menu bar included.
-        picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f, 0.0f);
+        if (shaded)
+        {
+            shader_chain_draw(&app->shader_chain, ImGui::GetBackgroundDrawList(), 0.0f, 0.0f);
+        }
+        else
+        {
+            picture_draw(&app->picture, ImGui::GetBackgroundDrawList(), &session->texture, session->texture_id, 0.0f,
+                         0.0f);
+        }
     }
 }
 
@@ -1798,7 +1922,19 @@ static void draw_settings(App* app)
         streaming_texture_uv_max(&session->texture, &image.uv_max_x, &image.uv_max_y);
         image.frame_width = session->texture.content_width;
         image.frame_height = session->texture.content_height;
+        // Pass 0's result (the shown part, after the crop): drawn over the
+        // preview so the picture controls show. Only once the chain has
+        // written it (a new image is still UNDEFINED while the UI is built).
+        const ShaderChain* chain = &app->shader_chain;
+        if (chain->ready && chain->stages[0].chain != nullptr && chain->middle.texture_id != 0 &&
+            chain->middle.layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        {
+            image.processed_texture_id = chain->middle.texture_id;
+            image.processed_width = chain->middle.width;
+            image.processed_height = chain->middle.height;
+        }
     }
+    image.controls_available = app->shader_library.loaded;
     SettingsWindowContext context = {};
     context.settings = &app->settings;
     context.paths = &app->paths;
@@ -1953,8 +2089,41 @@ static void draw_settings(App* app)
         }
     }
 
-    // Closed (by its button or Esc): apply the folders and save.
-    bool open = app->settings_window.open || app->settings_window.image_open;
+    // SHADER > CHOOSE: the picker opens in the chosen preset's folder, else
+    // in the curated presets.
+    if (app->settings_window.choose_shader_request)
+    {
+        app->settings_window.choose_shader_request = false;
+        std::string folder = settings_get_at(&app->settings, app->settings_window.scope, PICCOLO_VIDEO_SHADER_PRESET,
+                                             nullptr);
+        size_t slash = folder.find_last_of("/\\");
+        folder = slash == std::string::npos ? app->shader_presets_folder : folder.substr(0, slash);
+        if (!host_fs_exists(folder.c_str()))
+        {
+            folder = app->shader_presets_folder;
+        }
+        file_picker_open_shader(&app->shader_picker, folder.c_str());
+    }
+    FilePickerChoice shader_choice = {};
+    if (file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
+                         &shader_choice))
+    {
+        // NONE: no preset at this scope. Globally that's the default; a core
+        // or game says it explicitly, so a global preset doesn't apply there.
+        SettingLayer scope = app->settings_window.scope;
+        if (shader_choice.content_path[0] != '\0' || scope != SettingLayer::global)
+        {
+            settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, shader_choice.content_path);
+        }
+        else
+        {
+            settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
+        }
+    }
+
+    // Closed (by its button or Esc): apply the folders and save. The shader
+    // picker counts as part of it.
+    bool open = app->settings_window.open || app->settings_window.image_open || app->shader_picker.open;
     if (app->settings_window_was_open && !open)
     {
         apply_folders(app);
@@ -3216,6 +3385,40 @@ int main(int argc, char** argv)
     {
         io.IniFilename = nullptr;
     }
+
+    // librashader (shader presets): next to the program, in piccolo's folder,
+    // or wherever the system finds it. Without it, presets are off.
+    std::vector<std::string> shader_library_folders;
+    const char* program_folder_for_shaders = SDL_GetBasePath();   // SDL owns it
+    if (program_folder_for_shaders != nullptr)
+    {
+        shader_library_folders.push_back(program_folder_for_shaders);
+    }
+    shader_library_folders.push_back(app->paths.root);
+    shader_library_load(&app->shader_library, shader_library_folders);
+    // piccolo's own presets: the user's copy in piccolo's folder wins over
+    // the ones that come with piccolo (next to the program), like lang/.
+    {
+        std::string user_folder = app->paths.root.empty() ? std::string() : app->paths.root + "/shaders/";
+        std::string bundled_folder = std::string(program_folder_for_shaders != nullptr ? program_folder_for_shaders : "") +
+                                     "shaders/";
+        host_fs_forward_slashes(bundled_folder.data());
+        const char* names[4] = {"pass0.slangp", "scale-nearest.slangp", "scale-bilinear.slangp",
+                                "scale-sharp-bilinear.slangp"};
+        std::string* targets[4] = {&app->shader_pass0_path, &app->shader_scale_paths[0], &app->shader_scale_paths[1],
+                                   &app->shader_scale_paths[2]};
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            std::string user_copy = user_folder.empty() ? std::string() : user_folder + names[i];
+            *targets[i] = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? user_copy : bundled_folder + names[i];
+        }
+        // The curated presets: the copy in piccolo's folder when the build
+        // put one there, else the one next to the program.
+        std::string user_presets = user_folder.empty() ? std::string() : user_folder + "presets";
+        app->shader_presets_folder = !user_presets.empty() && host_fs_exists(user_presets.c_str()) ? user_presets
+                                                                                                  : bundled_folder + "presets";
+    }
+
     // Controllers: MAP CONTROLLER's mappings are in their profiles (input.cfg);
     // settings/gamecontrollerdb.txt, if the user drops one in (SDL's format),
     // adds to the ones SDL knows.
@@ -3552,6 +3755,8 @@ int main(int argc, char** argv)
             if (app_shell_acquire(&app->shell))
             {
                 picture_record(&app->picture, renderer_command_buffer(&app->shell.renderer), &app->session.texture);
+                shader_chain_record(&app->shader_chain, &app->shader_library,
+                                    renderer_command_buffer(&app->shell.renderer), &app->session.texture);
             }
             if (!app_shell_present(&app->shell, background))
             {
@@ -3578,6 +3783,8 @@ int main(int argc, char** argv)
     }
     quick_menu_destroy(&app->quick_menu, &app->shell);
     picture_destroy(&app->picture, &app->shell.vulkan);
+    shader_chain_destroy(&app->shader_chain, &app->shader_library, &app->shell.vulkan);
+    shader_library_unload(&app->shader_library);
     if (!app->input_config_path.empty())
     {
         input_config_save(&app->input, app->input_config_path.c_str());
