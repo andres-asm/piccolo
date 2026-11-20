@@ -54,8 +54,10 @@ done
 echo "== build tools for this machine"
 # piccolo's build runs multitap_strings_generator (the string IDs); a cross
 # build can't run what it builds, so it's built for this machine first.
+# SDL_UNIX_CONSOLE_BUILD: nothing here opens a window, so SDL needn't find
+# X11 / Wayland development packages on the build machine (CI runners).
 cmake -S "$root" -B "$host_build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_BUILD_TESTS=OFF \
-    -DMULTITAP_PICCOLO_DIR= >/dev/null
+    -DMULTITAP_PICCOLO_DIR= -DSDL_UNIX_CONSOLE_BUILD=ON >/dev/null
 cmake --build "$host_build" --target multitap_strings_generator
 generator=$(find "$host_build" -type f -name multitap_strings_generator | head -n 1)
 

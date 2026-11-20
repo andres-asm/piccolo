@@ -62,12 +62,12 @@ jobs:
           unzip -q "$RUNNER_TEMP/ndk.zip" -d "$HOME"
 
       # The host build (strings generator) configures all of piccolo, so it
-      # needs the desktop build's packages too (Vulkan headers, SDL's deps).
+      # needs the Vulkan headers (SDL is a console build there: no X11).
       - name: SDK platform, build tools, Ninja, host packages
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-${ANDROID_API}" "build-tools;${BUILD_TOOLS}" > /dev/null
           sudo apt-get update -q
-          sudo apt-get install -y -q ninja-build libvulkan-dev libx11-dev libxext-dev
+          sudo apt-get install -y -q ninja-build libvulkan-dev
 
       - name: Build the APK
         run: |
