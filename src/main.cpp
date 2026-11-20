@@ -24,6 +24,7 @@
 #include "app_paths.h"
 #include "app_shell.h"
 #include "bundled_files.h"
+#include "main_loop.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
@@ -1077,7 +1078,10 @@ static void update_window(App* app)
 {
     ViewportInput picture = {};
     bool has_picture = game_picture(app, &picture);
-    piccolo_window_apply(&app->window, app->shell.window, &app->settings, has_picture ? &picture : nullptr);
+    if (!main_loop_window_follows_page())
+    {
+        piccolo_window_apply(&app->window, app->shell.window, &app->settings, has_picture ? &picture : nullptr);
+    }
 }
 
 // Keyboard as the game's joypad only while the game has the screen.
@@ -3306,6 +3310,324 @@ static void net_update_locked(App* app)
     net_follow_stream_tuning(app);
 }
 
+// One turn of piccolo's loop: events, the game's frame, the UI, present.
+// False when piccolo should end (QUIT, or a fatal rendering error). Called
+// by main_loop_run: a plain loop on desktop, the browser's animation frames
+// in the web build (main_loop.h).
+static bool app_frame(App* app)
+{
+    app_handle_events(app);
+    net_update(app);
+    if (app->pending_close_game)
+    {
+        app->pending_close_game = false;
+        save_core_options(app);
+        core_session_stop(&app->session, &app->shell);   // writes save RAM
+        remove_running_marker(app);   // a proper end
+        update_settings_context(app);
+        app->menu_visible = true;
+        set_status(app, piccolo_text(&app->strings, Str::status_game_closed));
+    }
+    if (app->has_pending_start)
+    {
+        app->has_pending_start = false;
+        bool started = start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
+        // SAFE START asking: answered once it's decided (below, or the
+        // start that follows its answer).
+        if (app->net_load_waiting && !app->safe_start_open)
+        {
+            net_answer_load(app, started ? NetContentStatus::ok : NetContentStatus::failed);
+        }
+    }
+    update_pause(app);
+    app->session.timing.mode = piccolo_settings_timing(&app->settings);
+    app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
+    update_window(app);
+    update_language(app);
+    RetroUiPalette palette = {};
+    piccolo_settings_palette(&app->settings, &palette);   // the Interface settings, live
+    retro_ui_set_palette(&palette);
+    // BACKGROUND behind the menu; while a game runs, black around its picture.
+    uint32_t back = game_running(app) ? 0xFF000000u : palette.background;
+    ClearColor background = {static_cast<float>((back >> 16) & 0xFFu) / 255.0f,
+                             static_cast<float>((back >> 8) & 0xFFu) / 255.0f,
+                             static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
+    app_shell_set_frames_in_flight(&app->shell, piccolo_settings_frames_in_flight(&app->settings));
+    // RUN-AHEAD: the setting, or a streaming device's tuning (in memory
+    // only) when it isn't "host's".
+    {
+        int32_t run_ahead = settings_get_int(&app->settings, PICCOLO_LATENCY_RUN_AHEAD);
+        if (stream_delay_overrides(app))
+        {
+            run_ahead = app->stream_tuning.run_ahead;
+        }
+        if (app->session.host != nullptr)
+        {
+            libretro_host_set_run_ahead(app->session.host, static_cast<unsigned>(run_ahead > 0 ? run_ahead : 0));
+        }
+    }
+    // A streaming device's frame delay needs present waits (piccolo's
+    // frame delay works only that way): turned on here, in memory only.
+    app_shell_set_wait_for_present(&app->shell,
+                                   settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
+                                       (stream_delay_overrides(app) &&
+                                        app->stream_tuning.delay != NetStreamDelay::off));
+    piccolo_settings_audio(&app->settings, &app->session.audio_config);
+    apply_learned_latency(app);
+    // Held for the whole game, paused or not: a request is a D-Bus call
+    // that may block, so not on every pause and resume.
+    game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
+    core_session_update(&app->session, &app->shell, game_has_keyboard(app));
+    if (app->option_cache.dirty)
+    {
+        save_core_options(app);   // a core declared new options: on disk before it can crash
+    }
+    if (app->marker_written && !app->marker_options_changed && app->option_store.dirty)
+    {
+        app->marker_options_changed = true;   // recorded in case this change brings the core down
+        write_running_marker(app);
+    }
+    app_update_input(app);
+    CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, &app->cursor_input, game_has_keyboard(app));
+    if (ran == CoreSessionFrame::ran)
+    {
+        net_stream_frame(app);
+    }
+    if (ran != CoreSessionFrame::skipped || !game_running(app))
+    {
+        input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
+    }
+    if (ran == CoreSessionFrame::shut_down)
+    {
+        set_status(app, app->session.message);
+        app->menu_visible = true;
+        update_settings_context(app);
+        remove_running_marker(app);   // the core shut down on its own: a proper end
+    }
+
+    if (app_shell_begin_frame(&app->shell))
+    {
+        app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
+
+        draw_game(app);   // background, behind everything
+        bool menu_shown = app->menu_visible || !game_running(app);
+        if (menu_shown)
+        {
+            // The status line's window goes first, so it stays behind the others.
+            retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
+            int32_t recent_picked = -1;
+            MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
+                                                  app->recent_label_pointers.data(),
+                                                  static_cast<int32_t>(app->recent_label_pointers.size()),
+                                                  &recent_picked, app->open_first_menu);
+            app->open_first_menu = false;
+            if (action == MenuAction::recent_game && recent_picked >= 0)
+            {
+                // Started at the top of the next loop, like LOAD GAME (see pending_start).
+                const RecentGame* game = &app->recent.games[static_cast<size_t>(recent_picked)];
+                app->pending_start = FilePickerChoice{};
+                std::snprintf(app->pending_start.core_path, sizeof(app->pending_start.core_path), "%s",
+                              game->core_path.c_str());
+                std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s",
+                              game->content_path.c_str());
+                app->has_pending_start = true;
+            }
+            handle_menu_action(app, action);
+        }
+
+        draw_settings(app);
+        // After SETTINGS, so CHOOSE FOLDER opened from it is drawn on top.
+        FilePickerChoice picked;
+        bool choosing_folder = app->picker.mode == FilePickerMode::folder;
+        if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &picked))
+        {
+            if (choosing_folder)
+            {
+                choose_folder_done(app, &picked);
+            }
+            else
+            {
+                app->pending_start = picked;
+                app->has_pending_start = true;   // see pending_start
+            }
+        }
+        if (!game_running(app))
+        {
+            app->quick_menu.open = false;
+        }
+        QuickMenuContext quick = {};
+        quick.strings = &app->strings;
+        quick.session = &app->session;
+        quick.core_options_state = &app->core_options_state;
+        quick.core_options = core_options_context(app);
+        quick.input = &app->input;
+        quick.host = app->session.host;
+        quick.settings = &app->settings;
+        uint32_t slot_before = app->quick_menu.slot;
+        quick.sdl = &app->input_sdl;
+        quick.layouts = &app->layouts;
+        quick.now_ms = SDL_GetTicks();
+        QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
+        draw_remap_prompt(app);
+        if (app->quick_menu.slot != slot_before || app->quick_menu.open)
+        {
+            app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot
+        }
+        switch (quick_action)
+        {
+        case QuickMenuAction::save:
+            save_state_with_thumbnail(app);
+            set_status(app, app->session.message);
+            break;
+        case QuickMenuAction::load:
+            if (core_session_load_state(&app->session))
+            {
+                app->quick_menu.open = false;   // back to the game
+            }
+            set_status(app, app->session.message);
+            break;
+        case QuickMenuAction::reset:
+            libretro_host_reset(app->session.host);
+            set_status(app, piccolo_text(&app->strings, Str::status_reset));
+            app->quick_menu.open = false;
+            break;
+        case QuickMenuAction::close_game:
+            app->pending_close_game = true;   // the texture may be in this frame already
+            app->quick_menu.open = false;
+            break;
+        case QuickMenuAction::none:
+            break;
+        }
+        CoreOptionsUiContext manager = core_options_context(app);
+        core_options_manager_draw(&app->core_options_manager, &app->core_options_state, &manager, app->pixel_font,
+                                  app->ui_scale);
+        if (app->core_options_manager_was_open && !app->core_options_manager)
+        {
+            save_core_options(app);   // what was deleted
+        }
+        app->core_options_manager_was_open = app->core_options_manager;
+        // The core downloader: pick up what finished; the catalog sees
+        // installed or removed cores right away.
+        core_updater_poll(&app->core_updater);
+        if (app->core_updater.cores_changed)
+        {
+            app->core_updater.cores_changed = false;
+            core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
+        }
+        std::string running_file = running_core_file(app);
+        CoresWindowContext cores_context = {};
+        cores_context.strings = &app->strings;
+        cores_context.updater = &app->core_updater;
+        cores_context.running_file = running_file.c_str();
+        app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+        cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
+        if (app->cores_window.show_non_free_changed)
+        {
+            app->cores_window.show_non_free_changed = false;
+            settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
+                              app->cores_window.show_non_free);
+            save_settings(app);
+        }
+        InputWindowContext input_context = {};
+        input_context.input = &app->input;
+        input_context.sdl = &app->input_sdl;
+        input_context.strings = &app->strings;
+        input_context.settings = &app->settings;
+        input_context.core_name = app->core_name;
+        input_context.game_name = app->game_name;
+        input_context.layouts = &app->layouts;
+        input_context.now_ms = SDL_GetTicks();
+        bool input_was_open = app->input_window.open;
+        input_window_draw(&app->input_window, &input_context, app->pixel_font, app->ui_scale);
+        MapWindowContext map_context = {};
+        map_context.input = &app->input;
+        map_context.strings = &app->strings;
+        map_context.layouts = &app->layouts;
+        map_context.now_ms = SDL_GetTicks();
+        map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
+        if (input_was_open && !app->input_window.open)
+        {
+            save_settings(app);   // SETTINGS tab
+            if (app->input_window.dirty && !app->input_config_path.empty())
+            {
+                input_config_save(&app->input, app->input_config_path.c_str());   // closed: keep what changed
+                app->input_window.dirty = false;
+            }
+        }
+        if (app->safe_start_open)
+        {
+            SafeStartChoice answer = safe_start_window_draw(app->pixel_font, app->ui_scale, &app->strings,
+                                                            app->crashed_core.c_str(), app->crashed_after_options);
+            if (answer == SafeStartChoice::delete_stored)
+            {
+                std::vector<std::string> sections;
+                core_options_store_sections_of(&app->option_store, app->crashed_core.c_str(), &sections);
+                for (size_t i = 0; i < sections.size(); i++)
+                {
+                    core_options_store_remove_section(&app->option_store, sections[i].c_str());
+                }
+                save_core_options(app);
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Safe start: deleted the stored options of %s",
+                            app->crashed_core.c_str());
+            }
+            if (answer == SafeStartChoice::defaults)
+            {
+                app->session.skip_stored_options_once = true;
+            }
+            if (answer == SafeStartChoice::stored || answer == SafeStartChoice::defaults ||
+                answer == SafeStartChoice::delete_stored)
+            {
+                app->pending_start = app->safe_start_pending;   // started at the top of the next loop
+                app->has_pending_start = true;
+                app->safe_start_confirmed = true;
+            }
+            if (answer != SafeStartChoice::none)
+            {
+                app->safe_start_open = false;
+                if (app->net_load_waiting && !app->has_pending_start)
+                {
+                    net_answer_load(app, NetContentStatus::failed);   // not started after all
+                }
+            }
+        }
+        if (app->show_debug_window)
+        {
+            app_draw_debug_ui(app);
+        }
+
+        bool ui_up = ui_is_up(app);
+        save_after_options_windows(app);
+        retro_ui_scrollbars(app->ui_scale);
+        retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
+
+        core_session_upload_video(&app->session, &app->shell);
+        quick_menu_upload(&app->quick_menu, &app->shell);
+        if (app_shell_acquire(&app->shell))
+        {
+            video_output_record(&app->video, &app->shader_library, &app->shell, &app->session.texture);
+        }
+        if (!app_shell_present(&app->shell, background))
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
+            return false;
+        }
+        if (main_loop_can_wait())
+        {
+            frame_delay(app);
+        }
+    }
+    if (main_loop_can_wait())
+    {
+        core_session_wait(&app->session);   // the browser paces its own frames (main_loop.h)
+    }
+    return app->running;
+}
+
+static bool app_frame_callback(void* data)
+{
+    return app_frame(static_cast<App*>(data));
+}
+
 int main(int argc, char** argv)
 {
     (void)argc;
@@ -3341,6 +3663,7 @@ int main(int argc, char** argv)
     {
         SDL_SetWindowTitle(app->shell.window, "piccolo " PICCOLO_VERSION);
     }
+    main_loop_prepare_window(app->shell.window);
     debug_ui_set_draw_data_hook(add_text_shadows, app);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
@@ -3477,307 +3800,7 @@ int main(int argc, char** argv)
     refresh_audio_devices(app);
 
     app->running = true;
-    while (app->running)
-    {
-        app_handle_events(app);
-        net_update(app);
-        if (app->pending_close_game)
-        {
-            app->pending_close_game = false;
-            save_core_options(app);
-            core_session_stop(&app->session, &app->shell);   // writes save RAM
-            remove_running_marker(app);   // a proper end
-            update_settings_context(app);
-            app->menu_visible = true;
-            set_status(app, piccolo_text(&app->strings, Str::status_game_closed));
-        }
-        if (app->has_pending_start)
-        {
-            app->has_pending_start = false;
-            bool started = start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
-            // SAFE START asking: answered once it's decided (below, or the
-            // start that follows its answer).
-            if (app->net_load_waiting && !app->safe_start_open)
-            {
-                net_answer_load(app, started ? NetContentStatus::ok : NetContentStatus::failed);
-            }
-        }
-        update_pause(app);
-        app->session.timing.mode = piccolo_settings_timing(&app->settings);
-        app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
-        update_window(app);
-        update_language(app);
-        RetroUiPalette palette = {};
-        piccolo_settings_palette(&app->settings, &palette);   // the Interface settings, live
-        retro_ui_set_palette(&palette);
-        // BACKGROUND behind the menu; while a game runs, black around its picture.
-        uint32_t back = game_running(app) ? 0xFF000000u : palette.background;
-        ClearColor background = {static_cast<float>((back >> 16) & 0xFFu) / 255.0f,
-                                 static_cast<float>((back >> 8) & 0xFFu) / 255.0f,
-                                 static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
-        app_shell_set_frames_in_flight(&app->shell, piccolo_settings_frames_in_flight(&app->settings));
-        // RUN-AHEAD: the setting, or a streaming device's tuning (in memory
-        // only) when it isn't "host's".
-        {
-            int32_t run_ahead = settings_get_int(&app->settings, PICCOLO_LATENCY_RUN_AHEAD);
-            if (stream_delay_overrides(app))
-            {
-                run_ahead = app->stream_tuning.run_ahead;
-            }
-            if (app->session.host != nullptr)
-            {
-                libretro_host_set_run_ahead(app->session.host, static_cast<unsigned>(run_ahead > 0 ? run_ahead : 0));
-            }
-        }
-        // A streaming device's frame delay needs present waits (piccolo's
-        // frame delay works only that way): turned on here, in memory only.
-        app_shell_set_wait_for_present(&app->shell,
-                                       settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
-                                           (stream_delay_overrides(app) &&
-                                            app->stream_tuning.delay != NetStreamDelay::off));
-        piccolo_settings_audio(&app->settings, &app->session.audio_config);
-        apply_learned_latency(app);
-        // Held for the whole game, paused or not: a request is a D-Bus call
-        // that may block, so not on every pause and resume.
-        game_mode_set(&app->game_mode, game_running(app) && settings_get_bool(&app->settings, PICCOLO_GAME_MODE));
-        core_session_update(&app->session, &app->shell, game_has_keyboard(app));
-        if (app->option_cache.dirty)
-        {
-            save_core_options(app);   // a core declared new options: on disk before it can crash
-        }
-        if (app->marker_written && !app->marker_options_changed && app->option_store.dirty)
-        {
-            app->marker_options_changed = true;   // recorded in case this change brings the core down
-            write_running_marker(app);
-        }
-        app_update_input(app);
-        CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, &app->cursor_input, game_has_keyboard(app));
-        if (ran == CoreSessionFrame::ran)
-        {
-            net_stream_frame(app);
-        }
-        if (ran != CoreSessionFrame::skipped || !game_running(app))
-        {
-            input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
-        }
-        if (ran == CoreSessionFrame::shut_down)
-        {
-            set_status(app, app->session.message);
-            app->menu_visible = true;
-            update_settings_context(app);
-            remove_running_marker(app);   // the core shut down on its own: a proper end
-        }
-
-        if (app_shell_begin_frame(&app->shell))
-        {
-            app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
-
-            draw_game(app);   // background, behind everything
-            bool menu_shown = app->menu_visible || !game_running(app);
-            if (menu_shown)
-            {
-                // The status line's window goes first, so it stays behind the others.
-                retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
-                int32_t recent_picked = -1;
-                MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
-                                                      app->recent_label_pointers.data(),
-                                                      static_cast<int32_t>(app->recent_label_pointers.size()),
-                                                      &recent_picked, app->open_first_menu);
-                app->open_first_menu = false;
-                if (action == MenuAction::recent_game && recent_picked >= 0)
-                {
-                    // Started at the top of the next loop, like LOAD GAME (see pending_start).
-                    const RecentGame* game = &app->recent.games[static_cast<size_t>(recent_picked)];
-                    app->pending_start = FilePickerChoice{};
-                    std::snprintf(app->pending_start.core_path, sizeof(app->pending_start.core_path), "%s",
-                                  game->core_path.c_str());
-                    std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s",
-                                  game->content_path.c_str());
-                    app->has_pending_start = true;
-                }
-                handle_menu_action(app, action);
-            }
-
-            draw_settings(app);
-            // After SETTINGS, so CHOOSE FOLDER opened from it is drawn on top.
-            FilePickerChoice picked;
-            bool choosing_folder = app->picker.mode == FilePickerMode::folder;
-            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &picked))
-            {
-                if (choosing_folder)
-                {
-                    choose_folder_done(app, &picked);
-                }
-                else
-                {
-                    app->pending_start = picked;
-                    app->has_pending_start = true;   // see pending_start
-                }
-            }
-            if (!game_running(app))
-            {
-                app->quick_menu.open = false;
-            }
-            QuickMenuContext quick = {};
-            quick.strings = &app->strings;
-            quick.session = &app->session;
-            quick.core_options_state = &app->core_options_state;
-            quick.core_options = core_options_context(app);
-            quick.input = &app->input;
-            quick.host = app->session.host;
-            quick.settings = &app->settings;
-            uint32_t slot_before = app->quick_menu.slot;
-            quick.sdl = &app->input_sdl;
-            quick.layouts = &app->layouts;
-            quick.now_ms = SDL_GetTicks();
-            QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
-            draw_remap_prompt(app);
-            if (app->quick_menu.slot != slot_before || app->quick_menu.open)
-            {
-                app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot
-            }
-            switch (quick_action)
-            {
-            case QuickMenuAction::save:
-                save_state_with_thumbnail(app);
-                set_status(app, app->session.message);
-                break;
-            case QuickMenuAction::load:
-                if (core_session_load_state(&app->session))
-                {
-                    app->quick_menu.open = false;   // back to the game
-                }
-                set_status(app, app->session.message);
-                break;
-            case QuickMenuAction::reset:
-                libretro_host_reset(app->session.host);
-                set_status(app, piccolo_text(&app->strings, Str::status_reset));
-                app->quick_menu.open = false;
-                break;
-            case QuickMenuAction::close_game:
-                app->pending_close_game = true;   // the texture may be in this frame already
-                app->quick_menu.open = false;
-                break;
-            case QuickMenuAction::none:
-                break;
-            }
-            CoreOptionsUiContext manager = core_options_context(app);
-            core_options_manager_draw(&app->core_options_manager, &app->core_options_state, &manager, app->pixel_font,
-                                      app->ui_scale);
-            if (app->core_options_manager_was_open && !app->core_options_manager)
-            {
-                save_core_options(app);   // what was deleted
-            }
-            app->core_options_manager_was_open = app->core_options_manager;
-            // The core downloader: pick up what finished; the catalog sees
-            // installed or removed cores right away.
-            core_updater_poll(&app->core_updater);
-            if (app->core_updater.cores_changed)
-            {
-                app->core_updater.cores_changed = false;
-                core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
-            }
-            std::string running_file = running_core_file(app);
-            CoresWindowContext cores_context = {};
-            cores_context.strings = &app->strings;
-            cores_context.updater = &app->core_updater;
-            cores_context.running_file = running_file.c_str();
-            app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
-            cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
-            if (app->cores_window.show_non_free_changed)
-            {
-                app->cores_window.show_non_free_changed = false;
-                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
-                                  app->cores_window.show_non_free);
-                save_settings(app);
-            }
-            InputWindowContext input_context = {};
-            input_context.input = &app->input;
-            input_context.sdl = &app->input_sdl;
-            input_context.strings = &app->strings;
-            input_context.settings = &app->settings;
-            input_context.core_name = app->core_name;
-            input_context.game_name = app->game_name;
-            input_context.layouts = &app->layouts;
-            input_context.now_ms = SDL_GetTicks();
-            bool input_was_open = app->input_window.open;
-            input_window_draw(&app->input_window, &input_context, app->pixel_font, app->ui_scale);
-            MapWindowContext map_context = {};
-            map_context.input = &app->input;
-            map_context.strings = &app->strings;
-            map_context.layouts = &app->layouts;
-            map_context.now_ms = SDL_GetTicks();
-            map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
-            if (input_was_open && !app->input_window.open)
-            {
-                save_settings(app);   // SETTINGS tab
-                if (app->input_window.dirty && !app->input_config_path.empty())
-                {
-                    input_config_save(&app->input, app->input_config_path.c_str());   // closed: keep what changed
-                    app->input_window.dirty = false;
-                }
-            }
-            if (app->safe_start_open)
-            {
-                SafeStartChoice answer = safe_start_window_draw(app->pixel_font, app->ui_scale, &app->strings,
-                                                                app->crashed_core.c_str(), app->crashed_after_options);
-                if (answer == SafeStartChoice::delete_stored)
-                {
-                    std::vector<std::string> sections;
-                    core_options_store_sections_of(&app->option_store, app->crashed_core.c_str(), &sections);
-                    for (size_t i = 0; i < sections.size(); i++)
-                    {
-                        core_options_store_remove_section(&app->option_store, sections[i].c_str());
-                    }
-                    save_core_options(app);
-                    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Safe start: deleted the stored options of %s",
-                                app->crashed_core.c_str());
-                }
-                if (answer == SafeStartChoice::defaults)
-                {
-                    app->session.skip_stored_options_once = true;
-                }
-                if (answer == SafeStartChoice::stored || answer == SafeStartChoice::defaults ||
-                    answer == SafeStartChoice::delete_stored)
-                {
-                    app->pending_start = app->safe_start_pending;   // started at the top of the next loop
-                    app->has_pending_start = true;
-                    app->safe_start_confirmed = true;
-                }
-                if (answer != SafeStartChoice::none)
-                {
-                    app->safe_start_open = false;
-                    if (app->net_load_waiting && !app->has_pending_start)
-                    {
-                        net_answer_load(app, NetContentStatus::failed);   // not started after all
-                    }
-                }
-            }
-            if (app->show_debug_window)
-            {
-                app_draw_debug_ui(app);
-            }
-
-            bool ui_up = ui_is_up(app);
-            save_after_options_windows(app);
-            retro_ui_scrollbars(app->ui_scale);
-            retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
-
-            core_session_upload_video(&app->session, &app->shell);
-            quick_menu_upload(&app->quick_menu, &app->shell);
-            if (app_shell_acquire(&app->shell))
-            {
-                video_output_record(&app->video, &app->shader_library, &app->shell, &app->session.texture);
-            }
-            if (!app_shell_present(&app->shell, background))
-            {
-                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
-                break;
-            }
-            frame_delay(app);
-        }
-        core_session_wait(&app->session);
-    }
+    main_loop_run(app_frame_callback, app);
 
     piccolo_window_capture(&app->window, app->shell.window);
     save_last_used(app);
