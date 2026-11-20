@@ -23,6 +23,7 @@
 #include "app_icon.h"
 #include "app_paths.h"
 #include "app_shell.h"
+#include "bundled_files.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
@@ -2658,6 +2659,7 @@ int main(int argc, char** argv)
     ImGuiIO& io = ImGui::GetIO();
     if (app_paths_init(&app->paths, "piccolo", "piccolo.cfg"))
     {
+        bundled_files_install_cores(app->paths.cores.c_str());   // before the catalog first looks
         app->imgui_ini = app->paths.settings + "/imgui.ini";
         io.IniFilename = app->imgui_ini.c_str();
         app->settings_path = app->paths.settings + "/piccolo.cfg";
@@ -2691,8 +2693,9 @@ int main(int argc, char** argv)
     std::string database_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamecontrollerdb.txt";
     // Controller layouts: the ones next to the program, then piccolo's folder's
     // (the same id there wins), and GENERIC built in if neither has it.
-    const char* program_folder = SDL_GetBasePath();
-    std::string bundled_layouts = std::string(program_folder != nullptr ? program_folder : "") + "layouts";
+    // (next to the program; on Android a copy out of the APK: bundled_files.h)
+    std::string program_folder = bundled_files_data_folder();
+    std::string bundled_layouts = program_folder + "layouts";
     host_fs_forward_slashes(bundled_layouts.data());
     input_layouts_load_directory(&app->layouts, bundled_layouts.c_str());
     if (!app->paths.root.empty())
@@ -2702,7 +2705,7 @@ int main(int argc, char** argv)
     input_layouts_ensure_generic(&app->layouts);
     // Interface themes from files: the ones next to the program, then piccolo's
     // folder's (the same name there wins). The built-in ones are in retro_ui.cpp.
-    std::string bundled_themes = std::string(program_folder != nullptr ? program_folder : "") + "themes";
+    std::string bundled_themes = program_folder + "themes";
     host_fs_forward_slashes(bundled_themes.data());
     piccolo_themes_load_directory(&app->themes, bundled_themes.c_str());
     if (!app->paths.root.empty())
