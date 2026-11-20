@@ -65,8 +65,10 @@ if [ "${1:-}" = "--legacy" ]; then
 fi
 if [ "$legacy" = 1 ]; then
     MIN_API=21
-    ABI=armeabi-v7a
-    native="$build/native-legacy"
+    # PICCOLO_LEGACY_ABI=arm64-v8a: the same GLES 2 build for 64-bit devices
+    # (to tell a 32-bit driver's problem from ours on a device that runs both).
+    ABI=${PICCOLO_LEGACY_ABI:-armeabi-v7a}
+    native="$build/native-legacy-$ABI"
     apk_name=piccolo-legacy.apk
     gpu_flags="-DMULTITAP_GPU_VULKAN=OFF -DMULTITAP_GL_ES2=ON"
 else
