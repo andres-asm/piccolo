@@ -36,6 +36,7 @@
 #include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
+#include "text_input_window.h"
 #include "settings_window.h"
 #include "host_fs.h"
 #include "settings_file.h"
@@ -261,6 +262,9 @@ struct App
     std::string      marker_content_path;
     std::string      crashed_core;                    // short name of the core whose session didn't end
     bool             crashed_after_options = false;
+    // A core's TEXT request (text_input_window.h): open while it's pending.
+    TextInputWindow  text_input_window = {};
+
     bool             safe_start_open = false;
     bool             safe_start_confirmed = false;    // the next start skips the check (answered)
     FilePickerChoice safe_start_pending = {};
@@ -465,6 +469,12 @@ static bool game_running(const App* app)
     return core_session_running(&app->session);
 }
 
+// The running core asked for a string (TEXT): its box is up, the game paused.
+static bool text_input_pending(const App* app)
+{
+    return game_running(app) && app->session.host->text_input.mode == RETRO_EXT_TEXT_INPUT_TEXT;
+}
+
 static void set_status(App* app, const char* text)
 {
     std::snprintf(app->status, sizeof(app->status), "%s", text);
@@ -477,7 +487,9 @@ static void update_pause(App* app)
     bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
-    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
+    // The text box always pauses (the core's text isn't typed into a running game).
+    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
+                          text_input_pending(app);
     // Not while a device streams: whoever plays is looking at the phone, not
     // at this window.
     bool pause_for_focus = !app->window_focused && !app->net_streaming &&
@@ -1087,7 +1099,7 @@ static bool any_window_open(const App* app)
     return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
            app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
-           map_window_open_now(&app->map_window);
+           map_window_open_now(&app->map_window) || text_input_pending(app);
 }
 
 // A menu or a dialog is up: the controllers drive it, not the game.
@@ -1107,7 +1119,11 @@ static bool game_has_keyboard(const App* app)
 static void close_topmost_or_toggle_menu(App* app)
 {
     {
-        if (map_window_open_now(&app->map_window))
+        if (text_input_pending(app))
+        {
+            libretro_host_text_input_answer(app->session.host, nullptr);   // the core's box is on top: cancelled
+        }
+        else if (map_window_open_now(&app->map_window))
         {
             map_window_close(&app->map_window, &app->input);
         }
@@ -3333,6 +3349,13 @@ int main(int argc, char** argv)
         delete app;
         return 1;
     }
+    // A build from a branch other than main has the branch in its version ("0.3-osk"):
+    // show it in the window title, so a test build says which branch opened it.
+    constexpr std::string_view version = PICCOLO_VERSION;
+    if (version.find('-') != std::string_view::npos)
+    {
+        SDL_SetWindowTitle(app->shell.window, "piccolo " PICCOLO_VERSION);
+    }
     debug_ui_set_draw_data_hook(add_text_shadows, app);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
@@ -3670,12 +3693,18 @@ int main(int argc, char** argv)
             cores_context.updater = &app->core_updater;
             cores_context.running_file = running_file.c_str();
             app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+            app->cores_window.show_legacy = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_LEGACY);
+            app->cores_window.show_experimental = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_EXPERIMENTAL);
             cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
-            if (app->cores_window.show_non_free_changed)
+            if (app->cores_window.show_changed)
             {
-                app->cores_window.show_non_free_changed = false;
+                app->cores_window.show_changed = false;
                 settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
                                   app->cores_window.show_non_free);
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_LEGACY,
+                                  app->cores_window.show_legacy);
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_EXPERIMENTAL,
+                                  app->cores_window.show_experimental);
                 save_settings(app);
             }
             InputWindowContext input_context = {};
@@ -3738,6 +3767,19 @@ int main(int argc, char** argv)
                     {
                         net_answer_load(app, NetContentStatus::failed);   // not started after all
                     }
+                }
+            }
+            if (text_input_pending(app))
+            {
+                TextInputChoice answer = text_input_window_draw(&app->text_input_window, &app->session.host->text_input,
+                                                                app->pixel_font, app->ui_scale, &app->strings);
+                if (answer == TextInputChoice::ok)
+                {
+                    libretro_host_text_input_answer(app->session.host, app->text_input_window.buffer);
+                }
+                else if (answer == TextInputChoice::cancel)
+                {
+                    libretro_host_text_input_answer(app->session.host, nullptr);
                 }
             }
             if (app->show_debug_window)
