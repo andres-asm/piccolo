@@ -2955,8 +2955,8 @@ msgstr "VINCULACIÓN CERRADA"
 
 
 msgctxt "net_device_access_help"
-msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."
-msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego."
+msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game. OWNER: also copy games, saves and states to and from the shared folders."
+msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego. DUEÑO: además copiar juegos, partidas y estados desde y hacia las carpetas compartidas."
 
 msgctxt "net_access_gamepad"
 msgid "GAMEPAD"
@@ -2969,6 +2969,26 @@ msgstr "STREAM"
 msgctxt "net_access_full"
 msgid "FULL"
 msgstr "COMPLETO"
+
+msgctxt "net_access_owner"
+msgid "OWNER"
+msgstr "DUEÑO"
+
+msgctxt "net_owner_confirm_title"
+msgid "OWNER ACCESS"
+msgstr "ACCESO DE DUEÑO"
+
+msgctxt "net_owner_confirm_text"
+msgid "THIS DEVICE WILL BE ABLE TO COPY GAMES, SAVES AND STATES FROM THIS PICCOLO'S SHARED FOLDERS, AND TO WRITE FILES INTO THEM. GIVE IT OWNER ACCESS?"
+msgstr "ESTE DISPOSITIVO PODRÁ COPIAR JUEGOS, PARTIDAS Y ESTADOS DE LAS CARPETAS COMPARTIDAS DE ESTE PICCOLO, Y ESCRIBIR ARCHIVOS EN ELLAS. ¿DARLE ACCESO DE DUEÑO?"
+
+msgctxt "net_owner_confirm_yes"
+msgid "GIVE OWNER ACCESS"
+msgstr "DAR ACCESO DE DUEÑO"
+
+msgctxt "net_owner_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
 
 msgctxt "action_slot_next"
 msgid "NEXT SLOT"

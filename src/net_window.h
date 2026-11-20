@@ -51,8 +51,17 @@ struct NetSpeedSummary
     bool     up_tested = false;
 };
 
+// What the tab keeps between frames: OWNER is given only after its
+// confirmation, to the device with this key (the list may change meanwhile).
+struct NetWindowState
+{
+    uint8_t owner_key[NET_KEY_SIZE] = {};
+    bool    confirm_owner = false;
+};
+
 struct NetWindowContext
 {
+    NetWindowState*     state = nullptr;
     Settings*           settings = nullptr;
     const Localization* strings = nullptr;
     NetAccess*          access = nullptr;   // nullptr while networking is off

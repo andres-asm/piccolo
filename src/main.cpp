@@ -157,6 +157,7 @@ struct App
     NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
     NetSpeedReceiver net_speed_receiver;   // a speed test, up
     bool             net_speed_reporting = false;   // the sender finished: its report goes out
+    NetWindowState net_window_state;   // SETTINGS > NETWORK between frames (OWNER's confirmation)
     std::vector<NetSpeedSummary> net_speed_results;  // what devices' speed tests found (SETTINGS > NETWORK)
     NetAccessLevel   net_actions_level[NET_MAX_PEERS] = {};   // the level each device's action list was made for
     // What the devices were last told runs (game_state): sent again when it changes.
@@ -1961,6 +1962,7 @@ static void draw_settings(App* app)
     context.strings = &app->strings;
     context.themes = &app->themes;
     NetWindowContext network;
+    network.state = &app->net_window_state;
     network.settings = &app->settings;
     network.strings = &app->strings;
     network.access = app->net_running ? &app->net_service.access : nullptr;
