@@ -33,6 +33,7 @@ static const MenuItem CONFIG_ITEMS[] = {
 // Tools: the core downloader and the options manager.
 static const MenuItem TOOLS_ITEMS[] = {
     { Str::menu_cores,           MenuAction::cores },
+    { Str::menu_share,           MenuAction::share },
     { Str::menu_options_manager, MenuAction::options_manager },
 };
 
@@ -95,6 +96,7 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::recent_game:  return "RECENT GAME";
         case MenuAction::options_manager: return "OPTIONS MANAGER";
         case MenuAction::cores:      return "CORES";
+        case MenuAction::share:      return "SHARE";
         case MenuAction::network:    return "NETWORK";
         case MenuAction::separator:    return "SEPARATOR";
         default:                     return "?";

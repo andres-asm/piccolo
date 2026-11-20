@@ -27,6 +27,7 @@ menu_input = INPUT...
 menu_sound = SOUND...
 menu_cores = CORES...
 menu_options_manager = OPTIONS MANAGER...
+menu_share = SHARE...
 menu_debug_window = DEBUG WINDOW
 menu_about = ABOUT PICCOLO
 menu_recent_empty = NO RECENT GAMES
@@ -818,3 +819,19 @@ action_pause = PAUSE
 action_reset = RESET
 status_paused_remotely = PAUSED FROM
 status_resumed = RESUMED
+
+# SHARE (TOOLS > SHARE): games, saves and states with another piccolo (OWNER access)
+share_title = SHARE
+share_this_piccolo = THIS PICCOLO
+share_other_piccolo = OTHER PICCOLO
+share_shared_folders = SHARED FOLDERS
+share_not_connected = NO PICCOLO CONNECTED WITH OWNER ACCESS
+share_list_failed = THIS FOLDER CAN'T BE READ
+share_no_files = NO FILES HERE
+share_copy_to_remote_help = Copies the selected file into the folder open on the other piccolo.
+share_copy_to_local_help = Copies the selected file from the other piccolo into the folder open here.
+share_hint = SELECT A FILE, OPEN A FOLDER ON THE OTHER SIDE, THEN PRESS THE ARROW.
+share_sending = SENDING
+share_receiving = RECEIVING
+share_paused = PAUSED: REMOTE PLAY
+share_cancel = CANCEL

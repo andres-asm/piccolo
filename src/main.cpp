@@ -43,6 +43,7 @@
 #include "core_catalog.h"
 #include "core_updater.h"
 #include "cores_window.h"
+#include "share_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -281,6 +282,8 @@ struct App
     // up when the window opens (the server and cores folder may have changed).
     CoreUpdater        core_updater;
     CoresWindow        cores_window;
+    ShareWindow        share_window;     // TOOLS > SHARE (files with another piccolo at OWNER level)
+    NetShareFolders    share_folders;    // this piccolo's shared folders: game folders, saves, states
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -788,6 +791,17 @@ static void open_cores_window(App* app)
     cores_window_open(&app->cores_window, &app->core_updater);
 }
 
+// TOOLS > SHARE: this piccolo's shared folders as they are now.
+static void open_share_window(App* app)
+{
+    std::vector<std::string> game_folders;
+    piccolo_settings_game_folders(&app->settings, &game_folders);
+    std::string saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
+    std::string states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+    net_share_set_folders(&app->share_folders, &game_folders, saves.c_str(), states.c_str());
+    share_window_open(&app->share_window);
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -849,6 +863,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::cores:
             open_cores_window(app);
+            break;
+        case MenuAction::share:
+            open_share_window(app);
             break;
         case MenuAction::network:
             settings_window_open(&app->settings_window, SettingsTab::network);
@@ -1099,7 +1116,8 @@ static void refresh_audio_devices(App* app)
 static bool any_window_open(const App* app)
 {
     return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
-           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
+           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->share_window.open ||
+           app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window) || text_input_pending(app);
 }
@@ -1140,6 +1158,10 @@ static void close_topmost_or_toggle_menu(App* app)
         else if (app->cores_window.open)
         {
             app->cores_window.open = false;
+        }
+        else if (app->share_window.open)
+        {
+            app->share_window.open = false;
         }
         else if (app->input_window.open)
         {
@@ -3709,6 +3731,18 @@ int main(int argc, char** argv)
             app->cores_window.show_legacy = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_LEGACY);
             app->cores_window.show_experimental = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_EXPERIMENTAL);
             cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
+
+            // SHARE: no piccolo connected as a client yet (piccolo-share step 6), so the
+            // other side stays empty and nothing can be asked to copy.
+            ShareTransferLine share_line;
+            ShareWindowContext share_context;
+            share_context.strings = &app->strings;
+            share_context.local_folders = &app->share_folders;
+            share_context.remote_name = "";
+            share_context.line = &share_line;
+            share_window_draw(&app->share_window, &share_context, app->pixel_font, app->ui_scale);
+            app->share_window.copies.clear();
+            app->share_window.cancel = false;
             if (app->cores_window.show_changed)
             {
                 app->cores_window.show_changed = false;

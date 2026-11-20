@@ -2671,6 +2671,10 @@ msgctxt "menu_cores"
 msgid "CORES..."
 msgstr "CORES..."
 
+msgctxt "menu_share"
+msgid "SHARE..."
+msgstr "COMPARTIR..."
+
 msgctxt "cores_title"
 msgid "CORES"
 msgstr "CORES"
@@ -3133,3 +3137,59 @@ msgstr "ESTE CORE HACE HASTA"
 msgctxt "run_ahead_no_game"
 msgid "NO GAME RUNNING"
 msgstr "NINGÚN JUEGO CORRIENDO"
+
+msgctxt "share_title"
+msgid "SHARE"
+msgstr "COMPARTIR"
+
+msgctxt "share_this_piccolo"
+msgid "THIS PICCOLO"
+msgstr "ESTE PICCOLO"
+
+msgctxt "share_other_piccolo"
+msgid "OTHER PICCOLO"
+msgstr "OTRO PICCOLO"
+
+msgctxt "share_shared_folders"
+msgid "SHARED FOLDERS"
+msgstr "CARPETAS COMPARTIDAS"
+
+msgctxt "share_not_connected"
+msgid "NO PICCOLO CONNECTED WITH OWNER ACCESS"
+msgstr "NINGÚN PICCOLO CONECTADO CON ACCESO DE DUEÑO"
+
+msgctxt "share_list_failed"
+msgid "THIS FOLDER CAN'T BE READ"
+msgstr "NO SE PUEDE LEER ESTA CARPETA"
+
+msgctxt "share_no_files"
+msgid "NO FILES HERE"
+msgstr "NO HAY ARCHIVOS AQUÍ"
+
+msgctxt "share_copy_to_remote_help"
+msgid "Copies the selected file into the folder open on the other piccolo."
+msgstr "Copia el archivo elegido a la carpeta abierta en el otro piccolo."
+
+msgctxt "share_copy_to_local_help"
+msgid "Copies the selected file from the other piccolo into the folder open here."
+msgstr "Copia el archivo elegido del otro piccolo a la carpeta abierta aquí."
+
+msgctxt "share_hint"
+msgid "SELECT A FILE, OPEN A FOLDER ON THE OTHER SIDE, THEN PRESS THE ARROW."
+msgstr "ELIGE UN ARCHIVO, ABRE UNA CARPETA DEL OTRO LADO Y PULSA LA FLECHA."
+
+msgctxt "share_sending"
+msgid "SENDING"
+msgstr "ENVIANDO"
+
+msgctxt "share_receiving"
+msgid "RECEIVING"
+msgstr "RECIBIENDO"
+
+msgctxt "share_paused"
+msgid "PAUSED: REMOTE PLAY"
+msgstr "EN PAUSA: JUEGO REMOTO"
+
+msgctxt "share_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
