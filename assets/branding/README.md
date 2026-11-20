@@ -11,10 +11,38 @@ The name is always lowercase: piccolo.
   background, for dark and light pages.
 - `piccolo-banner-tv-dark.svg`, `piccolo-banner-tv-light.svg`: Android TV banner,
   drawn at 640x360, exported at 320x180 (xhdpi). Dark is the one for the launcher.
+- `android/`: the Android adaptive icon and resources (see Android below).
 - `png/`: the PNG exports of all of the above.
 
 The logo and banner SVGs have their text converted to paths, so they don't need
 the font installed.
+
+## Android
+
+`android/` has the adaptive icon (Android 8+, the APK's minimum) and a `res/` tree
+ready to copy into the APK's resources:
+
+- `ic_launcher_background.svg`, `ic_launcher_foreground.svg`: the two layers, on
+  the 108 dp canvas. Launchers show the middle 72 dp through their own mask
+  (circle, squircle, rounded square); everything that matters stays inside the
+  centered 66 dp circle, the part no mask cuts.
+- `ic_launcher_monochrome.svg`: the themed icon (Android 13+), one color; the
+  system tints it by alpha.
+- `res/mipmap-{mdpi..xxxhdpi}/`: the three layers as PNGs (108 to 432 px).
+- `res/mipmap-anydpi-v26/ic_launcher.xml`: background + foreground.
+  `res/mipmap-anydpi-v33/ic_launcher.xml`: the same plus monochrome, which is
+  an API 33 element, so linking against an older android.jar still works.
+- `res/drawable-xhdpi/banner.png`: the TV banner (`android:banner`).
+
+With `android:icon="@mipmap/ic_launcher"` in the manifest. No legacy
+`ic_launcher.png` is needed: with minSdk 26 the adaptive one is always used.
+
+    inkscape android/ic_launcher_foreground.svg -w 432 -h 432 -o android/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+
+(108 mdpi, 162 hdpi, 216 xhdpi, 324 xxhdpi, 432 xxxhdpi.)
+
+The tile is the background layer; the d-pad and the buttons, with their
+shadow, are the foreground, centered.
 
 ## Colors
 
