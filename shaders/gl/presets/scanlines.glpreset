@@ -1,0 +1,5 @@
+# SCANLINES: scanlines-sine-abs (RiskyJumps, public domain), ported.
+passes = 1
+pass0 = scanlines.glsl
+pass0_filter = nearest
+pass0_scale = viewport

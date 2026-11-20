@@ -188,11 +188,12 @@ static void list_archive(FilePicker* picker, const LibretroCoreInfo* core, const
     }
 }
 
-// A shader preset: "*.slangp", any case.
-static bool is_shader_preset(const char* name)
+// A shader preset: "*<extension>" (".slangp" / ".glpreset"), any case.
+static bool is_shader_preset(const char* name, const char* extension)
 {
     size_t length = std::strlen(name);
-    return length > 7 && SDL_strcasecmp(name + length - 7, ".slangp") == 0;
+    size_t extension_length = std::strlen(extension);
+    return length > extension_length && SDL_strcasecmp(name + length - extension_length, extension) == 0;
 }
 
 // Whether a file goes in the list.
@@ -204,7 +205,7 @@ static bool listed_file(const FilePicker* picker, const LibretroCoreInfo* core, 
     }
     if (picker->mode == FilePickerMode::shader_preset)
     {
-        return is_shader_preset(name);
+        return is_shader_preset(name, picker->shader_extension);
     }
     // Only what the chosen core says it loads (its own extension list), and
     // every archive: what's inside is only known later.
@@ -362,8 +363,9 @@ void file_picker_open_folder(FilePicker* picker, const char* directory, const st
     }
 }
 
-void file_picker_open_shader(FilePicker* picker, const char* directory)
+void file_picker_open_shader(FilePicker* picker, const char* directory, const char* extension)
 {
+    std::snprintf(picker->shader_extension, sizeof(picker->shader_extension), "%s", extension);
     picker->open = true;
     picker->mode = FilePickerMode::shader_preset;
     picker->core_index = -1;

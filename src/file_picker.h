@@ -34,7 +34,7 @@
 // here), and USE THIS FOLDER picks the folder shown.
 //
 // It also picks a shader preset (FilePickerMode::shader_preset, from
-// SETTINGS > SHADER > CHOOSE): no core row, only .slangp files, no archives
+// SETTINGS > SHADER > CHOOSE): no core row, only presets (.slangp, or .glpreset on OpenGL ES), no archives
 // (presets are always plain files), and NONE / USE instead of the game
 // buttons. It can go to any folder (e.g. a full slang-shaders checkout).
 
@@ -55,7 +55,7 @@ enum class FilePickerMode
 {
     game,            // LOAD GAME: a core and a file
     folder,          // CHOOSE FOLDER: a folder
-    shader_preset,   // a .slangp for the SHADER setting
+    shader_preset,   // a preset for the SHADER setting (shader_extension)
 };
 
 struct FilePicker
@@ -67,6 +67,7 @@ struct FilePicker
     int32_t core_index = -1;   // index into the catalog; -1 = none chosen yet
     std::vector<std::string> game_folders;   // FOLDER's choices (copied at open), then HOME
     bool    show_all   = false;
+    char    shader_extension[16] = ".slangp";   // shader_preset mode: the files listed
 
     // Current folder's contents, sorted (case-insensitive). Re-read when the
     // folder, the core or "show all" changes.
@@ -108,7 +109,8 @@ void file_picker_open_folder(FilePicker* picker, const char* directory, const st
 
 // Opens the window to pick a shader preset, in `directory` (if it doesn't
 // exist: the home folder).
-void file_picker_open_shader(FilePicker* picker, const char* directory);
+// `extension`: the presets this GPU path takes (".slangp" on Vulkan, ".glpreset" on OpenGL ES).
+void file_picker_open_shader(FilePicker* picker, const char* directory, const char* extension);
 
 // Draws the window if open. Returns true on the frame the user picked
 // something; the picker closes itself then.

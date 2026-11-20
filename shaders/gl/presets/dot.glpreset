@@ -1,0 +1,5 @@
+# DOT: dot (Themaister, public domain), ported.
+passes = 1
+pass0 = dot.glsl
+pass0_filter = nearest
+pass0_scale = viewport

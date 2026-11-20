@@ -1,0 +1,6 @@
+# CRT MASK: piccolo's simple CRT for weak GPUs (crt-mask.glsl), MIT.
+passes = 1
+pass0 = crt-mask.glsl
+pass0_filter = nearest
+pass0_scale = viewport
+lut = masks/aperture-2x2.png

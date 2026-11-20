@@ -368,6 +368,16 @@ if(MULTITAP_BUILD_TESTS)
     set_tests_properties(piccolo_strings PROPERTIES
         FAIL_REGULAR_EXPRESSION "some keys are unknown|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
+    # The OpenGL ES presets (shaders/gl/) compile and run (needs a display; skipped without).
+    add_executable(piccolo_gl_presets_check tools/gl_presets_check.cpp)
+    target_link_libraries(piccolo_gl_presets_check PRIVATE frontend_common)
+    multitap_set_project_flags(piccolo_gl_presets_check)
+    add_test(NAME piccolo_gl_presets COMMAND piccolo_gl_presets_check "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gl")
+    set_tests_properties(piccolo_gl_presets PROPERTIES
+                         SKIP_RETURN_CODE 77
+                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load and run"
+                         FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
+
     add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)
     target_include_directories(piccolo_recent_games_test PRIVATE src)
     target_link_libraries(piccolo_recent_games_test PRIVATE frontend_libretro)

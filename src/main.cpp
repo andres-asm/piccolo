@@ -1708,6 +1708,21 @@ static bool shader_failed_before(const App* app, const std::string& path)
     return false;
 }
 
+// The presets this GPU path takes: librashader's .slangp on Vulkan, our own
+// .glpreset on OpenGL ES (frontends-common's gl_shader_chain.h).
+static const char* shader_extension(const App* app)
+{
+    return app->shell.api == GpuApi::gl ? ".glpreset" : ".slangp";
+}
+
+// A preset chosen on the other path (the setting is shared) is left unused.
+static bool shader_fits(const App* app, const std::string& path)
+{
+    const char* extension = shader_extension(app);
+    size_t length = std::strlen(extension);
+    return path.size() > length && SDL_strcasecmp(path.c_str() + path.size() - length, extension) == 0;
+}
+
 static void load_shader_stage(App* app, uint32_t stage, const std::string& path)
 {
     if (video_output_stage_preset(&app->video, stage) == path || shader_failed_before(app, path))
@@ -1726,7 +1741,8 @@ static void load_shader_stage(App* app, uint32_t stage, const std::string& path)
 
 static void update_shader_stages(App* app, ViewportFilter filter)
 {
-    if (!app->shader_library.loaded)
+    // Vulkan's presets need librashader; OpenGL ES's are ours.
+    if (app->shell.api == GpuApi::vulkan && !app->shader_library.loaded)
     {
         return;
     }
@@ -1738,7 +1754,8 @@ static void update_shader_stages(App* app, ViewportFilter filter)
     }
     load_shader_stage(app, 0, app->shader_pass0_path);
     const std::string* scale = &app->shader_scale_paths[static_cast<uint32_t>(filter)];
-    if (preset[0] != '\0' && !shader_failed_before(app, app->shader_preset_seen))
+    if (preset[0] != '\0' && shader_fits(app, app->shader_preset_seen) &&
+        !shader_failed_before(app, app->shader_preset_seen))
     {
         load_shader_stage(app, 1, app->shader_preset_seen);
     }
@@ -1756,7 +1773,7 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         float value = static_cast<float>(settings_get_real(&app->settings, PICCOLO_PASS0_CONTROLS[i].key));
         if (app->pass0_stale || value != app->pass0_applied[i])
         {
-            video_output_set_param(&app->video, &app->shader_library, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
+            video_output_set_param(&app->video, &app->shader_library, &app->shell, 0, PICCOLO_PASS0_CONTROLS[i].param, value);
             app->pass0_applied[i] = value;
         }
     }
@@ -1766,7 +1783,7 @@ static void update_shader_stages(App* app, ViewportFilter filter)
     {
         if (app->pass0_stale || profile[i] != app->profile_applied[i])
         {
-            video_output_set_param(&app->video, &app->shader_library, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
+            video_output_set_param(&app->video, &app->shader_library, &app->shell, 0, PICCOLO_PROFILE_PARAM_NAMES[i], profile[i]);
             app->profile_applied[i] = profile[i];
         }
     }
@@ -1919,7 +1936,7 @@ static void draw_settings(App* app)
         video_output_stage0_result(&app->video, &image.processed_texture_id, &image.processed_width,
                                    &image.processed_height);
     }
-    image.controls_available = app->shader_library.loaded;
+    image.controls_available = app->shader_library.loaded || app->shell.api == GpuApi::gl;
     SettingsWindowContext context = {};
     context.settings = &app->settings;
     context.paths = &app->paths;
@@ -2082,12 +2099,13 @@ static void draw_settings(App* app)
         std::string folder = settings_get_at(&app->settings, app->settings_window.scope, PICCOLO_VIDEO_SHADER_PRESET,
                                              nullptr);
         size_t slash = folder.find_last_of("/\\");
-        folder = slash == std::string::npos ? app->shader_presets_folder : folder.substr(0, slash);
+        folder = slash == std::string::npos || !shader_fits(app, folder) ? app->shader_presets_folder
+                                                                          : folder.substr(0, slash);
         if (!host_fs_exists(folder.c_str()))
         {
             folder = app->shader_presets_folder;
         }
-        file_picker_open_shader(&app->shader_picker, folder.c_str());
+        file_picker_open_shader(&app->shader_picker, folder.c_str(), shader_extension(app));
     }
     FilePickerChoice shader_choice = {};
     if (file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
@@ -3389,12 +3407,17 @@ int main(int argc, char** argv)
     // piccolo's own presets: the user's copy in piccolo's folder wins over
     // the ones that come with piccolo (next to the program), like lang/.
     {
-        std::string user_folder = app->paths.root.empty() ? std::string() : app->paths.root + "/shaders/";
+        // OpenGL ES: our own presets, in shaders/gl/ (same layout).
+        const char* subfolder = app->shell.api == GpuApi::gl ? "shaders/gl/" : "shaders/";
+        std::string user_folder = app->paths.root.empty() ? std::string() : app->paths.root + "/" + subfolder;
         std::string bundled_folder = std::string(program_folder_for_shaders != nullptr ? program_folder_for_shaders : "") +
-                                     "shaders/";
+                                     subfolder;
         host_fs_forward_slashes(bundled_folder.data());
-        const char* names[4] = {"pass0.slangp", "scale-nearest.slangp", "scale-bilinear.slangp",
-                                "scale-sharp-bilinear.slangp"};
+        const char* vulkan_names[4] = {"pass0.slangp", "scale-nearest.slangp", "scale-bilinear.slangp",
+                                       "scale-sharp-bilinear.slangp"};
+        const char* gl_names[4] = {"pass0.glpreset", "scale-nearest.glpreset", "scale-bilinear.glpreset",
+                                   "scale-sharp-bilinear.glpreset"};
+        const char* const* names = app->shell.api == GpuApi::gl ? gl_names : vulkan_names;
         std::string* targets[4] = {&app->shader_pass0_path, &app->shader_scale_paths[0], &app->shader_scale_paths[1],
                                    &app->shader_scale_paths[2]};
         for (uint32_t i = 0; i < 4; i++)
