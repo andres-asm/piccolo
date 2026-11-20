@@ -293,12 +293,12 @@ struct ActionInfo
 };
 
 static const ActionInfo ACTIONS[] = {
-    {"save_state", Str::menu_save_state, NetActionKind::press, NetAccessLevel::gamepad},
-    {"load_state", Str::menu_load_state, NetActionKind::press, NetAccessLevel::gamepad},
-    {"slot_previous", Str::action_slot_previous, NetActionKind::press, NetAccessLevel::gamepad},
-    {"slot_next", Str::action_slot_next, NetActionKind::press, NetAccessLevel::gamepad},
-    {"fast_forward", Str::input_action_hotkey_fast_forward, NetActionKind::hold, NetAccessLevel::gamepad},
-    {"pause", Str::action_pause, NetActionKind::toggle, NetAccessLevel::gamepad},
+    {"save_state", Str::menu_save_state, NetActionKind::press, NetAccessLevel::stream},
+    {"load_state", Str::menu_load_state, NetActionKind::press, NetAccessLevel::stream},
+    {"slot_previous", Str::action_slot_previous, NetActionKind::press, NetAccessLevel::stream},
+    {"slot_next", Str::action_slot_next, NetActionKind::press, NetAccessLevel::stream},
+    {"fast_forward", Str::input_action_hotkey_fast_forward, NetActionKind::hold, NetAccessLevel::stream},
+    {"pause", Str::action_pause, NetActionKind::toggle, NetAccessLevel::stream},
     {"reset", Str::action_reset, NetActionKind::press, NetAccessLevel::full},
     {"close_game", Str::quick_menu_close_game, NetActionKind::press, NetAccessLevel::full},
 };

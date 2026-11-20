@@ -2565,9 +2565,9 @@ static void net_follow_remote(App* app)
         app->net_paused = false;
     }
     // A device whose access changed (NETWORK): its new welcome went out with
-    // net_access_set_level; its action list follows at once, and a speed test
-    // its new level doesn't cover stops. (Nothing else it holds needs more
-    // than GAMEPAD: pause, fast forward, its pads.)
+    // net_access_set_level; its action list follows at once, and what its new
+    // level doesn't cover stops: remote play, a FAST FORWARD it holds, a PAUSE
+    // it made (STREAM since 2026-11-20). Speed tests and pads are GAMEPAD.
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
         if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
@@ -2579,14 +2579,11 @@ static void net_follow_remote(App* app)
         NetAccessLevel level = net_peer_access(app, i);
         if (!net_access_allows(level, NetAccessLevel::stream))
         {
-            if (app->net_speed_sender.active && app->net_speed_sender.peer == i)
+            app->net_fast_forward[i] = false;
+            if (app->net_paused && app->net_paused_by == i)
             {
-                app->net_speed_sender.active = false;
-                app->net_speed_reporting = false;
-            }
-            if (app->net_speed_receiver.active && app->net_speed_receiver.peer == i)
-            {
-                app->net_speed_receiver.active = false;
+                app->net_paused = false;   // it can't resume it any more
+                set_status(app, piccolo_text(&app->strings, Str::status_resumed));
             }
             net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
             app->stream_tuning_set[i] = false;
@@ -3289,9 +3286,8 @@ static void net_update_locked(App* app)
         case NetAccessEventType::message:
             if (event.channel == NetChannel::input && event.size > 0 && event.data[0] == NET_INPUT_TYPE_SPEED)
             {
-                // A speed test's packet (up): counted for STREAM devices only.
-                if (net_access_allows(event.access, NetAccessLevel::stream) &&
-                    event.peer == app->net_speed_receiver.peer)
+                // A speed test's packet (up), from the device running the test.
+                if (event.peer == app->net_speed_receiver.peer)
                 {
                     net_speed_receive(&app->net_speed_receiver, event.data, event.size, net_seconds());
                 }
@@ -3299,6 +3295,8 @@ static void net_update_locked(App* app)
             else if (event.channel == NetChannel::input && event.device >= 0)
             {
                 const NetTrustedDevice* paired = &app->net_service.access.trust.devices[static_cast<size_t>(event.device)];
+                input_net_set_hotkeys(&app->input_net, &app->input, event.peer,
+                                      net_access_allows(event.access, NetAccessLevel::stream));
                 input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
                                   event.data, event.size);
             }
