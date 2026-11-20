@@ -2618,7 +2618,7 @@ int main(int argc, char** argv)
 
     AppShellConfig config = {};
     config.name       = "piccolo";
-    config.identifier = "org.multitap.piccolo";
+    config.identifier = "site.multitap.piccolo";
     config.icons      = app_icon_images;
     config.icon_count = app_icon_image_count;
 

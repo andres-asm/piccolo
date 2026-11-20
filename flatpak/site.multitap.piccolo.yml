@@ -1,11 +1,11 @@
 # piccolo as a Flatpak. Built by .github/workflows/flatpak.yml; locally:
-#   flatpak-builder --user --install --force-clean build-flatpak flatpak/org.multitap.piccolo.yml
+#   flatpak-builder --user --install --force-clean build-flatpak flatpak/site.multitap.piccolo.yml
 # The sources are this checkout, with its submodules already in deps/
 # (git submodule update --init --recursive).
 #
 # Inside the sandbox piccolo's folder (cores, saves, settings) is
-# ~/.var/app/org.multitap.piccolo/data/piccolo, not ~/.local/share/piccolo.
-app-id: org.multitap.piccolo
+# ~/.var/app/site.multitap.piccolo/data/piccolo, not ~/.local/share/piccolo.
+app-id: site.multitap.piccolo
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
@@ -50,10 +50,10 @@ modules:
       - install -Dm755 build/piccolo /app/lib/piccolo/piccolo
       - cp -r lang layouts /app/lib/piccolo/
       - mkdir -p /app/bin && ln -s ../lib/piccolo/piccolo /app/bin/piccolo
-      - install -Dm644 assets/linux/org.multitap.piccolo.desktop /app/share/applications/org.multitap.piccolo.desktop
-      - install -Dm644 assets/linux/org.multitap.piccolo.metainfo.xml /app/share/metainfo/org.multitap.piccolo.metainfo.xml
-      - install -Dm644 assets/branding/piccolo-icon.svg /app/share/icons/hicolor/scalable/apps/org.multitap.piccolo.svg
-      - for size in 16 24 32 48 64 128 256 512; do install -Dm644 assets/branding/png/piccolo-icon-${size}.png /app/share/icons/hicolor/${size}x${size}/apps/org.multitap.piccolo.png; done
+      - install -Dm644 assets/linux/site.multitap.piccolo.desktop /app/share/applications/site.multitap.piccolo.desktop
+      - install -Dm644 assets/linux/site.multitap.piccolo.metainfo.xml /app/share/metainfo/site.multitap.piccolo.metainfo.xml
+      - install -Dm644 assets/branding/piccolo-icon.svg /app/share/icons/hicolor/scalable/apps/site.multitap.piccolo.svg
+      - for size in 16 24 32 48 64 128 256 512; do install -Dm644 assets/branding/png/piccolo-icon-${size}.png /app/share/icons/hicolor/${size}x${size}/apps/site.multitap.piccolo.png; done
     sources:
       - type: dir
         path: ..

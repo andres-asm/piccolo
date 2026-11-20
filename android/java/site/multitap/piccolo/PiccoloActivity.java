@@ -1,4 +1,4 @@
-package io.github.andres_asm.piccolo;
+package site.multitap.piccolo;
 
 import org.libsdl.app.SDLActivity;
 
