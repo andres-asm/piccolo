@@ -52,3 +52,6 @@
 [submodule "deps/monocypher"]
 	path = deps/monocypher
 	url = https://github.com/LoupVaillant/Monocypher.git
+[submodule "deps/beacon"]
+	path = deps/beacon
+	url = https://github.com/multitap-org/multitap-beacon.git

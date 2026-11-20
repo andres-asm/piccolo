@@ -33,6 +33,9 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
+- `deps/beacon`                     multitap-beacon (multitap-org/multitap-beacon, MIT): the introduction server for
+                                     connections across the internet (STUN-like + hole punching, never a relay);
+                                     frontends-common builds only its `beacon_wire` library (tests also its server code)
 - `deps/piccolo-shaders`            piccolo-shaders: the curated slang presets (branch `piccolo` of a trimmed
                                      slang-shaders, per-file licenses), copied to shaders/presets/; optional.
                                      Rebased on upstream: tag the pinned commit (piccolo-YYYY-MM-DD) first
@@ -154,7 +157,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_service (the network on its own thread; remote play is coded and sent
+                              net_beacon (across the internet: register with the beacon, meet,
+                              punch, peer-reflexive), net_service (the network on its own thread; remote play is coded and sent
                               there), net_stream (remote play packets), net_settings (settings and
                               actions described by the host), net_speed (speed
                               test), net_wire (fields);

@@ -9,6 +9,9 @@
 //   |   ALLOW CONNECTIONS  [x]                                      |
 //   |   NAME               [LIVING ROOM               ]             |
 //   |   PORT               [- 55420 +]                              |
+//   |   INTERNET           [x]                                      |
+//   |   BEACON SERVER      [beacon.get-piccolo.app    ]             |
+//   |   INTERNET STATUS    READY: PAIRED DEVICES CAN CONNECT        |
 //   |   THIS DEVICE        3fa2-91c0-7d4e-b815                       |
 //   | -- PAIRING -------------------------------------------------- |
 //   |   [PAIR A DEVICE]                                             |
@@ -56,6 +59,7 @@ struct NetWindowContext
     bool                listen_failed = false;   // on, but the port couldn't be opened
     const char*         this_device = "";   // our key's fingerprint
     const std::vector<NetSpeedSummary>* speed = nullptr;   // speed test results, by device key
+    bool                internet = false;   // INTERNET is on (the beacon status row shows)
 };
 
 // The tab's contents, inside SETTINGS' tab. The rows always edit the global

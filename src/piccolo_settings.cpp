@@ -187,6 +187,12 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_net_port), .help = text_id(Str::setting_net_port_help)},
     {.key = PICCOLO_NET_NAME, .type = SettingType::text, .default_value = "PICCOLO",
      .label = text_id(Str::setting_net_name), .help = text_id(Str::setting_net_name_help)},
+    // Off by default: on, piccolo tells the beacon server it's here (Andrés
+    // decides the default). beacon.get-piccolo.app = NET_BEACON_DEFAULT_SERVER.
+    {.key = PICCOLO_NET_INTERNET, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_net_internet), .help = text_id(Str::setting_net_internet_help)},
+    {.key = PICCOLO_NET_BEACON, .type = SettingType::text, .default_value = "beacon.get-piccolo.app",
+     .label = text_id(Str::setting_net_beacon), .help = text_id(Str::setting_net_beacon_help)},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
      .help = text_id(Str::setting_path_cores_help)},
     {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),

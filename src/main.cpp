@@ -116,6 +116,7 @@ struct App
     NetKeypair net_identity = {};
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
+    std::string net_beacon_applied;      // the beacon server handed to the service ("" = INTERNET off)
     bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
     // stream_tuning (net_stream.h): what streaming devices asked for, kept only
     // here (never in the settings or the files: a crash leaves nothing changed).
@@ -1966,6 +1967,7 @@ static void draw_settings(App* app)
     network.listen_failed = app->net_listen_failed;
     network.this_device = app->net_fingerprint;
     network.speed = &app->net_speed_results;
+    network.internet = settings_get_bool(&app->settings, PICCOLO_NET_INTERNET);
     context.network = &network;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
@@ -3128,6 +3130,7 @@ static void net_start(App* app)
     }
     app->net_listen_failed = false;
     app->net_running = true;
+    app->net_beacon_applied.clear();   // a new service: net_update hands it the beacon again
 }
 
 static void net_stop(App* app)
@@ -3180,6 +3183,16 @@ static void net_update(App* app)
     if (!app->net_running)
     {
         return;
+    }
+    // INTERNET and BEACON SERVER: the service resolves the name on its own
+    // thread. Only when they change (an empty name is off too).
+    std::string beacon = settings_get_bool(&app->settings, PICCOLO_NET_INTERNET)
+                             ? settings_get_text(&app->settings, PICCOLO_NET_BEACON)
+                             : "";
+    if (beacon != app->net_beacon_applied)
+    {
+        app->net_beacon_applied = beacon;
+        net_service_set_beacon(&app->net_service, beacon.c_str());
     }
     // The network thread polls; this loop handles what it queued, holding
     // the lock for all of it (the NetAccess, its peers and lists).
