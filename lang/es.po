@@ -3273,3 +3273,63 @@ msgstr "EL OTRO PICCOLO ESTÁ OCUPADO, INTÉNTALO DE NUEVO"
 msgctxt "share_done_failed"
 msgid "FAILED"
 msgstr "FALLÓ"
+
+msgctxt "share_done_same"
+msgid "ALREADY THERE, SAME FILE"
+msgstr "YA ESTÁ AHÍ, EL MISMO ARCHIVO"
+
+msgctxt "share_same_legend"
+msgid "GREY: ALREADY ON THE OTHER SIDE, SAME FILE"
+msgstr "GRIS: YA ESTÁ DEL OTRO LADO, EL MISMO ARCHIVO"
+
+msgctxt "share_same_help"
+msgid "The same name, size and date: piccolo's copies keep the date, so it's the file copied before."
+msgstr "El mismo nombre, tamaño y fecha: las copias de piccolo conservan la fecha, así que es el archivo que ya se copió."
+
+msgctxt "share_with_save"
+msgid "WITH ITS SAVE"
+msgstr "CON SU PARTIDA"
+
+msgctxt "share_with_state"
+msgid "WITH ITS STATE"
+msgstr "CON SU ESTADO"
+
+msgctxt "share_with_states"
+msgid "WITH ITS %u STATES"
+msgstr "CON SUS %u ESTADOS"
+
+msgctxt "share_with_save_state"
+msgid "WITH ITS SAVE AND STATE"
+msgstr "CON SU PARTIDA Y SU ESTADO"
+
+msgctxt "share_with_save_states"
+msgid "WITH ITS SAVE AND %u STATES"
+msgstr "CON SU PARTIDA Y %u ESTADOS"
+
+msgctxt "share_with_help"
+msgid "Also copies this game's save and states (SAVES and STATES, in the core's folder), so it goes on where it was on the other piccolo."
+msgstr "También copia la partida y los estados de este juego (SAVES y STATES, en la carpeta del núcleo), para seguir donde quedó en el otro piccolo."
+
+msgctxt "share_replace_title"
+msgid "ALREADY THERE"
+msgstr "YA ESTÁ AHÍ"
+
+msgctxt "share_replace_text"
+msgid "ANOTHER FILE WITH THIS NAME IS ALREADY THERE. REPLACE IT?"
+msgstr "YA HAY OTRO ARCHIVO CON ESTE NOMBRE. ¿REEMPLAZARLO?"
+
+msgctxt "share_replace"
+msgid "REPLACE"
+msgstr "REEMPLAZAR"
+
+msgctxt "share_skip"
+msgid "SKIP"
+msgstr "SALTAR"
+
+msgctxt "share_replace_all"
+msgid "REPLACE ALL (%u)"
+msgstr "REEMPLAZAR TODOS (%u)"
+
+msgctxt "share_skip_all"
+msgid "SKIP ALL"
+msgstr "SALTAR TODOS"

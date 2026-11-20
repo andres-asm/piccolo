@@ -25,6 +25,14 @@
 // (share_window_remote_wants_list / share_window_set_remote_list). Copies
 // asked for go into `copies` for the caller to run; the line at the bottom
 // shows the one running (ShareTransferLine).
+//
+// A game selected in a game folder is looked up in that side's SAVES and
+// STATES (<core>/<game stem>.*: what the core writes); "WITH ITS SAVE AND N
+// STATES" copies them along, into the other side's SAVES and STATES under
+// the same core folder, so the game goes on where it was. A file in grey is
+// on the other side already with the same name, size and date (copies keep
+// the date). A copy that finds another file with its name asks before
+// replacing it (`conflicts`, handed in by the caller).
 
 #include <cstdint>
 #include <string>
@@ -45,6 +53,29 @@ struct SharePane
     bool                       stale = true;     // list again
     bool                       waiting = false;  // the other side: asked, no answer yet
     int32_t                    selected = -1;    // a file in `entries`
+    std::vector<uint8_t>       same;             // per entry: 1 = on the other side too (grey)
+};
+
+// A save or state that goes with a game (virtual path on its side).
+struct ShareCompanion
+{
+    std::string path;    // "SAVES/mGBA/Metroid Fusion.srm"
+    uint64_t    size = 0;
+    uint64_t    mtime = 0;
+};
+
+// The selected game's saves and states, looked up on its side: this side
+// at once, the other one a listing at a time (SAVES, then each core folder).
+struct ShareCompanions
+{
+    bool        remote = false;          // whose game
+    std::string game;                    // its virtual path ("" = no game selected)
+    std::string stem;                    // its name without the extension
+    std::vector<std::string> folders;    // still to list
+    bool        waiting = false;         // the other side: folders[0] asked
+    std::vector<ShareCompanion> files;
+    uint32_t    saves = 0;
+    uint32_t    states = 0;              // .stateN files (their .png pictures go along, not counted)
 };
 
 // One copy asked for, in the window's words: from a virtual path on one
@@ -55,6 +86,8 @@ struct ShareCopy
     std::string from;               // "roms/gba/Metroid Fusion.gba"
     std::string to;                 // "ROMS/gba/Metroid Fusion.gba"
     uint64_t    size = 0;
+    uint64_t    mtime = 0;
+    bool        replace = false;    // another file there may be replaced (asked first)
 };
 
 // What the bottom line shows (from the caller: the copy running).
@@ -86,6 +119,13 @@ struct ShareWindow
     bool    disconnect = false;      // DISCONNECT clicked
     std::vector<ShareCopy> copies;   // asked for, taken by the caller
     bool      cancel = false;        // CANCEL clicked: the caller stops the copy running
+
+    ShareCompanions companions;
+    bool      with_companions = true;      // WITH ITS SAVE AND N STATES
+    std::vector<ShareCopy> conflicts;      // found another file there: replace? (from the caller)
+    bool      remote_asked = false;        // a listing of the other side is on its way
+    bool      same_stale = true;           // the grey marks need working out again
+    bool      any_same = false;            // some file is grey (the legend shows)
 };
 
 struct ShareWindowContext
@@ -99,10 +139,13 @@ struct ShareWindowContext
 void share_window_open(ShareWindow* window);
 void share_window_draw(ShareWindow* window, const ShareWindowContext* context, ImFont* pixel_font, int32_t scale);
 
-// The other side's folder to list, once per change (the caller sends a
+// The other side's folder to list, one at a time: the folder open there, or
+// one where the selected game's saves and states may be (the caller sends a
 // list_request for it and hands the answer to share_window_set_remote_list).
 bool share_window_remote_wants_list(ShareWindow* window, std::string* path);
 void share_window_set_remote_list(ShareWindow* window, const char* path, NetShareStatus status,
                                   const std::vector<NetShareEntry>* entries);
 // The other piccolo left (or a new one came): its side starts over.
 void share_window_remote_reset(ShareWindow* window);
+// A copy ended: `exists` asks whether to replace (the rest are the caller's).
+void share_window_add_conflict(ShareWindow* window, const ShareCopy* copy);
