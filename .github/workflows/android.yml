@@ -2,9 +2,12 @@
 # same script as on the development machine, and uploads it as an artifact.
 # Install it with:
 #   adb install --no-incremental -r piccolo.apk
-# Signed with a debug key made for each run: installing over a build signed
-# by another key needs an uninstall first. (Release signing: build-apk.sh's
-# PICCOLO_KEYSTORE, not wired here yet.)
+# Signed with the release key from the repository secrets
+# ANDROID_KEYSTORE_BASE64 (the PKCS12 keystore, base64) and
+# ANDROID_KEYSTORE_PASS: package site.multitap.piccolo, updates install over
+# each other. Where the secrets aren't available (pull requests from forks)
+# it's a debug build: site.multitap.piccolo.debug, "piccolo debug", signed by
+# a key made for that run.
 #
 # The development machine (Linux arm64) uses the distro's clang with the
 # NDK's sysroot; on GitHub's x86_64 runners the NDK's own clang does the same
@@ -70,7 +73,15 @@ jobs:
           sudo apt-get install -y -q ninja-build libvulkan-dev
 
       - name: Build the APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PICCOLO_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
         run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            export PICCOLO_KEYSTORE="$RUNNER_TEMP/release.p12"
+            export PICCOLO_KEY_ALIAS=piccolo
+          fi
           ndk="$HOME/android-ndk-${NDK_VERSION}"
           tools="$ANDROID_HOME/build-tools/${BUILD_TOOLS}"
           export PATH="$tools:$PATH"

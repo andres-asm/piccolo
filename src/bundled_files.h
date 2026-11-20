@@ -22,3 +22,10 @@ void bundled_files_install_cores(const char* cores_directory);
 // assets in the app's private storage, refreshed at every start (a few small
 // files). Empty if there's none.
 std::string bundled_files_data_folder();
+
+// The name of piccolo's folder (app_paths: ~/.local/share/<name>,
+// /sdcard/<name>). "piccolo", except Android debug builds: "piccolo-debug",
+// told by the Java side (PICCOLO_FOLDER_NAME), because the debug package's
+// cores live in its own private storage and a shared folder would list paths
+// the other package can't open (core cache, RECENT).
+const char* bundled_files_folder_name();

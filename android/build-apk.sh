@@ -23,10 +23,15 @@
 #   JAVA_HOME         a JDK for javac/java (default /usr/lib/jvm/java-21-openjdk-arm64)
 #   BUILD_TYPE        CMake build type (default Debug)
 #
-# Signing: with PICCOLO_KEYSTORE set, the release key in that keystore
-# (PICCOLO_KEY_ALIAS, PICCOLO_KEYSTORE_PASS; the key's password is the same).
-# Without it, the standard Android debug key: fine for testing, but an APK
-# signed by another key can't be installed over it without uninstalling.
+# Release or debug, decided by the key:
+#   PICCOLO_KEYSTORE set: a release build, signed with the release key in that
+#     keystore (PICCOLO_KEY_ALIAS, PICCOLO_KEYSTORE_PASS; the key's password is
+#     the same). Package site.multitap.piccolo, named "piccolo". CI builds.
+#   Not set: a debug build, signed with the standard Android debug key. Package
+#     site.multitap.piccolo.debug, named "piccolo debug", banner with a DEBUG
+#     tag (android/res-debug). It installs next to a release build instead of
+#     clashing with it (Android refuses an update signed by another key).
+# The debug build's folder is /sdcard/piccolo-debug (PiccoloActivity.java).
 
 set -eu
 
@@ -43,6 +48,11 @@ D8_JAR=${D8_JAR:-$HOME/Android/r8/r8.jar}
 JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}
 BUILD_TYPE=${BUILD_TYPE:-Debug}
 MIN_API=28
+if [ -n "${PICCOLO_KEYSTORE:-}" ]; then
+    variant=release
+else
+    variant=debug
+fi
 
 for f in "$ANDROID_JAR" "$AAPT_ANDROID_JAR" "$D8_JAR" "$JAVA_HOME/bin/javac"; do
     if [ ! -e "$f" ]; then
@@ -73,7 +83,7 @@ cmake --build "$native" --target piccolo
 # number of commits as versionCode, which only grows on one branch.
 version_name=$(sed -n 's/^#define PICCOLO_VERSION "\(.*\)"$/\1/p' "$native/generated/piccolo_version.h")
 version_code=$(git -C "$root" rev-list --count HEAD)
-echo "piccolo $version_name (versionCode $version_code)"
+echo "piccolo $version_name (versionCode $version_code, $variant)"
 
 echo "== java"
 rm -rf "$apk_dir"
@@ -95,10 +105,21 @@ echo "== package"
 # lang/ there like next to the program; layouts/ and themes/ are copied out at
 # start (src/bundled_files_android.cpp).
 cp -r "$root/lang" "$root/layouts" "$root/themes" "$apk_dir/assets/"
-# Resources: the launcher icon and the TV banner (android/res, exported from assets/branding).
+# Resources: the name, launcher icon and TV banner (android/res, exported
+# from assets/branding). Debug builds lay android/res-debug over them (the
+# later -R wins) and rename the package; aapt2 keeps the activities' class
+# names pointing at the Java package, which doesn't change.
+# --replace-version: the version flags only fill in a missing version otherwise.
 aapt2 compile --dir "$here/res" -o "$apk_dir/res.zip"
-aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -R "$apk_dir/res.zip" --auto-add-overlay \
-    -A "$apk_dir/assets" --version-name "$version_name" --version-code "$version_code" \
+if [ "$variant" = debug ]; then
+    aapt2 compile --dir "$here/res-debug" -o "$apk_dir/res-debug.zip"
+    variant_flags="-R $apk_dir/res-debug.zip --rename-manifest-package site.multitap.piccolo.debug"
+else
+    variant_flags=""
+fi
+# shellcheck disable=SC2086 # $variant_flags is a list of words without spaces
+aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -R "$apk_dir/res.zip" $variant_flags \
+    --auto-add-overlay -A "$apk_dir/assets" --replace-version --version-name "$version_name" --version-code "$version_code" \
     -o "$apk_dir/unaligned.apk"
 libs="lib/arm64-v8a/libmain.so"
 cp "$native/libmain.so" "$apk_dir/lib/arm64-v8a/libmain.so"

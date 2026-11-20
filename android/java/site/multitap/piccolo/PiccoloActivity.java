@@ -33,9 +33,13 @@ public class PiccoloActivity extends SDLActivity {
         // user folders on Android.
         String sdcard = Environment.getExternalStorageDirectory().getAbsolutePath();
         nativeSetenv("MULTITAP_HOME_DIR", sdcard);
+        // Debug builds (package site.multitap.piccolo.debug, see build-apk.sh)
+        // keep their own folder: their cores are in their own private storage.
+        String folder = getPackageName().endsWith(".debug") ? "piccolo-debug" : "piccolo";
+        nativeSetenv("PICCOLO_FOLDER_NAME", folder);
         if (StartActivity.hasSharedStorageAccess(this)) {
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);
-            Log.i(TAG, "data folder: " + sdcard + "/piccolo");
+            Log.i(TAG, "data folder: " + sdcard + "/" + folder);
         } else {
             Log.w(TAG, "no storage access: using the app's private folder (deleted on uninstall)");
         }

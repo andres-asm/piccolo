@@ -119,3 +119,9 @@ std::string bundled_files_data_folder()
     copy_asset_folder("themes", destination);
     return destination;
 }
+
+const char* bundled_files_folder_name()
+{
+    const char* name = SDL_getenv("PICCOLO_FOLDER_NAME");   // set by PiccoloActivity
+    return (name != nullptr && name[0] != '\0') ? name : "piccolo";
+}

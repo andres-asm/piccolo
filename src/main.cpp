@@ -2774,7 +2774,7 @@ int main(int argc, char** argv)
     // Everything in piccolo's folder, migrated once from ~/.host-libretro.
     // Without it nothing is saved, but games still run.
     ImGuiIO& io = ImGui::GetIO();
-    if (app_paths_init(&app->paths, "piccolo", "piccolo.cfg"))
+    if (app_paths_init(&app->paths, bundled_files_folder_name(), "piccolo.cfg"))
     {
         bundled_files_install_cores(app->paths.cores.c_str());   // before the catalog first looks
         app->imgui_ini = app->paths.settings + "/imgui.ini";

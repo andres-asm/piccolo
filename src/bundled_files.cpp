@@ -14,3 +14,8 @@ std::string bundled_files_data_folder()
     const char* program_folder = SDL_GetBasePath();   // ends with a separator; SDL owns it
     return program_folder != nullptr ? program_folder : "";
 }
+
+const char* bundled_files_folder_name()
+{
+    return "piccolo";
+}
