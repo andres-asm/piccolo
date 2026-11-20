@@ -30,6 +30,10 @@ constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
 constexpr const char* PICCOLO_INPUT_PRESS_TIME = "input_press_seconds";   // binding: wait for a press this long, then go on
 constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // binding with SET / MAP CONTROLLER: hold this long
+// INPUT > ENABLE OSK: the system's on-screen keyboard for text fields and for
+// a core that asks for the keyboard. "auto" = on for phones, TVs and handhelds
+// (Android, Steam Deck, no physical keyboard), off on a PC. Global only.
+constexpr const char* PICCOLO_INPUT_OSK = "input_osk";
 constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
@@ -249,6 +253,9 @@ const char* piccolo_settings_ui_color_key(uint32_t index);
 
 // The Input settings (SETTINGS > INPUT) as the input layer's.
 void piccolo_settings_input(const Settings* settings, InputSettings* input);
+
+// INPUT > ENABLE OSK resolved for this machine ("auto" decided here).
+bool piccolo_settings_osk(const Settings* settings);
 
 // The Sound settings as audio_output's config.
 void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);
