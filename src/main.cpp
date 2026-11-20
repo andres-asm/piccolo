@@ -884,6 +884,8 @@ static Str share_done_text(NetShareStatus status)
     {
     case NetShareStatus::exists:
         return Str::share_done_exists;
+    case NetShareStatus::same:
+        return Str::share_done_same;
     case NetShareStatus::no_space:
         return Str::share_done_no_space;
     case NetShareStatus::mismatch:
@@ -954,7 +956,8 @@ static void share_update(App* app, ShareTransferLine* line)
         const ShareCopy* copy = &window->copies[i];
         const char* local = copy->to_remote ? copy->from.c_str() : copy->to.c_str();
         const char* remote = copy->to_remote ? copy->to.c_str() : copy->from.c_str();
-        net_share_link_copy(link, copy->to_remote, local, remote, copy->size, 0);
+        net_share_link_copy(link, copy->to_remote, local, remote, copy->size, copy->mtime,
+                            copy->replace ? NET_SHARE_PUT_REPLACE : 0);
         window->message.clear();
     }
     window->copies.clear();
@@ -971,6 +974,18 @@ static void share_update(App* app, ShareTransferLine* line)
         {
             window->local.stale = true;   // a new file on one side
             window->remote.stale = true;
+            continue;
+        }
+        if (done->status == NetShareStatus::exists)
+        {
+            // Another file with that name there: SHARE asks whether to replace it.
+            ShareCopy conflict;
+            conflict.to_remote = done->copy.to_remote;
+            conflict.from = done->copy.to_remote ? done->copy.local : done->copy.remote;
+            conflict.to = done->copy.to_remote ? done->copy.remote : done->copy.local;
+            conflict.size = done->copy.size;
+            conflict.mtime = done->copy.mtime;
+            share_window_add_conflict(window, &conflict);
             continue;
         }
         const std::string* name = done->copy.to_remote ? &done->copy.local : &done->copy.remote;
@@ -1445,7 +1460,10 @@ static void close_topmost_or_toggle_menu(App* app)
         }
         else if (app->share_window.open)
         {
-            app->share_window.open = false;
+            if (app->share_window.conflicts.empty())   // otherwise its REPLACE? question takes Escape
+            {
+                app->share_window.open = false;
+            }
         }
         else if (app->input_window.open)
         {
