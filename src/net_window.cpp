@@ -1,6 +1,7 @@
 #include "net_window.h"
 
 #include <cstdio>
+#include <cstring>
 
 #include "imgui.h"
 
@@ -74,6 +75,92 @@ static void draw_access(NetAccess* access, uint32_t device, const Localization* 
         net_access_set_level(access, device, static_cast<NetAccessLevel>(current));
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
+}
+
+static const NetSpeedSummary* speed_of(const NetWindowContext* context, const uint8_t* key)
+{
+    for (size_t i = 0; context->speed != nullptr && i < context->speed->size(); i++)
+    {
+        if (std::memcmp((*context->speed)[i].key, key, NET_KEY_SIZE) == 0)
+        {
+            return &(*context->speed)[i];
+        }
+    }
+    return nullptr;
+}
+
+// "95.0 MBIT/S", or "-" when nothing went through clean.
+static void speed_text(bool tested, uint32_t kbps, char* out, size_t size)
+{
+    if (!tested)
+    {
+        std::snprintf(out, size, "?");
+    }
+    else if (kbps == 0)
+    {
+        std::snprintf(out, size, "-");
+    }
+    else
+    {
+        std::snprintf(out, size, "%.1f MBIT/S", static_cast<double>(kbps) / 1000.0);
+    }
+}
+
+//   ANA'S PHONE  192.168.1.20:41000
+//   4 MS  JITTER 2 MS  LOSS 0%   SPEED TEST: DOWN 95.0 MBIT/S, UP 90.0 MBIT/S
+static void draw_connected(const NetWindowContext* context)
+{
+    const NetAccess* access = context->access;
+    const Localization* strings = context->strings;
+    bool any = false;
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        const NetAccessPeer* entry = &access->peers[peer];
+        if (entry->state != NetAccessPeerState::authorized || entry->device < 0 ||
+            static_cast<size_t>(entry->device) >= access->trust.devices.size())
+        {
+            continue;
+        }
+        const NetTrustedDevice* device = &access->trust.devices[static_cast<size_t>(entry->device)];
+        ImGui::PushID(static_cast<int>(peer));
+        if (any)
+        {
+            ImGui::Spacing();
+        }
+        any = true;
+        ImGui::TextUnformatted(device->name.empty() ? "?" : device->name.c_str());
+        NetAddress address;
+        if (net_access_peer_address(access, peer, &address))
+        {
+            char text[64];
+            net_address_to_text(address, text, sizeof(text));
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", text);
+        }
+        NetLinkStats stats;
+        if (net_access_peer_stats(access, peer, &stats))
+        {
+            ImGui::Text("%u MS  %s %u MS  %s %.0f%%", stats.round_trip_ms, piccolo_text(strings, Str::net_jitter),
+                        stats.jitter_ms, piccolo_text(strings, Str::net_loss), static_cast<double>(stats.loss) * 100.0);
+            retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_ping_help));
+        }
+        const NetSpeedSummary* speed = speed_of(context, device->key);
+        if (speed != nullptr && (speed->down_tested || speed->up_tested))
+        {
+            char down[32];
+            char up[32];
+            speed_text(speed->down_tested, speed->down_kbps, down, sizeof(down));
+            speed_text(speed->up_tested, speed->up_kbps, up, sizeof(up));
+            ImGui::Text("%s: %s %s, %s %s", piccolo_text(strings, Str::net_speed_test),
+                        piccolo_text(strings, Str::net_speed_down), down, piccolo_text(strings, Str::net_speed_up), up);
+            retro_ui_item_tooltip(piccolo_text(strings, Str::net_speed_test_help));
+        }
+        ImGui::PopID();
+    }
+    if (!any)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::net_no_connected));
+    }
 }
 
 // The ping of a connected device's first connection, or false.
@@ -176,6 +263,8 @@ void net_window_draw_tab(const NetWindowContext* context, float label_width)
     }
     retro_ui_separator_text(piccolo_text(strings, Str::net_section_pairing));
     draw_pairing(context);
+    retro_ui_separator_text(piccolo_text(strings, Str::net_section_connected));
+    draw_connected(context);
     retro_ui_separator_text(piccolo_text(strings, Str::net_section_devices));
     draw_devices(context);
 }

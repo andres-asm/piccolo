@@ -127,6 +127,8 @@ struct App
     NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
     NetSpeedReceiver net_speed_receiver;   // a speed test, up
     bool             net_speed_reporting = false;   // the sender finished: its report goes out
+    std::vector<NetSpeedSummary> net_speed_results;  // what devices' speed tests found (SETTINGS > NETWORK)
+    NetAccessLevel   net_actions_level[NET_MAX_PEERS] = {};   // the level each device's action list was made for
     // What the devices were last told runs (game_state): sent again when it changes.
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
@@ -1615,6 +1617,7 @@ static void draw_settings(App* app)
     network.access = app->net_running ? &app->net : nullptr;
     network.listen_failed = app->net_listen_failed;
     network.this_device = app->net_fingerprint;
+    network.speed = &app->net_speed_results;
     context.network = &network;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
@@ -1865,8 +1868,9 @@ static void net_send_actions(App* app, uint32_t peer, uint32_t id)
     {
         if ((peer == NET_NO_PEER || peer == i) && app->net.peers[i].state == NetAccessPeerState::authorized)
         {
+            app->net_actions_level[i] = net_peer_access(app, i);
             size_t size = net_remote_write_actions(&app->net_remote, id, app->net_peer_language[i],
-                                                   app->paths.root.c_str(), net_peer_access(app, i), &game);
+                                                   app->paths.root.c_str(), app->net_actions_level[i], &game);
             net_access_send(&app->net, i, NetChannel::control, app->net_remote.reply.data(), size);
         }
     }
@@ -2043,6 +2047,32 @@ static void net_follow_remote(App* app)
     {
         app->net_paused = false;
     }
+    // A device whose access changed (NETWORK): its new welcome went out with
+    // net_access_set_level; its action list follows at once, and a speed test
+    // its new level doesn't cover stops. (Nothing else it holds needs more
+    // than GAMEPAD: pause, fast forward, its pads.)
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net.peers[i].state != NetAccessPeerState::authorized ||
+            net_peer_access(app, i) == app->net_actions_level[i])
+        {
+            continue;
+        }
+        net_send_actions(app, i, 0);
+        NetAccessLevel level = net_peer_access(app, i);
+        if (!net_access_allows(level, NetAccessLevel::stream))
+        {
+            if (app->net_speed_sender.active && app->net_speed_sender.peer == i)
+            {
+                app->net_speed_sender.active = false;
+                app->net_speed_reporting = false;
+            }
+            if (app->net_speed_receiver.active && app->net_speed_receiver.peer == i)
+            {
+                app->net_speed_receiver.active = false;
+            }
+        }
+    }
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
         if (app->net.peers[i].state == NetAccessPeerState::authorized &&
@@ -2218,6 +2248,47 @@ static void net_speed_request(App* app, const NetAccessEvent* event)
     {
         net_speed_receiver_start(&app->net_speed_receiver, id, event->peer,
                                  now + static_cast<double>(duration) / 1000.0 + NET_SPEED_GRACE_SECONDS);
+    }
+}
+
+// speed_result: one step of a device's speed test, as it measured it.
+static void net_speed_result(App* app, const NetAccessEvent* event)
+{
+    NetSpeedResult result;
+    if (event->device < 0 || static_cast<size_t>(event->device) >= app->net.trust.devices.size() ||
+        !net_speed_read_result(event->data, event->size, &result))
+    {
+        return;
+    }
+    const uint8_t* key = app->net.trust.devices[static_cast<size_t>(event->device)].key;
+    NetSpeedSummary* summary = nullptr;
+    for (size_t i = 0; i < app->net_speed_results.size() && summary == nullptr; i++)
+    {
+        if (std::memcmp(app->net_speed_results[i].key, key, NET_KEY_SIZE) == 0)
+        {
+            summary = &app->net_speed_results[i];
+        }
+    }
+    if (summary == nullptr)
+    {
+        NetSpeedSummary entry;
+        std::memcpy(entry.key, key, NET_KEY_SIZE);
+        app->net_speed_results.push_back(entry);
+        summary = &app->net_speed_results.back();
+    }
+    bool down = result.direction == NetSpeedDirection::down;
+    uint32_t* best = down ? &summary->down_kbps : &summary->up_kbps;
+    uint32_t* last_asked = down ? &summary->down_last_asked : &summary->up_last_asked;
+    bool* tested = down ? &summary->down_tested : &summary->up_tested;
+    if (result.asked_kbps <= *last_asked)
+    {
+        *best = 0;   // a new test (its first, lowest step)
+    }
+    *last_asked = result.asked_kbps;
+    *tested = true;
+    if (result.loss_per_mille <= NET_WINDOW_SPEED_MAX_LOSS && result.got_kbps > *best)
+    {
+        *best = result.got_kbps;
     }
 }
 
@@ -2517,6 +2588,10 @@ static void net_update(App* app)
                 if (event.size > 0 && event.data[0] == NET_SPEED_REQUEST)
                 {
                     net_speed_request(app, &event);
+                }
+                if (event.size > 0 && event.data[0] == NET_SPEED_RESULT)
+                {
+                    net_speed_result(app, &event);
                 }
                 net_games_message(app, &event, device);   // net_access let through only what its level covers
                 net_remote_message(app, &event, device);

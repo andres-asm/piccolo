@@ -26,10 +26,27 @@
 // list act on the running NetAccess directly.
 
 #include <cstdint>
+#include <vector>
 
 #include "localization.h"
 #include "net_access.h"
 #include "settings.h"
+
+// The last speed test of a device, as it reported each step (net_speed.h
+// speed_result): the best rate each way that lost no more than
+// NET_WINDOW_SPEED_MAX_LOSS. Kept while piccolo runs, by device key.
+constexpr uint16_t NET_WINDOW_SPEED_MAX_LOSS = 20;   // per mille
+
+struct NetSpeedSummary
+{
+    uint8_t  key[NET_KEY_SIZE] = {};
+    uint32_t down_kbps = 0;   // 0 = none clean (or not tested)
+    uint32_t up_kbps = 0;
+    uint32_t down_last_asked = 0;   // a step asking less than the last starts a new test
+    uint32_t up_last_asked = 0;
+    bool     down_tested = false;
+    bool     up_tested = false;
+};
 
 struct NetWindowContext
 {
@@ -38,6 +55,7 @@ struct NetWindowContext
     NetAccess*          access = nullptr;   // nullptr while networking is off
     bool                listen_failed = false;   // on, but the port couldn't be opened
     const char*         this_device = "";   // our key's fingerprint
+    const std::vector<NetSpeedSummary>* speed = nullptr;   // speed test results, by device key
 };
 
 // The tab's contents, inside SETTINGS' tab. The rows always edit the global
