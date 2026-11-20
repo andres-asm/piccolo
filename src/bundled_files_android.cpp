@@ -137,6 +137,7 @@ std::string bundled_files_data_folder()
     }
     copy_asset_folder("layouts", destination);
     copy_asset_folder("themes", destination);
+    copy_asset_folder("shaders", destination);   // piccolo's own presets + the curated ones (shaders/presets)
     if (have_stamp && !host_fs_write_file(stamp_path.c_str(), stamp, std::strlen(stamp)))
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Bundled files: can't write %s", stamp_path.c_str());
