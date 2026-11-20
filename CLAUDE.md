@@ -133,7 +133,8 @@ src/
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
-                          codec on real games), lsan-suppressions.txt
+                          codec on real games), netplay_measure (which netplay mode a core and game
+                          suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
@@ -197,7 +198,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-67 tests with test-libretro (48 without). Before calling a larger change done:
+68 tests with test-libretro (49 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless

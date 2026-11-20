@@ -22,10 +22,10 @@
 #include <string>
 #include <vector>
 
-#include "archive.h"
 #include "frame_delta.h"
 #include "host_log.h"
 #include "libretro_host.h"
+#include "measure_common.h"
 
 static void usage()
 {
@@ -56,32 +56,6 @@ static bool frame_format(retro_pixel_format format, FramePixelFormat* out)
 static const char* format_name(FramePixelFormat format)
 {
     return format == FramePixelFormat::rgb565 ? "RGB565" : format == FramePixelFormat::xrgb1555 ? "0RGB1555" : "XRGB8888";
-}
-
-// The scripted pad (RETRO_DEVICE_ID_JOYPAD_* bits) at a frame: START and A
-// every 1.5 s for the first 20 s (menus, file select), then RIGHT and Y held
-// (run) with B (jump) every half second.
-static uint16_t script(uint32_t frame)
-{
-    uint32_t t = frame % 90;
-    if (frame < 20 * 60)
-    {
-        if (t < 6)
-        {
-            return 1u << 3;   // START
-        }
-        if (t >= 45 && t < 51)
-        {
-            return 1u << 8;   // A
-        }
-        return 0;
-    }
-    uint16_t buttons = static_cast<uint16_t>((1u << 7) | (1u << 1));   // RIGHT, Y
-    if (frame % 30 < 10)
-    {
-        buttons = static_cast<uint16_t>(buttons | (1u << 0));   // B
-    }
-    return buttons;
 }
 
 static double milliseconds_since(std::chrono::steady_clock::time_point start)
@@ -132,28 +106,10 @@ int main(int argc, char** argv)
     }
     host_log_set_min_level(LogLevel::warning);
 
-    // A zip or 7z: its first file, extracted.
-    std::string content = game_path;
-    if (archive_format(game_path) != ArchiveFormat::none)
+    std::string content;
+    if (!measure_content(game_path, &scratch, &content))
     {
-        std::vector<ArchiveEntry> entries;
-        size_t first = 0;
-        while (archive_list(game_path, &entries) && first < entries.size() && entries[first].is_directory)
-        {
-            first++;
-        }
-        if (first >= entries.size())
-        {
-            std::printf("nothing to load in %s\n", game_path);
-            return 1;
-        }
-        const std::string* name = &entries[first].name;
-        size_t slash = name->rfind('/');
-        content = scratch + "/" + (slash == std::string::npos ? *name : name->substr(slash + 1));
-        if (!archive_extract(game_path, name->c_str(), content.c_str()))
-        {
-            return 1;
-        }
+        return 1;
     }
 
     LibretroHost* host = new LibretroHost{};
@@ -189,7 +145,7 @@ int main(int argc, char** argv)
     for (uint32_t frame = 0; frame < skip + frames; frame++)
     {
         LibretroInputState input;
-        input.joypad_buttons[0] = script(frame);
+        input.joypad_buttons[0] = measure_script(frame);
         libretro_host_set_input(host, &input);
         if (!libretro_host_run_frame(host))
         {
