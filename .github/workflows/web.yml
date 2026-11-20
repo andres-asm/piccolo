@@ -1,0 +1,94 @@
+# Builds piccolo for the browser (web/build-core.sh, web/build.sh,
+# web/package.sh: the same scripts as on the development machine) and uploads
+# the zip that deploys by unzipping on any static server (artifact
+# piccolo-web). Also builds the Docker image that serves it with the COOP/COEP
+# headers its threads need, and checks those headers from a running
+# container. The image is NOT pushed anywhere (GHCR needs Andrés's OK).
+name: Web
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  EMSDK_VERSION: 6.0.13
+  RGBDS_VERSION: v1.0.1   # the one multitap-org/cores builds SameBoy's boot ROMs with
+
+jobs:
+  web:
+    name: Web (wasm)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # The submodules the build uses (the package copies their licenses too).
+      - name: Submodules
+        run: |
+          git submodule update --init --recursive --depth 1 \
+            deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
+            deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher \
+            deps/piccolo-shaders \
+            deps/common/hosts-common deps/common/frontends-common \
+            deps/libretro/host-libretro deps/libretro/frontend-libretro
+          git submodule update --init --depth 1 deps/librashader
+
+      # Ninja; the Vulkan headers (web/build.sh: frontends-common's headers name
+      # Vulkan types even with Vulkan off); bison + libpng to build rgbds; zip.
+      - name: Packages
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build libvulkan-dev bison libpng-dev zip
+
+      - name: Cache emsdk and rgbds
+        id: tools-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/emsdk
+            ~/rgbds
+          key: web-tools-emsdk-${{ env.EMSDK_VERSION }}-rgbds-${{ env.RGBDS_VERSION }}
+
+      - name: emsdk and rgbds
+        if: steps.tools-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone -q https://github.com/emscripten-core/emsdk "$HOME/emsdk"
+          "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
+          "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
+          # rgbds from source, like multitap-org/cores' scripts/tools.sh.
+          git clone -q --depth 1 --branch "$RGBDS_VERSION" https://github.com/gbdev/rgbds.git "$RUNNER_TEMP/rgbds"
+          cmake -S "$RUNNER_TEMP/rgbds" -B "$RUNNER_TEMP/rgbds/build" -G Ninja -DCMAKE_BUILD_TYPE=Release > /dev/null
+          cmake --build "$RUNNER_TEMP/rgbds/build"
+          mkdir -p "$HOME/rgbds"
+          for exe in rgbasm rgblink rgbfix rgbgfx; do cp "$RUNNER_TEMP/rgbds/$exe" "$HOME/rgbds/"; done
+
+      - name: Build and package
+        run: |
+          . "$HOME/emsdk/emsdk_env.sh"
+          RGBDS="$HOME/rgbds/" web/build-core.sh
+          web/build.sh
+          web/package.sh
+          ls -la web/build/dist
+
+      # The image is built from the unzipped folder: the same files as the zip.
+      # Then a container serves it and the headers are checked: COOP/COEP on
+      # the page, application/wasm on the wasm.
+      - name: Docker image
+        run: |
+          dist=$(find web/build/dist -mindepth 1 -maxdepth 1 -type d -name 'piccolo-*-web' | head -n 1)
+          docker build -t piccolo-web -f web/docker/Dockerfile --build-context config=web/docker "$dist"
+          docker run -d --rm --name piccolo-web -p 8080:80 piccolo-web
+          sleep 2
+          curl -fsSI http://localhost:8080/sameboy/ | tee page-headers.txt
+          curl -fsSI http://localhost:8080/sameboy/piccolo.wasm | tee wasm-headers.txt
+          docker stop piccolo-web
+          grep -qi '^cross-origin-opener-policy: same-origin' page-headers.txt
+          grep -qi '^cross-origin-embedder-policy: require-corp' page-headers.txt
+          grep -qi '^content-type: application/wasm' wasm-headers.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piccolo-web
+          path: web/build/dist/*.zip
