@@ -153,7 +153,14 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
         const char* keys[4] = {PICCOLO_PATH_CORES, PICCOLO_PATH_SYSTEM, PICCOLO_PATH_SAVES, PICCOLO_PATH_STATES};
         const char* hints[4] = {context->paths->cores.c_str(), context->paths->system.c_str(),
                                 context->paths->saves.c_str(), context->paths->states.c_str()};
-        for (uint32_t i = 0; i < 4; i++)
+        // Android: no CORES row. Cores load only from the app's private
+        // storage (shared storage is noexec); main.cpp ignores the setting.
+#if defined(SDL_PLATFORM_ANDROID)
+        uint32_t first = 1;
+#else
+        uint32_t first = 0;
+#endif
+        for (uint32_t i = first; i < 4; i++)
         {
             if (settings_ui_folder_row(ui, keys[i], hints[i]))
             {

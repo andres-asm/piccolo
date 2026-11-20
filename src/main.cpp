@@ -381,7 +381,13 @@ static void apply_folders(App* app)
     std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s", system.c_str());
     std::snprintf(app->session.cache_directory, sizeof(app->session.cache_directory), "%s", app->paths.cache.c_str());
 
+#if defined(SDL_PLATFORM_ANDROID)
+    // Android: cores load only from the app's private storage (shared storage
+    // is noexec), so the CORES setting isn't offered (settings_window.cpp).
+    std::string cores = app->paths.cores;
+#else
     std::string cores = folder_setting(app, PICCOLO_PATH_CORES, app->paths.cores);
+#endif
     if (cores != app->cores_directory)
     {
         app->cores_directory = cores;
