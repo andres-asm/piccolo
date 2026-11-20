@@ -190,6 +190,7 @@ set(PICCOLO_SOURCES
     src/recent_games.cpp
     src/core_options_ui.cpp
     src/cores_window.cpp
+    src/share_window.cpp
     src/safe_start_window.cpp
     src/shader_check.cpp
     src/shader_check_window.cpp

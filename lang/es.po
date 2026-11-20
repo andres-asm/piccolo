@@ -2715,6 +2715,10 @@ msgctxt "menu_cores"
 msgid "CORES..."
 msgstr "CORES..."
 
+msgctxt "menu_share"
+msgid "SHARE..."
+msgstr "COMPARTIR..."
+
 msgctxt "cores_title"
 msgid "CORES"
 msgstr "CORES"
@@ -3019,8 +3023,8 @@ msgstr "VINCULACIÓN CERRADA"
 
 
 msgctxt "net_device_access_help"
-msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."
-msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego."
+msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game. OWNER: also copy games, saves and states to and from the shared folders."
+msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego. DUEÑO: además copiar juegos, partidas y estados desde y hacia las carpetas compartidas."
 
 msgctxt "net_access_gamepad"
 msgid "GAMEPAD"
@@ -3033,6 +3037,26 @@ msgstr "STREAM"
 msgctxt "net_access_full"
 msgid "FULL"
 msgstr "COMPLETO"
+
+msgctxt "net_access_owner"
+msgid "OWNER"
+msgstr "DUEÑO"
+
+msgctxt "net_owner_confirm_title"
+msgid "OWNER ACCESS"
+msgstr "ACCESO DE DUEÑO"
+
+msgctxt "net_owner_confirm_text"
+msgid "THIS DEVICE WILL BE ABLE TO COPY GAMES, SAVES AND STATES FROM THIS PICCOLO'S SHARED FOLDERS, AND TO WRITE FILES INTO THEM. GIVE IT OWNER ACCESS?"
+msgstr "ESTE DISPOSITIVO PODRÁ COPIAR JUEGOS, PARTIDAS Y ESTADOS DE LAS CARPETAS COMPARTIDAS DE ESTE PICCOLO, Y ESCRIBIR ARCHIVOS EN ELLAS. ¿DARLE ACCESO DE DUEÑO?"
+
+msgctxt "net_owner_confirm_yes"
+msgid "GIVE OWNER ACCESS"
+msgstr "DAR ACCESO DE DUEÑO"
+
+msgctxt "net_owner_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
 
 msgctxt "action_slot_next"
 msgid "NEXT SLOT"
@@ -3177,3 +3201,139 @@ msgstr "ESTE CORE HACE HASTA"
 msgctxt "run_ahead_no_game"
 msgid "NO GAME RUNNING"
 msgstr "NINGÚN JUEGO CORRIENDO"
+
+msgctxt "share_title"
+msgid "SHARE"
+msgstr "COMPARTIR"
+
+msgctxt "share_this_piccolo"
+msgid "THIS PICCOLO"
+msgstr "ESTE PICCOLO"
+
+msgctxt "share_other_piccolo"
+msgid "OTHER PICCOLO"
+msgstr "OTRO PICCOLO"
+
+msgctxt "share_shared_folders"
+msgid "SHARED FOLDERS"
+msgstr "CARPETAS COMPARTIDAS"
+
+msgctxt "share_not_connected"
+msgid "NO PICCOLO CONNECTED WITH OWNER ACCESS"
+msgstr "NINGÚN PICCOLO CONECTADO CON ACCESO DE DUEÑO"
+
+msgctxt "share_list_failed"
+msgid "THIS FOLDER CAN'T BE READ"
+msgstr "NO SE PUEDE LEER ESTA CARPETA"
+
+msgctxt "share_no_files"
+msgid "NO FILES HERE"
+msgstr "NO HAY ARCHIVOS AQUÍ"
+
+msgctxt "share_copy_to_remote_help"
+msgid "Copies the selected file into the folder open on the other piccolo."
+msgstr "Copia el archivo elegido a la carpeta abierta en el otro piccolo."
+
+msgctxt "share_copy_to_local_help"
+msgid "Copies the selected file from the other piccolo into the folder open here."
+msgstr "Copia el archivo elegido del otro piccolo a la carpeta abierta aquí."
+
+msgctxt "share_hint"
+msgid "SELECT A FILE, OPEN A FOLDER ON THE OTHER SIDE, THEN PRESS THE ARROW."
+msgstr "ELIGE UN ARCHIVO, ABRE UNA CARPETA DEL OTRO LADO Y PULSA LA FLECHA."
+
+msgctxt "share_sending"
+msgid "SENDING"
+msgstr "ENVIANDO"
+
+msgctxt "share_receiving"
+msgid "RECEIVING"
+msgstr "RECIBIENDO"
+
+msgctxt "share_paused"
+msgid "PAUSED: REMOTE PLAY"
+msgstr "EN PAUSA: JUEGO REMOTO"
+
+msgctxt "share_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "share_network_off"
+msgid "THE NETWORK COULDN'T START (SEE THE LOG)."
+msgstr "LA RED NO PUDO ARRANCAR (MIRA EL REGISTRO)."
+
+msgctxt "share_needs_owner"
+msgid "CONNECTED, BUT THIS PICCOLO DIDN'T GIVE US OWNER ACCESS. GIVE IT ON THAT PICCOLO: SETTINGS > NETWORK, THIS DEVICE, OWNER."
+msgstr "CONECTADO, PERO ESTE PICCOLO NO NOS DIO ACCESO DE DUEÑO. DALO EN ESE PICCOLO: AJUSTES > RED, ESTE DISPOSITIVO, DUEÑO."
+
+msgctxt "share_disconnect"
+msgid "DISCONNECT"
+msgstr "DESCONECTAR"
+
+msgctxt "share_found"
+msgid "PICCOLOS ON THIS NETWORK"
+msgstr "PICCOLOS EN ESTA RED"
+
+msgctxt "share_found_none"
+msgid "LOOKING... (THE OTHER PICCOLO NEEDS NETWORK ON IN SETTINGS > NETWORK)"
+msgstr "BUSCANDO... (EL OTRO PICCOLO NECESITA LA RED ACTIVADA EN AJUSTES > RED)"
+
+msgctxt "share_code"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "share_code_help"
+msgid "The first time only: the 6 digits the other piccolo shows after SETTINGS > NETWORK > PAIR A DEVICE."
+msgstr "Sólo la primera vez: los 6 dígitos que muestra el otro piccolo tras AJUSTES > RED > VINCULAR UN DISPOSITIVO."
+
+msgctxt "share_connect"
+msgid "CONNECT"
+msgstr "CONECTAR"
+
+msgctxt "share_connecting"
+msgid "CONNECTING..."
+msgstr "CONECTANDO..."
+
+msgctxt "share_refused_not_paired"
+msgid "NOT PAIRED YET: TYPE THE CODE IT SHOWS."
+msgstr "AÚN NO EMPAREJADOS: ESCRIBE EL CÓDIGO QUE MUESTRA."
+
+msgctxt "share_refused_pairing_closed"
+msgid "IT ISN'T PAIRING NOW: OPEN PAIRING ON IT FIRST."
+msgstr "NO ESTÁ EMPAREJANDO: ABRE EL EMPAREJAMIENTO EN ÉL PRIMERO."
+
+msgctxt "share_refused_wrong_code"
+msgid "WRONG CODE."
+msgstr "CÓDIGO INCORRECTO."
+
+msgctxt "share_refused_unknown_host"
+msgid "IT ISN'T THE PICCOLO WE PAIRED WITH."
+msgstr "NO ES EL PICCOLO CON EL QUE NOS EMPAREJAMOS."
+
+msgctxt "share_refused_connection"
+msgid "COULDN'T CONNECT."
+msgstr "NO SE PUDO CONECTAR."
+
+msgctxt "share_done_exists"
+msgid "ALREADY THERE"
+msgstr "YA ESTÁ AHÍ"
+
+msgctxt "share_done_no_space"
+msgid "NOT ENOUGH SPACE"
+msgstr "NO HAY ESPACIO"
+
+msgctxt "share_done_mismatch"
+msgid "ARRIVED DAMAGED, THROWN AWAY"
+msgstr "LLEGÓ DAÑADO, DESCARTADO"
+
+msgctxt "share_done_refused"
+msgid "NOT ALLOWED"
+msgstr "NO PERMITIDO"
+
+msgctxt "share_done_busy"
+msgid "THE OTHER PICCOLO IS BUSY, TRY AGAIN"
+msgstr "EL OTRO PICCOLO ESTÁ OCUPADO, INTÉNTALO DE NUEVO"
+
+msgctxt "share_done_failed"
+msgid "FAILED"
+msgstr "FALLÓ"

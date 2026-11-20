@@ -45,6 +45,7 @@
 #include "core_catalog.h"
 #include "core_updater.h"
 #include "cores_window.h"
+#include "share_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -120,6 +121,9 @@ struct App
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
     std::string net_beacon_applied;      // the beacon server handed to the service ("" = INTERNET off)
+    std::string net_share_applied;     // the shared folders the service has (piccolo-share), as one text
+    uint32_t    net_share_revision = 0;   // the settings' revision they were looked at for
+    bool        net_share_set = false;    // the service has them
     bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
     // stream_tuning (net_stream.h): what streaming devices asked for, kept only
     // here (never in the settings or the files: a crash leaves nothing changed).
@@ -161,6 +165,7 @@ struct App
     NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
     NetSpeedReceiver net_speed_receiver;   // a speed test, up
     bool             net_speed_reporting = false;   // the sender finished: its report goes out
+    NetWindowState net_window_state;   // SETTINGS > NETWORK between frames (OWNER's confirmation)
     std::vector<NetSpeedSummary> net_speed_results;  // what devices' speed tests found (SETTINGS > NETWORK)
     NetAccessLevel   net_actions_level[NET_MAX_PEERS] = {};   // the level each device's action list was made for
     // What the devices were last told runs (game_state): sent again when it changes.
@@ -296,6 +301,16 @@ struct App
     // up when the window opens (the server and cores folder may have changed).
     CoreUpdater        core_updater;
     CoresWindow        cores_window;
+    ShareWindow        share_window;     // TOOLS > SHARE (files with another piccolo at OWNER level)
+    NetShareFolders    share_folders;    // this piccolo's shared folders: game folders, saves, states
+    NetShareLink       share_link;       // SHARE's connection to another piccolo, as its client
+    NetShareLinkStatus share_status;     // read once per loop while SHARE is open
+    bool               share_connected = false;   // last loop: connected with OWNER access
+    std::vector<NetShareClientDone> share_done;
+    uint32_t           share_rate_id = 0;    // the copy the rate is measured for
+    uint64_t           share_rate_done = 0;
+    uint64_t           share_rate_ticks = 0;
+    uint32_t           share_rate_kbps = 0;
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -826,6 +841,174 @@ static void open_cores_window(App* app)
     cores_window_open(&app->cores_window, &app->core_updater);
 }
 
+// What this piccolo shares with OWNER devices (and lists on SHARE's own
+// side): the game folders, SAVES and STATES as the settings say now.
+static void share_folder_paths(const App* app, std::vector<std::string>* game_folders, std::string* saves,
+                               std::string* states)
+{
+    piccolo_settings_game_folders(&app->settings, game_folders);
+    *saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
+    *states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+}
+
+static bool net_prepare(App* app);
+
+// TOOLS > SHARE: this piccolo's shared folders as they are now, and the
+// connection to another piccolo (started the first time, kept afterwards so
+// copies go on with the window closed).
+static void open_share_window(App* app)
+{
+    std::vector<std::string> game_folders;
+    std::string saves;
+    std::string states;
+    share_folder_paths(app, &game_folders, &saves, &states);
+    net_share_set_folders(&app->share_folders, &game_folders, saves.c_str(), states.c_str());
+    if (!net_share_link_started(&app->share_link) && net_prepare(app))
+    {
+        std::string hosts_path = app->paths.settings + "/net_hosts.cfg";
+        net_share_link_start(&app->share_link, &app->net_identity, settings_get_text(&app->settings, PICCOLO_NET_NAME),
+                             hosts_path.c_str());
+    }
+    if (net_share_link_started(&app->share_link))
+    {
+        net_share_link_set_folders(&app->share_link, &game_folders, saves.c_str(), states.c_str());
+    }
+    share_window_open(&app->share_window);
+}
+
+// What a copy that didn't go well says on SHARE's bottom line.
+static Str share_done_text(NetShareStatus status)
+{
+    switch (status)
+    {
+    case NetShareStatus::exists:
+        return Str::share_done_exists;
+    case NetShareStatus::no_space:
+        return Str::share_done_no_space;
+    case NetShareStatus::mismatch:
+        return Str::share_done_mismatch;
+    case NetShareStatus::refused:
+    case NetShareStatus::not_found:
+        return Str::share_done_refused;
+    case NetShareStatus::busy:
+        return Str::share_done_busy;
+    default:
+        return Str::share_done_failed;
+    }
+}
+
+// SHARE, once per loop while the window is open or the connection runs:
+// the window's clicks go to the connection, its answers to the window.
+static void share_update(App* app, ShareTransferLine* line)
+{
+    ShareWindow* window = &app->share_window;
+    NetShareLink* link = &app->share_link;
+    if (!net_share_link_started(link))
+    {
+        window->connect = false;
+        window->disconnect = false;
+        window->copies.clear();
+        window->cancel = false;
+        return;
+    }
+    if (window->open)
+    {
+        net_share_link_status(link, &app->share_status);
+    }
+    if (window->connect)
+    {
+        window->connect = false;
+        if (window->found_selected >= 0 && static_cast<size_t>(window->found_selected) < app->share_status.found.size())
+        {
+            net_share_link_connect(link, app->share_status.found[static_cast<size_t>(window->found_selected)].address,
+                                   window->code);
+        }
+    }
+    if (window->disconnect)
+    {
+        window->disconnect = false;
+        net_share_link_disconnect(link);
+    }
+    bool connected = app->share_status.state == NetShareLinkState::ready &&
+                     app->share_status.access == NetAccessLevel::owner;
+    if (connected != app->share_connected)
+    {
+        app->share_connected = connected;
+        share_window_remote_reset(window);   // a new piccolo, or none: its side starts over
+        window->code[0] = '\0';             // used (or not needed any more)
+    }
+    std::string path;
+    if (connected && share_window_remote_wants_list(window, &path))
+    {
+        net_share_link_list(link, path.c_str());
+    }
+    NetShareStatus status = NetShareStatus::ok;
+    std::vector<NetShareEntry> entries;
+    if (connected && net_share_link_listing(link, &path, &status, &entries))
+    {
+        share_window_set_remote_list(window, path.c_str(), status, &entries);
+    }
+    for (size_t i = 0; i < window->copies.size(); i++)
+    {
+        const ShareCopy* copy = &window->copies[i];
+        const char* local = copy->to_remote ? copy->from.c_str() : copy->to.c_str();
+        const char* remote = copy->to_remote ? copy->to.c_str() : copy->from.c_str();
+        net_share_link_copy(link, copy->to_remote, local, remote, copy->size, 0);
+        window->message.clear();
+    }
+    window->copies.clear();
+    if (window->cancel)
+    {
+        window->cancel = false;
+        net_share_link_cancel(link);
+    }
+    net_share_link_take_done(link, &app->share_done);
+    for (size_t i = 0; i < app->share_done.size(); i++)
+    {
+        const NetShareClientDone* done = &app->share_done[i];
+        if (done->status == NetShareStatus::ok)
+        {
+            window->local.stale = true;   // a new file on one side
+            window->remote.stale = true;
+            continue;
+        }
+        const std::string* name = done->copy.to_remote ? &done->copy.local : &done->copy.remote;
+        window->message = std::string(piccolo_text(&app->strings, share_done_text(done->status))) + ": " + *name;
+    }
+
+    // The bottom line, with the rate over about a second.
+    NetShareProgress progress;
+    NetShareClientCopy copy;
+    uint32_t queued = 0;
+    net_share_link_progress(link, &progress, &copy, &queued);
+    line->active = progress.role != NetShareRole::none;
+    if (line->active)
+    {
+        uint64_t now = SDL_GetTicks();
+        if (progress.id != app->share_rate_id)
+        {
+            app->share_rate_id = progress.id;
+            app->share_rate_done = progress.done;
+            app->share_rate_ticks = now;
+            app->share_rate_kbps = 0;
+        }
+        else if (now - app->share_rate_ticks >= 1000)
+        {
+            uint64_t bytes = progress.done - app->share_rate_done;
+            app->share_rate_kbps = static_cast<uint32_t>(bytes * 8 / (now - app->share_rate_ticks));
+            app->share_rate_done = progress.done;
+            app->share_rate_ticks = now;
+        }
+        size_t slash = copy.remote.rfind('/');
+        line->name = slash == std::string::npos ? copy.remote : copy.remote.substr(slash + 1);
+        line->sending = copy.to_remote;
+        line->done = progress.done;
+        line->size = progress.size;
+        line->rate_kbps = app->share_rate_kbps;
+        line->queued = queued;
+    }
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -887,6 +1070,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::cores:
             open_cores_window(app);
+            break;
+        case MenuAction::share:
+            open_share_window(app);
             break;
         case MenuAction::network:
             settings_window_open(&app->settings_window, SettingsTab::network);
@@ -1202,7 +1388,8 @@ static bool any_window_open(const App* app)
 {
     return app->picker.open || app->shader_picker.open || shader_check_asking(app) || app->settings_window.open ||
            app->settings_window.image_open ||
-           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
+           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->share_window.open ||
+           app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window) || text_input_pending(app);
 }
@@ -1251,6 +1438,10 @@ static void close_topmost_or_toggle_menu(App* app)
         else if (app->cores_window.open)
         {
             app->cores_window.open = false;
+        }
+        else if (app->share_window.open)
+        {
+            app->share_window.open = false;
         }
         else if (app->input_window.open)
         {
@@ -2136,6 +2327,7 @@ static void draw_settings(App* app)
     context.strings = &app->strings;
     context.themes = &app->themes;
     NetWindowContext network;
+    network.state = &app->net_window_state;
     network.settings = &app->settings;
     network.strings = &app->strings;
     network.access = app->net_running ? &app->net_service.access : nullptr;
@@ -3296,22 +3488,20 @@ static void net_games_message(App* app, const NetAccessEvent* event, const char*
 
 // The listener, when SETTINGS has it on. Started at launch and restarted
 // when ALLOW CONNECTIONS or PORT change (net_update).
-static void net_start(App* app)
+// The network library and this device's key (made once, kept in the
+// settings folder): for the listener and for SHARE's connection alike.
+static bool net_prepare(App* app)
 {
-    // Any failure below is remembered with the port it was tried on, so it
-    // isn't retried every frame (net_update).
-    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
-    app->net_listen_failed = true;
     if (app->paths.settings.empty())
     {
-        return;   // nowhere to keep the device key: networking stays off
+        return false;   // nowhere to keep the device key: networking stays off
     }
     if (!app->net_ready)
     {
         app->net_ready = net_init();
         if (!app->net_ready)
         {
-            return;
+            return false;
         }
     }
     if (!app->net_has_identity)
@@ -3320,10 +3510,23 @@ static void net_start(App* app)
         app->net_has_identity = net_identity_load_or_create(identity_path.c_str(), &app->net_identity);
         if (!app->net_has_identity)
         {
-            return;
+            return false;
         }
         net_key_fingerprint(app->net_identity.public_key, app->net_fingerprint, sizeof(app->net_fingerprint));
         SDL_Log("Network: this device is %s", app->net_fingerprint);
+    }
+    return true;
+}
+
+static void net_start(App* app)
+{
+    // Any failure below is remembered with the port it was tried on, so it
+    // isn't retried every frame (net_update).
+    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    app->net_listen_failed = true;
+    if (!net_prepare(app))
+    {
+        return;
     }
     app->net_service.access = NetAccess{};
     net_games_init(&app->net_games);
@@ -3340,6 +3543,7 @@ static void net_start(App* app)
     app->net_listen_failed = false;
     app->net_running = true;
     app->net_beacon_applied.clear();   // a new service: net_update hands it the beacon again
+    app->net_share_set = false;        // and its shared folders
 }
 
 static void net_stop(App* app)
@@ -3357,6 +3561,7 @@ static void net_stop(App* app)
 
 static void net_shutdown_all(App* app)
 {
+    net_share_link_stop(&app->share_link);
     net_stop(app);
     net_keypair_wipe(&app->net_identity);
     if (app->net_ready)
@@ -3404,9 +3609,32 @@ static void net_update(App* app)
         app->net_beacon_applied = beacon;
         net_service_set_beacon(&app->net_service, beacon.c_str());
     }
+    // The shared folders OWNER devices reach (piccolo-share): looked at
+    // again only when a setting changed, handed over only when they did.
+    bool share_check = !app->net_share_set || app->settings.revision != app->net_share_revision;
+    std::vector<std::string> share_games;
+    std::string share_saves;
+    std::string share_states;
+    std::string share_key;
+    if (share_check)
+    {
+        app->net_share_revision = app->settings.revision;
+        share_folder_paths(app, &share_games, &share_saves, &share_states);
+        share_key = share_saves + "\n" + share_states;
+        for (size_t i = 0; i < share_games.size(); i++)
+        {
+            share_key += "\n" + share_games[i];
+        }
+    }
     // The network thread polls; this loop handles what it queued, holding
     // the lock for all of it (the NetAccess, its peers and lists).
     net_service_lock(&app->net_service);
+    if (share_check && (!app->net_share_set || share_key != app->net_share_applied))
+    {
+        app->net_share_applied = share_key;
+        app->net_share_set = true;
+        net_service_set_share_folders(&app->net_service, &share_games, share_saves.c_str(), share_states.c_str());
+    }
     net_update_locked(app);
     net_service_unlock(&app->net_service);
 }
@@ -3953,6 +4181,19 @@ int main(int argc, char** argv)
             app->cores_window.show_legacy = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_LEGACY);
             app->cores_window.show_experimental = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_EXPERIMENTAL);
             cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
+
+            // SHARE: this side from our folders, the other from the connection.
+            if (app->share_window.open)
+            {
+                ShareTransferLine share_line;
+                share_update(app, &share_line);
+                ShareWindowContext share_context;
+                share_context.strings = &app->strings;
+                share_context.local_folders = &app->share_folders;
+                share_context.link = net_share_link_started(&app->share_link) ? &app->share_status : nullptr;
+                share_context.line = &share_line;
+                share_window_draw(&app->share_window, &share_context, app->pixel_font, app->ui_scale);
+            }
             if (app->cores_window.show_changed)
             {
                 app->cores_window.show_changed = false;
