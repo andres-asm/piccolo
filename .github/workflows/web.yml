@@ -2,8 +2,12 @@
 # web/package.sh: the same scripts as on the development machine) and uploads
 # the zip that deploys by unzipping on any static server (artifact
 # piccolo-web). Also builds the Docker image that serves it with the COOP/COEP
-# headers its threads need, and checks those headers from a running
-# container. The image is NOT pushed anywhere (GHCR needs Andrés's OK).
+# headers its threads need, checks those headers from a running container,
+# and publishes it to GHCR (Andrés, 2026-11-20) on pushes to main and on tags,
+# never from pull requests:
+#   ghcr.io/multitap-org/piccolo-web:main      every push to main
+#   ghcr.io/multitap-org/piccolo-web:<tag>     a tag (v0.4.0 -> 0.4.0), plus :latest
+#   docker run --rm -p 8080:80 ghcr.io/multitap-org/piccolo-web   -> http://localhost:8080/
 name: Web
 
 on:
@@ -21,6 +25,9 @@ jobs:
   web:
     name: Web (wasm)
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write   # the GHCR push (main and tags only)
     steps:
       - uses: actions/checkout@v4
 
@@ -78,7 +85,12 @@ jobs:
       - name: Docker image
         run: |
           dist=$(find web/build/dist -mindepth 1 -maxdepth 1 -type d -name 'piccolo-*-web' | head -n 1)
-          docker build -t piccolo-web -f web/docker/Dockerfile --build-context config=web/docker "$dist"
+          # The source label links the package to this repository on GitHub.
+          docker build -t piccolo-web -f web/docker/Dockerfile --build-context config=web/docker \
+            --label org.opencontainers.image.source="https://github.com/${{ github.repository }}" \
+            --label org.opencontainers.image.description="piccolo in the browser, served with COOP/COEP" \
+            --label org.opencontainers.image.licenses=MIT \
+            "$dist"
           docker run -d --rm --name piccolo-web -p 8080:80 piccolo-web
           sleep 2
           curl -fsSI http://localhost:8080/sameboy/ | tee page-headers.txt
@@ -87,6 +99,26 @@ jobs:
           grep -qi '^cross-origin-opener-policy: same-origin' page-headers.txt
           grep -qi '^cross-origin-embedder-policy: require-corp' page-headers.txt
           grep -qi '^content-type: application/wasm' wasm-headers.txt
+
+      - name: Publish the image (GHCR)
+        if: github.event_name == 'push'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          image="ghcr.io/${{ github.repository_owner }}/piccolo-web"
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          if [ "${{ github.ref_type }}" = tag ]; then
+            version="${{ github.ref_name }}"
+            version="${version#v}"
+            tags="$version latest"
+          else
+            tags="main"
+          fi
+          for tag in $tags; do
+            docker tag piccolo-web "$image:$tag"
+            docker push "$image:$tag"
+          done
+          docker logout ghcr.io
 
       - uses: actions/upload-artifact@v4
         with:
