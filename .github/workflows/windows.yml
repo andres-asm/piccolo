@@ -105,7 +105,7 @@ jobs:
             echo "piccolo.exe depends on MSYS2 DLLs"
             exit 1
           fi
-          objdump -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
+          "$objdump" -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
           if grep -iE 'vcruntime|msvcp|api-ms-win-crt|libstdc|libgcc' rashader-dlls.txt; then
             echo "librashader.dll depends on a C/C++ runtime DLL"
             exit 1
