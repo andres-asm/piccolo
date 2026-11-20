@@ -3,7 +3,12 @@
 # ships aapt2 for x86_64; the development machine is Linux arm64). The same
 # steps as piccoletto's android/build-apk.sh.
 #
-#   android/build-apk.sh      -> android/build/piccolo.apk
+#   android/build-apk.sh           -> android/build/piccolo.apk
+#   android/build-apk.sh --legacy  -> android/build/piccolo-legacy.apk: Android 5+ on
+#       32-bit ARM, OpenGL ES 2 only (the SHIELD Portable, Tegra 4). No Vulkan in
+#       it (Android 5 has no libvulkan.so), so it's a separate build: armeabi-v7a,
+#       minSdk 21, MULTITAP_GPU_VULKAN=OFF, MULTITAP_GL_ES2=ON. Same package
+#       name as the main APK (a device takes one or the other).
 #   adb install -r android/build/piccolo.apk
 #   adb logcat -s piccolo SDL
 #
@@ -47,7 +52,24 @@ AAPT_ANDROID_JAR=${AAPT_ANDROID_JAR:-/usr/lib/android-sdk/platforms/android-32/a
 D8_JAR=${D8_JAR:-$HOME/Android/r8/r8.jar}
 JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-arm64}
 BUILD_TYPE=${BUILD_TYPE:-Debug}
-MIN_API=28
+# The main APK: arm64, Android 9+ (its libvulkan exports Vulkan 1.1), Vulkan
+# with an OpenGL ES 3 fallback. --legacy: see the top of this file.
+legacy=0
+if [ "${1:-}" = "--legacy" ]; then
+    legacy=1
+fi
+if [ "$legacy" = 1 ]; then
+    MIN_API=21
+    ABI=armeabi-v7a
+    native="$build/native-legacy"
+    apk_name=piccolo-legacy.apk
+    gpu_flags="-DMULTITAP_GPU_VULKAN=OFF -DMULTITAP_GL_ES2=ON"
+else
+    MIN_API=28
+    ABI=arm64-v8a
+    apk_name=piccolo.apk
+    gpu_flags=""
+fi
 if [ -n "${PICCOLO_KEYSTORE:-}" ]; then
     variant=release
 else
@@ -74,8 +96,10 @@ generator=$(find "$host_build" -type f -name multitap_strings_generator | head -
 echo "== native library"
 # piccolo's own CMakeLists: with ANDROID set (the toolchain) it builds
 # libmain.so instead of the program.
+# shellcheck disable=SC2086 # $gpu_flags is a list of words without spaces
 cmake -S "$root" -B "$native" -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DCMAKE_TOOLCHAIN_FILE="$root/deps/common/hosts-common/cmake/android-toolchain.cmake" \
+    -DMULTITAP_ANDROID_ABI="$ABI" -DMULTITAP_ANDROID_API="$MIN_API" $gpu_flags \
     -DMULTITAP_BUILD_TESTS=OFF -DMULTITAP_PICCOLO_DIR= -DMULTITAP_STRINGS_GENERATOR="$generator" >/dev/null
 cmake --build "$native" --target piccolo
 
@@ -83,11 +107,11 @@ cmake --build "$native" --target piccolo
 # number of commits as versionCode, which only grows on one branch.
 version_name=$(sed -n 's/^#define PICCOLO_VERSION "\(.*\)"$/\1/p' "$native/generated/piccolo_version.h")
 version_code=$(git -C "$root" rev-list --count HEAD)
-echo "piccolo $version_name (versionCode $version_code, $variant)"
+echo "piccolo $version_name (versionCode $version_code, $variant, $ABI, minSdk $MIN_API)"
 
 echo "== java"
 rm -rf "$apk_dir"
-mkdir -p "$apk_dir/classes" "$apk_dir/dex" "$apk_dir/lib/arm64-v8a" "$apk_dir/assets"
+mkdir -p "$apk_dir/classes" "$apk_dir/dex" "$apk_dir/lib/$ABI" "$apk_dir/assets"
 # SDL's Java side straight from the submodule, plus our activities.
 find "$root/deps/SDL/android-project/app/src/main/java" "$here/java" -name '*.java' > "$apk_dir/sources.txt"
 # Java 8 bytecode against android.jar as the boot class path (not the JDK's
@@ -110,6 +134,15 @@ cp -r "$root/lang" "$root/layouts" "$root/themes" "$apk_dir/assets/"
 # later -R wins) and rename the package; aapt2 keeps the activities' class
 # names pointing at the Java package, which doesn't change.
 # --replace-version: the version flags only fill in a missing version otherwise.
+# The legacy APK's manifest: minSdk 21 and no Vulkan requirement (the
+# Play-style uses-feature line would hide it from devices without Vulkan).
+manifest="$here/AndroidManifest.xml"
+if [ "$legacy" = 1 ]; then
+    manifest="$apk_dir/AndroidManifest.xml"
+    sed -e 's/android:minSdkVersion="28"/android:minSdkVersion="21"/' \
+        -e '/android.hardware.vulkan.version/d' "$here/AndroidManifest.xml" > "$manifest"
+    grep -q 'android:minSdkVersion="21"' "$manifest" || { echo "legacy manifest: minSdkVersion not set" >&2; exit 1; }
+fi
 aapt2 compile --dir "$here/res" -o "$apk_dir/res.zip"
 if [ "$variant" = debug ]; then
     aapt2 compile --dir "$here/res-debug" -o "$apk_dir/res-debug.zip"
@@ -118,16 +151,16 @@ else
     variant_flags=""
 fi
 # shellcheck disable=SC2086 # $variant_flags is a list of words without spaces
-aapt2 link --manifest "$here/AndroidManifest.xml" -I "$AAPT_ANDROID_JAR" -R "$apk_dir/res.zip" $variant_flags \
+aapt2 link --manifest "$manifest" -I "$AAPT_ANDROID_JAR" -R "$apk_dir/res.zip" $variant_flags \
     --auto-add-overlay -A "$apk_dir/assets" --replace-version --version-name "$version_name" --version-code "$version_code" \
     -o "$apk_dir/unaligned.apk"
-libs="lib/arm64-v8a/libmain.so"
-cp "$native/libmain.so" "$apk_dir/lib/arm64-v8a/libmain.so"
+libs="lib/$ABI/libmain.so"
+cp "$native/libmain.so" "$apk_dir/lib/$ABI/libmain.so"
 # Android only extracts lib/<abi>/lib*.so when installing, hence the "lib"
 # prefix for the core (bundled_files_install_cores takes it off again).
 if [ -f "$native/test_libretro.so" ]; then
-    cp "$native/test_libretro.so" "$apk_dir/lib/arm64-v8a/libtest_libretro.so"
-    libs="$libs lib/arm64-v8a/libtest_libretro.so"
+    cp "$native/test_libretro.so" "$apk_dir/lib/$ABI/libtest_libretro.so"
+    libs="$libs lib/$ABI/libtest_libretro.so"
 fi
 # Paths inside the APK are relative to the folder zip runs in.
 (cd "$apk_dir/dex" && zip -q "$apk_dir/unaligned.apk" classes.dex)
@@ -139,7 +172,7 @@ echo "== sign"
 if [ -n "${PICCOLO_KEYSTORE:-}" ]; then
     JAVA_HOME="$JAVA_HOME" apksigner sign --ks "$PICCOLO_KEYSTORE" --ks-key-alias "${PICCOLO_KEY_ALIAS:?}" \
         --ks-pass env:PICCOLO_KEYSTORE_PASS --key-pass env:PICCOLO_KEYSTORE_PASS \
-        --out "$build/piccolo.apk" "$apk_dir/aligned.apk"
+        --out "$build/$apk_name" "$apk_dir/aligned.apk"
 else
     # The standard Android debug key, the one Android Studio would create
     # (shared with piccoletto's builds).
@@ -150,7 +183,7 @@ else
             -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
     fi
     JAVA_HOME="$JAVA_HOME" apksigner sign --ks "$keystore" --ks-pass pass:android --ks-key-alias androiddebugkey \
-        --out "$build/piccolo.apk" "$apk_dir/aligned.apk"
+        --out "$build/$apk_name" "$apk_dir/aligned.apk"
 fi
-apksigner verify "$build/piccolo.apk"
-echo "built $build/piccolo.apk"
+apksigner verify "$build/$apk_name"
+echo "built $build/$apk_name"

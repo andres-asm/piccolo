@@ -37,6 +37,7 @@ option(MULTITAP_BUILD_TESTS        "Build tests and register CTest tests"       
 # (MULTITAP_GPU=gl forces it). ImGui's GL backend is built either in its desktop mode
 # (GLES 3 / desktop GL, functions loaded at run time) or, with this ON, for GLES 2:
 # the Android 5 APK (Tegra 4), or a Linux build that tests like it.
+option(MULTITAP_GPU_VULKAN         "Vulkan in the build (OFF: OpenGL ES only, the Android 5 APK)" ON)
 option(MULTITAP_GL_ES2             "ImGui's GL backend for GLES 2 (and GLES 2.0 contexts)" OFF)
 
 # Where builds are copied so they're easy to find and run: piccolo's own
@@ -98,7 +99,9 @@ endforeach()
 # ---------------------------------------------------------------------------
 # Third-party dependencies (built with their own defaults, not our warnings)
 # ---------------------------------------------------------------------------
-find_package(Vulkan REQUIRED)
+if(MULTITAP_GPU_VULKAN)
+    find_package(Vulkan REQUIRED)
+endif()
 
 if(MULTITAP_SYSTEM_SDL3)
     find_package(SDL3 CONFIG REQUIRED)
@@ -123,11 +126,14 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui SYSTEM PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
-target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+if(MULTITAP_GPU_VULKAN)
+    target_sources(imgui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+    target_link_libraries(imgui PUBLIC Vulkan::Vulkan)
+endif()
 if(MULTITAP_GL_ES2)
     # GLES 2 mode calls libGLESv2 directly (its own header, no loader).
     find_library(MULTITAP_GLESV2_LIBRARY NAMES GLESv2 REQUIRED)

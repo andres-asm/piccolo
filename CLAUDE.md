@@ -198,6 +198,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
                                    # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
 MULTITAP_GPU=gl ./build/piccolo     # the OpenGL ES path (GLES 3); -DMULTITAP_GL_ES2=ON builds test like the Tegra 4
+android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-DMULTITAP_GPU_VULKAN=OFF), the SHIELD Portable
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 

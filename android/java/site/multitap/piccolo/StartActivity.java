@@ -40,6 +40,11 @@ public class StartActivity extends Activity {
     }
 
     static boolean hasSharedStorageAccess(Activity activity) {
+        // Android 5 (the legacy APK): permissions are granted at install,
+        // and checkSelfPermission doesn't exist yet (API 23).
+        if (Build.VERSION.SDK_INT < 23) {
+            return true;
+        }
         if (usesLegacyStorage(activity)) {
             return activity.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                    == PackageManager.PERMISSION_GRANTED;
