@@ -1847,6 +1847,24 @@ static void draw_settings(App* app)
                       auto_frame_delay_seconds_to_lock(auto_delay));
     }
     context.frame_delay = frame_delay_text;
+    // RUN-AHEAD: what the running core does with it.
+    char run_ahead_text[200] = {};
+    const LibretroHost* run_ahead_host = app->session.host;
+    if (!game_running(app))
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s", piccolo_text(&app->strings, Str::run_ahead_no_game));
+    }
+    else if (run_ahead_host->core_run_ahead_max == 0)
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s", piccolo_text(&app->strings, Str::run_ahead_none));
+    }
+    else
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s: %u (%s %u)",
+                      piccolo_text(&app->strings, Str::run_ahead_in_use), libretro_host_run_ahead_applied(run_ahead_host),
+                      piccolo_text(&app->strings, Str::run_ahead_most), run_ahead_host->core_run_ahead_max);
+    }
+    context.run_ahead = run_ahead_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
     // The NETWORK tab reads and changes the NetAccess (pairing, levels,
     // FORGET): the network thread waits meanwhile.
@@ -2522,7 +2540,10 @@ static void net_follow_stream_tuning(App* app)
     NetStreamTuning result;
     result.delay = app->stream_tuning_on ? app->stream_tuning.delay : NetStreamDelay::host;
     result.delay_ms = static_cast<uint8_t>(app->frame_delay_ms < 255 ? app->frame_delay_ms : 255);
-    result.run_ahead = 0;   // not in piccolo yet
+    // What the running core really does (only cores with their own, for now).
+    result.run_ahead = app->session.host != nullptr && game_running(app)
+                           ? static_cast<uint8_t>(libretro_host_run_ahead_applied(app->session.host))
+                           : 0;
     result.flags = app->shell.renderer.wait_for_present ? NET_STREAM_TUNING_WAITS_FOR_PRESENT : 0;
     for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
     {
@@ -3098,6 +3119,19 @@ int main(int argc, char** argv)
                                  static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
+        // RUN-AHEAD: the setting, or a streaming device's tuning (in memory
+        // only) when it isn't "host's".
+        {
+            int32_t run_ahead = settings_get_int(&app->settings, PICCOLO_LATENCY_RUN_AHEAD);
+            if (stream_delay_overrides(app))
+            {
+                run_ahead = app->stream_tuning.run_ahead;
+            }
+            if (app->session.host != nullptr)
+            {
+                libretro_host_set_run_ahead(app->session.host, static_cast<unsigned>(run_ahead > 0 ? run_ahead : 0));
+            }
+        }
         // A streaming device's frame delay needs present waits (piccolo's
         // frame delay works only that way): turned on here, in memory only.
         app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||

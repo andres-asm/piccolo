@@ -288,6 +288,8 @@ static void draw_sync(SettingsWindow* window, const SettingsUiContext* ui, const
         }
     }
     ImGui::TextDisabled("%s", context->present_wait);
+    settings_ui_row(ui, PICCOLO_LATENCY_RUN_AHEAD, nullptr);
+    ImGui::TextDisabled("%s", context->run_ahead);
 }
 
 static void draw_sound(const SettingsUiContext* ui, const SettingsWindowContext* context)
