@@ -4,6 +4,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 
+import java.io.File;
+
 import org.libsdl.app.SDLActivity;
 
 // piccolo's activity: SDL's activity with SDL3 linked statically into
@@ -14,7 +16,7 @@ import org.libsdl.app.SDLActivity;
 // access, piccolo's folder is /sdcard/piccolo (it survives uninstalling): this
 // class tells the native side through the environment variable
 // MULTITAP_DATA_DIR (read by frontends-common app_paths), set before SDL_main
-// runs. Without access it's not set and the app's private folder is used.
+// runs. Without access it's the app's Android/media folder.
 public class PiccoloActivity extends SDLActivity {
     private static final String TAG = "piccolo";
 
@@ -41,7 +43,18 @@ public class PiccoloActivity extends SDLActivity {
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);
             Log.i(TAG, "data folder: " + sdcard + "/" + folder);
         } else {
-            Log.w(TAG, "no storage access: using the app's private folder (deleted on uninstall)");
+            // Android/media/<package>: no permission needed, and unlike
+            // Android/data, file managers can still open it (Android 11+).
+            // Deleted on uninstall, so the storage dialog stays the better
+            // choice. getExternalMediaDirs is deprecated since API 30 but works.
+            File[] media = getExternalMediaDirs();
+            if (media.length > 0 && media[0] != null) {
+                String path = media[0].getAbsolutePath();
+                nativeSetenv("MULTITAP_DATA_DIR", path);
+                Log.w(TAG, "no storage access: data folder " + path + "/" + folder + " (deleted on uninstall)");
+            } else {
+                Log.w(TAG, "no storage access: using the app's private folder (deleted on uninstall)");
+            }
         }
     }
 }
