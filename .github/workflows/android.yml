@@ -34,8 +34,11 @@ jobs:
           fetch-depth: 0   # versionCode is the commit count
 
       # Only the submodules the build uses; Test libretro goes into the APK.
+      # Some nested submodules (imguisw's third_party) have SSH URLs, which
+      # the runner has no key for: GitHub's are fetched over HTTPS instead.
       - name: Submodules
         run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive --depth 1 \
             deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
             deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher \
