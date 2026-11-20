@@ -1,8 +1,11 @@
 package site.multitap.piccolo;
 
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
+
+import java.io.File;
 
 import org.libsdl.app.SDLActivity;
 
@@ -14,7 +17,7 @@ import org.libsdl.app.SDLActivity;
 // access, piccolo's folder is /sdcard/piccolo (it survives uninstalling): this
 // class tells the native side through the environment variable
 // MULTITAP_DATA_DIR (read by frontends-common app_paths), set before SDL_main
-// runs. Without access it's not set and the app's private folder is used.
+// runs. Without access it's the app's Android/media folder.
 public class PiccoloActivity extends SDLActivity {
     private static final String TAG = "piccolo";
 
@@ -37,11 +40,30 @@ public class PiccoloActivity extends SDLActivity {
         // keep their own folder: their cores are in their own private storage.
         String folder = getPackageName().endsWith(".debug") ? "piccolo-debug" : "piccolo";
         nativeSetenv("PICCOLO_FOLDER_NAME", folder);
+        // When this APK was installed: the files it ships are copied out of
+        // it again only when this changes (bundled_files_android.cpp).
+        try {
+            long installed = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
+            nativeSetenv("PICCOLO_APK_STAMP", Long.toString(installed));
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "can't read the package's update time: bundled files copied at every start");
+        }
         if (StartActivity.hasSharedStorageAccess(this)) {
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);
             Log.i(TAG, "data folder: " + sdcard + "/" + folder);
         } else {
-            Log.w(TAG, "no storage access: using the app's private folder (deleted on uninstall)");
+            // Android/media/<package>: no permission needed, and unlike
+            // Android/data, file managers can still open it (Android 11+).
+            // Deleted on uninstall, so the storage dialog stays the better
+            // choice. getExternalMediaDirs is deprecated since API 30 but works.
+            File[] media = getExternalMediaDirs();
+            if (media.length > 0 && media[0] != null) {
+                String path = media[0].getAbsolutePath();
+                nativeSetenv("MULTITAP_DATA_DIR", path);
+                Log.w(TAG, "no storage access: data folder " + path + "/" + folder + " (deleted on uninstall)");
+            } else {
+                Log.w(TAG, "no storage access: using the app's private folder (deleted on uninstall)");
+            }
         }
     }
 }

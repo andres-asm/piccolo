@@ -399,7 +399,13 @@ static void apply_folders(App* app)
     std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s", system.c_str());
     std::snprintf(app->session.cache_directory, sizeof(app->session.cache_directory), "%s", app->paths.cache.c_str());
 
+#if defined(SDL_PLATFORM_ANDROID)
+    // Android: cores load only from the app's private storage (shared storage
+    // is noexec), so the CORES setting isn't offered (settings_window.cpp).
+    std::string cores = app->paths.cores;
+#else
     std::string cores = folder_setting(app, PICCOLO_PATH_CORES, app->paths.cores);
+#endif
     if (cores != app->cores_directory)
     {
         app->cores_directory = cores;
@@ -3540,8 +3546,13 @@ int main(int argc, char** argv)
         io.IniFilename = nullptr;
     }
 
+    // The files that come with piccolo (layouts, themes, shaders): next to the
+    // program; on Android a copy out of the APK (bundled_files.h).
+    std::string program_folder = bundled_files_data_folder();
+
     // librashader (shader presets): next to the program, in piccolo's folder,
-    // or wherever the system finds it. Without it, presets are off.
+    // or wherever the system finds it (on Android: the APK's native
+    // libraries, where dlopen looks for a bare name). Without it, presets are off.
     std::vector<std::string> shader_library_folders;
     const char* program_folder_for_shaders = SDL_GetBasePath();   // SDL owns it
     if (program_folder_for_shaders != nullptr)
@@ -3554,8 +3565,7 @@ int main(int argc, char** argv)
     // the ones that come with piccolo (next to the program), like lang/.
     {
         std::string user_folder = app->paths.root.empty() ? std::string() : app->paths.root + "/shaders/";
-        std::string bundled_folder = std::string(program_folder_for_shaders != nullptr ? program_folder_for_shaders : "") +
-                                     "shaders/";
+        std::string bundled_folder = program_folder + "shaders/";
         host_fs_forward_slashes(bundled_folder.data());
         const char* names[4] = {"pass0.slangp", "scale-nearest.slangp", "scale-bilinear.slangp",
                                 "scale-sharp-bilinear.slangp"};
@@ -3579,8 +3589,6 @@ int main(int argc, char** argv)
     std::string database_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamecontrollerdb.txt";
     // Controller layouts: the ones next to the program, then piccolo's folder's
     // (the same id there wins), and GENERIC built in if neither has it.
-    // (next to the program; on Android a copy out of the APK: bundled_files.h)
-    std::string program_folder = bundled_files_data_folder();
     std::string bundled_layouts = program_folder + "layouts";
     host_fs_forward_slashes(bundled_layouts.data());
     input_layouts_load_directory(&app->layouts, bundled_layouts.c_str());
