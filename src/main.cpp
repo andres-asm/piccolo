@@ -164,7 +164,7 @@ struct App
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
     FilePicker  picker  = {};
-    FilePicker  shader_picker = {};   // SHADER > CHOOSE (SETTINGS or the QUICK MENU)
+    FilePicker  shader_picker = {};   // QUICK MENU > SHADER > CHOOSE
     SettingLayer shader_picker_scope = SettingLayer::global;   // where its pick goes
     bool        menu_visible = true;   // only hideable while a game runs
 
@@ -1223,7 +1223,7 @@ static void close_topmost_or_toggle_menu(App* app)
         {
             map_window_close(&app->map_window, &app->input);
         }
-        else if (app->shader_picker.open)   // opened from SETTINGS or the QUICK MENU: closes before them
+        else if (app->shader_picker.open)   // opened from the QUICK MENU: closes before it
         {
             app->shader_picker.open = false;
         }
@@ -2052,9 +2052,9 @@ static void choose_folder_done(App* app, const FilePickerChoice* picked)
     }
 }
 
-// SHADER > CHOOSE (SETTINGS or the QUICK MENU): the picker opens in the
+// QUICK MENU > SHADER > CHOOSE: the picker opens in the
 // chosen preset's folder, else in the curated presets. What's picked goes to
-// `scope`, the scope the window that opened it edits.
+// `scope`, the scope the QUICK MENU's SHADER tab edits.
 static void open_shader_picker(App* app, SettingLayer scope)
 {
     std::string folder = settings_get_at(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, nullptr);
@@ -2068,7 +2068,7 @@ static void open_shader_picker(App* app, SettingLayer scope)
     file_picker_open_shader(&app->shader_picker, folder.c_str());
 }
 
-// Drawn over SETTINGS and the QUICK MENU, whichever opened it.
+// Drawn over the QUICK MENU.
 static void draw_shader_picker(App* app)
 {
     FilePickerChoice choice = {};
@@ -2087,10 +2087,7 @@ static void draw_shader_picker(App* app)
     {
         settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
     }
-    if (!app->settings_window.open)
-    {
-        save_settings(app);   // from the QUICK MENU: SETTINGS isn't there to save it when it closes
-    }
+    save_settings(app);
 }
 
 static void draw_settings(App* app)
@@ -2270,15 +2267,9 @@ static void draw_settings(App* app)
         }
     }
 
-    if (app->settings_window.choose_shader_request)
-    {
-        app->settings_window.choose_shader_request = false;
-        open_shader_picker(app, app->settings_window.scope);
-    }
 
-    // Closed (by its button or Esc): apply the folders and save. The shader
-    // picker counts as part of it.
-    bool open = app->settings_window.open || app->settings_window.image_open || app->shader_picker.open;
+    // Closed (by its button or Esc): apply the folders and save.
+    bool open = app->settings_window.open || app->settings_window.image_open;
     if (app->settings_window_was_open && !open)
     {
         apply_folders(app);
@@ -3790,7 +3781,7 @@ int main(int argc, char** argv)
                 app->quick_menu.choose_shader_request = false;
                 open_shader_picker(app, app->quick_menu.shader_scope);
             }
-            draw_shader_picker(app);   // over SETTINGS and the QUICK MENU
+            draw_shader_picker(app);   // over the QUICK MENU
             if (app->quick_menu.slot != slot_before || app->quick_menu.open)
             {
                 app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot

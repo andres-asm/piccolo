@@ -122,7 +122,7 @@ src/
                           CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
-                          combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER)
+                          combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
