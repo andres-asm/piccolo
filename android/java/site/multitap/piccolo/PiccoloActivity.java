@@ -1,5 +1,6 @@
 package site.multitap.piccolo;
 
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
@@ -39,6 +40,14 @@ public class PiccoloActivity extends SDLActivity {
         // keep their own folder: their cores are in their own private storage.
         String folder = getPackageName().endsWith(".debug") ? "piccolo-debug" : "piccolo";
         nativeSetenv("PICCOLO_FOLDER_NAME", folder);
+        // When this APK was installed: the files it ships are copied out of
+        // it again only when this changes (bundled_files_android.cpp).
+        try {
+            long installed = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
+            nativeSetenv("PICCOLO_APK_STAMP", Long.toString(installed));
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "can't read the package's update time: bundled files copied at every start");
+        }
         if (StartActivity.hasSharedStorageAccess(this)) {
             nativeSetenv("MULTITAP_DATA_DIR", sdcard);
             Log.i(TAG, "data folder: " + sdcard + "/" + folder);

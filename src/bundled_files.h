@@ -19,8 +19,8 @@ void bundled_files_install_cores(const char* cores_directory);
 
 // The folder that holds the shipped layouts/ and themes/, ending with a
 // separator. Desktop: the program's folder. Android: a copy of the APK's
-// assets in the app's private storage, refreshed at every start (a few small
-// files). Empty if there's none.
+// assets in the app's private storage, refreshed when the APK changed (the
+// activity's PICCOLO_APK_STAMP). Empty if there's none.
 std::string bundled_files_data_folder();
 
 // The name of piccolo's folder (app_paths: ~/.local/share/<name>,
