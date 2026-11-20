@@ -116,12 +116,14 @@ generator=$(find "$host_build" -type f -name multitap_strings_generator | head -
 
 echo "== native library"
 # piccolo's own CMakeLists: with ANDROID set (the toolchain) it builds
-# libmain.so instead of the program.
+# libmain.so instead of the program. No WebRTC (MULTITAP_NET_RTC): libdatachannel
+# needs OpenSSL, which Android doesn't have; the network is ENet only here.
 # shellcheck disable=SC2086 # $gpu_flags is a list of words without spaces
 cmake -S "$root" -B "$native" -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DCMAKE_TOOLCHAIN_FILE="$root/deps/common/hosts-common/cmake/android-toolchain.cmake" \
     -DMULTITAP_ANDROID_ABI="$ABI" -DMULTITAP_ANDROID_API="$MIN_API" $gpu_flags \
-    -DMULTITAP_BUILD_TESTS=OFF -DMULTITAP_PICCOLO_DIR= -DMULTITAP_STRINGS_GENERATOR="$generator" >/dev/null
+    -DMULTITAP_BUILD_TESTS=OFF -DMULTITAP_PICCOLO_DIR= -DMULTITAP_STRINGS_GENERATOR="$generator" \
+    -DMULTITAP_NET_RTC=OFF >/dev/null
 cmake --build "$native" --target piccolo
 
 # Version: piccolo's (the build's piccolo_version.h) as versionName; the
