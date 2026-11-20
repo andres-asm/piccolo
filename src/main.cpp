@@ -146,6 +146,8 @@ struct App
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
     NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
     uint64_t   net_controllers_sent[NET_MAX_PEERS] = {};   // a summary of the controllers each device was last sent
+    bool       net_devices_wanted[NET_MAX_PEERS] = {};     // asked for `devices` once: gets it again on changes
+    uint64_t   net_devices_sent[NET_MAX_PEERS] = {};       // a summary of the `devices` each was last sent
     NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
     NetSpeedReceiver net_speed_receiver;   // a speed test, up
     bool             net_speed_reporting = false;   // the sender finished: its report goes out
@@ -2194,6 +2196,111 @@ static void net_change_port_device(App* app, uint32_t peer, uint8_t pad, uint32_
     SDL_Log("Network: %s set port %d to device %u", device, port + 1, device_id);
 }
 
+// Who plays on piccolo's ports now (devices): only controllers that joined
+// a port and whose device is connected. `peer` is the device asking (its own
+// pads are marked).
+static void net_devices_for(const App* app, uint32_t peer, std::vector<NetDevice>* devices)
+{
+    devices->clear();
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        uint32_t controller = static_cast<uint32_t>(c);
+        uint8_t ports = 0;
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            if (input_port_has(&app->input, p, controller))
+            {
+                ports = static_cast<uint8_t>(ports | (1u << p));
+            }
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (ports == 0 || device == nullptr || !device->connected)
+        {
+            continue;
+        }
+        NetDevice entry;
+        entry.controller = controller;
+        entry.device = device->id;
+        entry.ports = ports;
+        entry.name = input_controller_label(&app->input, controller);
+        entry.kind = device->kind == InputDeviceKind::keyboard ? NetDeviceKind::keyboard
+                     : device->kind == InputDeviceKind::mouse  ? NetDeviceKind::mouse
+                                                                : NetDeviceKind::gamepad;
+        // A paired device's pad: whose, and which of its pads.
+        for (uint32_t owner = 0; owner < NET_MAX_PEERS; owner++)
+        {
+            for (uint32_t pad = 0; pad < NET_INPUT_MAX_PADS; pad++)
+            {
+                const InputNetPad* net_pad = &app->input_net.pads[owner][pad];
+                if (net_pad->active && net_pad->device == device->id)
+                {
+                    entry.kind = NetDeviceKind::network;
+                    entry.owner = owner == peer ? NetDeviceOwner::yours : NetDeviceOwner::other;
+                    entry.pad = static_cast<uint8_t>(pad);
+                }
+            }
+        }
+        devices->push_back(entry);
+    }
+}
+
+// A summary of net_devices_for, compared every loop (no allocation).
+static uint64_t net_devices_summary(const App* app, uint32_t peer)
+{
+    uint64_t summary = 1469598103934665603ull;
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        uint32_t controller = static_cast<uint32_t>(c);
+        uint32_t ports = 0;
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            ports |= input_port_has(&app->input, p, controller) ? (1u << p) : 0u;
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (ports == 0 || device == nullptr || !device->connected)
+        {
+            continue;
+        }
+        uint32_t values[3] = {controller, device->id, ports};
+        for (uint32_t i = 0; i < 3; i++)
+        {
+            summary = (summary ^ values[i]) * 1099511628211ull;
+        }
+    }
+    return (summary ^ peer) * 1099511628211ull;
+}
+
+static void net_send_devices(App* app, uint32_t peer, uint32_t id)
+{
+    std::vector<NetDevice> devices;
+    net_devices_for(app, peer, &devices);
+    size_t size = net_settings_write_devices(app->net_remote.reply.data(), app->net_remote.reply.size(), id, &devices);
+    net_access_send(&app->net_service.access, peer, NetChannel::control, app->net_remote.reply.data(), size);
+    app->net_devices_sent[peer] = net_devices_summary(app, peer);
+}
+
+// device_port: that controller on that port only (-1: on none), as the quick
+// menu's CONTROLS does it. Nothing is saved (START joins again next time).
+// A stale controller / device pair (the list changed meanwhile) is ignored:
+// the summary check sends the device a fresh `devices`.
+static void net_move_device(App* app, uint32_t controller, uint32_t device_id, int8_t port, const char* device)
+{
+    if (controller >= app->input.controllers.size() || app->input.controllers[controller].device_id != device_id ||
+        port >= static_cast<int8_t>(INPUT_PORT_COUNT) || port < -1)
+    {
+        return;
+    }
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    {
+        input_port_remove(&app->input, p, controller);
+    }
+    if (port >= 0)
+    {
+        input_port_add(&app->input, static_cast<uint32_t>(port), controller);
+    }
+    SDL_Log("Network: %s moved %s to port %d", device, input_controller_label(&app->input, controller).c_str(), port + 1);
+}
+
 // Every loop: settings that changed (from anywhere) go to the FULL devices,
 // and the action lists again when what they show changed.
 static void net_follow_remote(App* app)
@@ -2246,6 +2353,14 @@ static void net_follow_remote(App* app)
             }
             net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
             app->stream_tuning_set[i] = false;
+        }
+    }
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_devices_wanted[i] && app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
+            net_peer_access(app, i) == NetAccessLevel::full && net_devices_summary(app, i) != app->net_devices_sent[i])
+        {
+            net_send_devices(app, i, 0);   // someone joined, left or moved
         }
     }
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
@@ -2398,6 +2513,20 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
     if (net_settings_read_port_device(event->data, event->size, &pad, &device_id))
     {
         net_change_port_device(app, event->peer, pad, device_id, device);
+        return;
+    }
+    // devices / device_port: FULL (net_access let them through only then).
+    if (net_settings_read_devices_request(event->data, event->size, &id))
+    {
+        app->net_devices_wanted[event->peer] = true;
+        net_send_devices(app, event->peer, id);
+        return;
+    }
+    uint32_t controller = 0;
+    int8_t port = 0;
+    if (net_settings_read_device_port(event->data, event->size, &controller, &device_id, &port))
+    {
+        net_move_device(app, controller, device_id, port, device);
     }
 }
 
@@ -2879,6 +3008,7 @@ static void net_update_locked(App* app)
             {
                 app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
                 app->net_peer_language[event.peer][0] = '\0';
+                app->net_devices_wanted[event.peer] = false;
                 if (app->net_paused && app->net_paused_by == event.peer)
                 {
                     app->net_paused = false;   // nobody here could resume it
