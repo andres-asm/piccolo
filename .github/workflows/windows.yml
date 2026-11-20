@@ -64,7 +64,11 @@ jobs:
       - name: Build
         run: cmake --build build
 
+      # MULTITAP_NET_HTTP_ONLINE_URL: net_http_test also downloads over the
+      # network (WinHTTP, TLS by Schannel) from the cores site.
       - name: Test
+        env:
+          MULTITAP_NET_HTTP_ONLINE_URL: https://cores.get-piccolo.app/v1/index/windows-x86_64.cfg
         run: ctest --test-dir build --output-on-failure
 
       # librashader (shader presets), which piccolo loads at run time from its
