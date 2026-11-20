@@ -2,7 +2,8 @@
 # Builds piccolo for the browser (WebAssembly, Emscripten + SDL3, WebGL 2
 # through the OpenGL ES path). See docs/wasm.md.
 #
-#   web/build.sh            -> web/build/wasm/piccolo.{js,wasm}
+#   web/build-core.sh       -> web/build/cores/sameboy_libretro_emscripten.a
+#   web/build.sh            -> web/build/wasm/piccolo.{js,wasm}, SameBoy linked in
 #
 # Needs Emscripten in the environment (emcc on PATH), the version CI pins:
 #   git clone https://github.com/emscripten-core/emsdk ~/emsdk
@@ -18,6 +19,8 @@
 #
 # Overridable from the environment:
 #   BUILD_TYPE   CMake build type (default Release)
+#   CORE_ARCHIVE the core's static archive (default: SameBoy's, from web/build-core.sh)
+#   CORE_FILE    the file name it answers to (default sameboy_libretro.so)
 
 set -eu
 
@@ -27,6 +30,12 @@ build="$here/build"
 host_build="$build/host"
 wasm_build="$build/wasm"
 BUILD_TYPE=${BUILD_TYPE:-Release}
+CORE_ARCHIVE=${CORE_ARCHIVE:-$build/cores/sameboy_libretro_emscripten.a}
+CORE_FILE=${CORE_FILE:-sameboy_libretro.so}
+if [ ! -f "$CORE_ARCHIVE" ]; then
+    echo "web/build.sh: no core archive at $CORE_ARCHIVE (run web/build-core.sh first)" >&2
+    exit 1
+fi
 
 if ! command -v emcmake >/dev/null 2>&1; then
     echo "web/build.sh: emcmake not found; source emsdk_env.sh first (see the top of this script)" >&2
@@ -60,7 +69,8 @@ emcmake cmake -S "$root" -B "$wasm_build" -G Ninja -DCMAKE_BUILD_TYPE="$BUILD_TY
     -DCMAKE_C_FLAGS="-pthread" -DCMAKE_CXX_FLAGS="-pthread -isystem $vulkan_include" \
     -DSDL_PTHREADS=ON \
     -DMULTITAP_GPU_VULKAN=OFF -DMULTITAP_BUILD_TESTS=OFF -DMULTITAP_PICCOLO_DIR= \
-    -DMULTITAP_STRINGS_GENERATOR="$generator"
+    -DMULTITAP_STRINGS_GENERATOR="$generator" \
+    -DPICCOLO_LINKED_CORE="$CORE_ARCHIVE" -DPICCOLO_LINKED_CORE_FILE="$CORE_FILE"
 cmake --build "$wasm_build" --target piccolo
 
 echo "web/build.sh: $wasm_build/piccolo.js + piccolo.wasm"
