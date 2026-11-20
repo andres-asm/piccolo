@@ -195,6 +195,9 @@ safe_start_defaults_help = The core's own option values for this start only. Not
 safe_start_delete = DELETE STORED OPTIONS
 safe_start_delete_help = Deletes every option stored for this core (core, folders and games), then starts with its defaults.
 safe_start_cancel = CANCEL
+text_input_title = ENTER TEXT
+text_input_ok = OK
+text_input_cancel = CANCEL
 
 # QUICK MENU window
 quick_menu_title = QUICK MENU
