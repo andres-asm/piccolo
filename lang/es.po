@@ -2871,6 +2871,70 @@ msgctxt "setting_net_port_help"
 msgid "The UDP port for everything network. Change it only if another program uses it."
 msgstr "El puerto UDP para todo lo de red. Cámbialo solo si otro programa lo usa."
 
+msgctxt "setting_net_internet"
+msgid "INTERNET"
+msgstr "INTERNET"
+
+msgctxt "setting_net_internet_help"
+msgid "Lets paired devices connect from outside this network, through the BEACON SERVER. It only introduces the two devices: the game never goes through it. Some networks don't let the connection through."
+msgstr "Deja que los dispositivos vinculados se conecten desde fuera de esta red, a través del SERVIDOR BEACON. Solo presenta a los dos dispositivos: el juego nunca pasa por él. Algunas redes no dejan pasar la conexión."
+
+msgctxt "setting_net_beacon"
+msgid "BEACON SERVER"
+msgstr "SERVIDOR BEACON"
+
+msgctxt "setting_net_beacon_help"
+msgid "The server that introduces paired devices across the internet. Anyone can run their own (MULTITAP-BEACON)."
+msgstr "El servidor que presenta a los dispositivos vinculados a través de internet. Cualquiera puede montar el suyo (MULTITAP-BEACON)."
+
+msgctxt "net_beacon_status"
+msgid "INTERNET STATUS"
+msgstr "ESTADO DE INTERNET"
+
+msgctxt "net_beacon_status_help"
+msgid "Whether the beacon server knows this PICCOLO, so paired devices can find it from outside."
+msgstr "Si el servidor beacon conoce este PICCOLO, para que los dispositivos vinculados lo encuentren desde fuera."
+
+msgctxt "net_beacon_off"
+msgid "OFF"
+msgstr "APAGADO"
+
+msgctxt "net_beacon_waiting"
+msgid "CONNECTING TO THE BEACON..."
+msgstr "CONECTANDO CON EL BEACON..."
+
+msgctxt "net_beacon_registered"
+msgid "READY: PAIRED DEVICES CAN CONNECT"
+msgstr "LISTO: LOS DISPOSITIVOS VINCULADOS PUEDEN CONECTARSE"
+
+msgctxt "net_beacon_symmetric"
+msgid "READY, BUT THIS NETWORK MAY BLOCK CONNECTIONS (SYMMETRIC NAT)"
+msgstr "LISTO, PERO ESTA RED PUEDE BLOQUEAR CONEXIONES (NAT SIMÉTRICO)"
+
+msgctxt "net_beacon_unreachable"
+msgid "THE BEACON SERVER DOESN'T ANSWER"
+msgstr "EL SERVIDOR BEACON NO RESPONDE"
+
+msgctxt "headless_show"
+msgid "SHOW PICCOLO"
+msgstr "MOSTRAR PICCOLO"
+
+msgctxt "headless_play_here"
+msgid "PLAY HERE AGAIN"
+msgstr "JUGAR AQUÍ DE NUEVO"
+
+msgctxt "headless_tooltip"
+msgid "PICCOLO: THE GAME IS ON A DEVICE"
+msgstr "PICCOLO: EL JUEGO ESTÁ EN UN DISPOSITIVO"
+
+msgctxt "status_headless_back"
+msgid "BACK ON PICCOLO"
+msgstr "DE VUELTA EN PICCOLO"
+
+msgctxt "status_headless_paused"
+msgid "THE DEVICE WITH THE GAME LEFT: PAUSED"
+msgstr "EL DISPOSITIVO CON EL JUEGO SE FUE: EN PAUSA"
+
 msgctxt "net_this_device"
 msgid "THIS DEVICE"
 msgstr "ESTE DISPOSITIVO"

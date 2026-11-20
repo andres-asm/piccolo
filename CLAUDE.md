@@ -33,12 +33,18 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
+- `deps/beacon`                     multitap-beacon (multitap-org/multitap-beacon, MIT): the introduction server for
+                                     connections across the internet (STUN-like + hole punching, never a relay);
+                                     frontends-common builds only its `beacon_wire` library (tests also its server code)
+- `deps/libdatachannel`             libdatachannel v0.24.6 (MPL-2.0, accepted 2026-11-20): WebRTC data channels natively
+                                     (desktop, Android meet browsers); static, no WebSocket / media; OpenSSL for DTLS.
+                                     Its own submodules: plog, usrsctp, libjuice (`git submodule update --init` there)
 - `deps/piccolo-shaders`            piccolo-shaders: the curated slang presets (branch `piccolo` of a trimmed
                                      slang-shaders, per-file licenses), copied to shaders/presets/; optional.
                                      Rebased on upstream: tag the pinned commit (piccolo-YYYY-MM-DD) first
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (zpl-c's ENet: UDP connections, IPv6 dual-stack), `deps/monocypher`
   (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
   signatures); libcurl from the system (Linux) for the core downloader
 
@@ -128,6 +134,7 @@ src/
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
+  headless.*              GO HEADLESS: a streaming device takes the game (window hidden behind a tray icon)
   core_options_ui.* safe_start_window.*
   shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
   text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
@@ -135,7 +142,8 @@ src/
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh, res/ (icons, banner), res-debug/ (debug variant)
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
-                          codec on real games), lsan-suppressions.txt
+                          codec on real games), netplay_measure (which netplay mode a core and game
+                          suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
@@ -154,7 +162,10 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_service (the network on its own thread; remote play is coded and sent
+                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _none; peers
+                              carry their transport, the same channels and bytes as ENet),
+                              net_beacon (across the internet: register with the beacon, meet,
+                              punch, peer-reflexive), net_service (the network on its own thread; remote play is coded and sent
                               there), net_stream (remote play packets), net_settings (settings and
                               actions described by the host), net_speed (speed
                               test), net_wire (fields);

@@ -179,6 +179,7 @@ set(PICCOLO_SOURCES
     src/settings_window.cpp
     src/input_window.cpp
     src/net_window.cpp
+    src/headless.cpp
     src/net_games.cpp
     src/net_remote.cpp
     src/map_window.cpp
@@ -328,9 +329,15 @@ multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 
 # Development tool: what remote play's lossless codec (frame_delta.h) sends for a
 # real game, and its cost (netcode milestone 6).
-add_executable(stream_measure tools/stream_measure.cpp)
+add_executable(stream_measure tools/stream_measure.cpp tools/measure_common.cpp)
 target_link_libraries(stream_measure PRIVATE host_libretro frontend_common)
 multitap_set_project_flags(stream_measure)
+
+# Development tool: which netplay mode (rollback / delay / stream) a core and
+# game are good for: determinism, exact states, their cost (instrumented runs).
+add_executable(netplay_measure tools/netplay_measure.cpp tools/measure_common.cpp)
+target_link_libraries(netplay_measure PRIVATE host_libretro frontend_common)
+multitap_set_project_flags(netplay_measure)
 
 # Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
 add_executable(pixel_font_preview tools/pixel_font_preview.cpp)

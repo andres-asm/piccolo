@@ -233,6 +233,48 @@ static void draw_devices(const NetWindowContext* context)
     }
 }
 
+// INTERNET STATUS: what the beacon says (net_access_beacon_status).
+static void draw_beacon_status(const NetWindowContext* context, float label_width)
+{
+    const Localization* strings = context->strings;
+    Str text = Str::net_beacon_off;
+    bool good = false;
+    switch (net_access_beacon_status(context->access))
+    {
+    case NetBeaconStatus::off:
+        text = Str::net_beacon_off;
+        break;
+    case NetBeaconStatus::waiting:
+        text = Str::net_beacon_waiting;
+        break;
+    case NetBeaconStatus::registered:
+        text = Str::net_beacon_registered;
+        good = true;
+        break;
+    case NetBeaconStatus::symmetric_nat:
+        text = Str::net_beacon_symmetric;
+        break;
+    case NetBeaconStatus::unreachable:
+        text = Str::net_beacon_unreachable;
+        break;
+    }
+    ImGui::Dummy(ImGui::CalcTextSize("C"));
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::net_beacon_status));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::net_beacon_status_help));
+    ImGui::SameLine(start + label_width);
+    if (good)
+    {
+        ImGui::TextUnformatted(piccolo_text(strings, text));
+    }
+    else
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, text));
+    }
+}
+
 void net_window_draw_tab(const NetWindowContext* context, float label_width)
 {
     const Localization* strings = context->strings;
@@ -244,6 +286,8 @@ void net_window_draw_tab(const NetWindowContext* context, float label_width)
     settings_ui_row(&rows, PICCOLO_NET_ENABLED, nullptr);
     settings_ui_row(&rows, PICCOLO_NET_NAME, nullptr);
     settings_ui_row(&rows, PICCOLO_NET_PORT, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_INTERNET, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_BEACON, nullptr);
 
     // As a row: the marker column, then the label column.
     ImGui::Dummy(ImGui::CalcTextSize("C"));
@@ -254,6 +298,11 @@ void net_window_draw_tab(const NetWindowContext* context, float label_width)
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_this_device_help));
     ImGui::SameLine(start + label_width);
     ImGui::TextUnformatted(context->this_device[0] != '\0' ? context->this_device : "-");
+
+    if (context->access != nullptr && context->internet)
+    {
+        draw_beacon_status(context, label_width);
+    }
 
     if (context->access == nullptr)
     {
