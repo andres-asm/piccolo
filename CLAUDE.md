@@ -129,6 +129,7 @@ src/
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
+  shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
   text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)

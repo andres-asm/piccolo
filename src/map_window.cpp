@@ -353,26 +353,6 @@ static void footer()
     }
 }
 
-// Seconds left of a countdown of `total_ms` started at `started_ms`.
-static int seconds_left(uint64_t now_ms, uint64_t started_ms, uint64_t total_ms)
-{
-    uint64_t elapsed = now_ms - started_ms;
-    return static_cast<int>((total_ms - (elapsed < total_ms ? elapsed : total_ms) + 999) / 1000);
-}
-
-// A button whose label counts down ("START (8)"): its id stays the same while
-// the number changes, so a click on it isn't lost when the second ticks.
-static bool countdown_button(const char* format, int seconds, const char* id)
-{
-    char label[128] = {};
-    int written = std::snprintf(label, sizeof(label), format, seconds);
-    if (written > 0 && static_cast<size_t>(written) < sizeof(label))
-    {
-        std::snprintf(label + written, sizeof(label) - static_cast<size_t>(written), "###%s", id);
-    }
-    return retro_ui_button(label);
-}
-
 // A press of any button on the controller being mapped, for pages it can
 // answer that way: one SDL doesn't know can't drive the interface. Each page
 // starts from everything let go (the press that opened it doesn't count).
@@ -421,7 +401,7 @@ static void step_buttons(MapWindow* window, const MapWindowContext* context)
     }
     ImGui::SameLine();
     uint32_t left = input_sdl_mapper_seconds_left(&window->mapper, context->now_ms);
-    bool skip = left > 0 ? countdown_button(piccolo_text(strings, Str::map_skip_n), static_cast<int>(left), "skip")
+    bool skip = left > 0 ? retro_ui_countdown_button(piccolo_text(strings, Str::map_skip_n), static_cast<int>(left), "skip")
                          : retro_ui_button(piccolo_text(strings, Str::map_skip));
     if (skip)
     {
@@ -624,8 +604,8 @@ static void draw_offer(MapWindow* window, const MapWindowContext* context)
         return;
     }
     ImGui::SameLine();
-    if (countdown_button(piccolo_text(strings, Str::map_not_now), seconds_left(context->now_ms, window->offer_started_ms, OFFER_MS),
-                         "not_now") ||
+    if (retro_ui_countdown_button(piccolo_text(strings, Str::map_not_now),
+                                  retro_ui_seconds_left(context->now_ms, window->offer_started_ms, OFFER_MS), "not_now") ||
         context->now_ms - window->offer_started_ms >= OFFER_MS)
     {
         not_now(window, context);
@@ -721,8 +701,8 @@ static void draw_type(MapWindow* window, const MapWindowContext* context, float 
     }
     bool pressed = window->needed && raw_press(window);
     bool timed_out = context->now_ms - window->page_started_ms >= START_MS;
-    if (countdown_button(piccolo_text(strings, Str::map_start), seconds_left(context->now_ms, window->page_started_ms, START_MS),
-                         "start") ||
+    if (retro_ui_countdown_button(piccolo_text(strings, Str::map_start),
+                                  retro_ui_seconds_left(context->now_ms, window->page_started_ms, START_MS), "start") ||
         pressed || timed_out)
     {
         window->skip_type = false;
@@ -763,8 +743,8 @@ static void draw_intro_buttons(MapWindow* window, const MapWindowContext* contex
         return;
     }
     ImGui::SameLine();
-    if (countdown_button(piccolo_text(strings, Str::map_start), seconds_left(context->now_ms, window->page_started_ms, START_MS),
-                         "start") ||
+    if (retro_ui_countdown_button(piccolo_text(strings, Str::map_start),
+                                  retro_ui_seconds_left(context->now_ms, window->page_started_ms, START_MS), "start") ||
         raw_press(window) || context->now_ms - window->page_started_ms >= START_MS)
     {
         window->skip_buttons = false;
@@ -803,8 +783,8 @@ static void draw_intro_interface(MapWindow* window, const MapWindowContext* cont
         return;
     }
     ImGui::SameLine();
-    if (countdown_button(piccolo_text(strings, Str::map_start), seconds_left(context->now_ms, window->page_started_ms, START_MS),
-                         "start") ||
+    if (retro_ui_countdown_button(piccolo_text(strings, Str::map_start),
+                                  retro_ui_seconds_left(context->now_ms, window->page_started_ms, START_MS), "start") ||
         raw_press(window) || context->now_ms - window->page_started_ms >= START_MS)
     {
         window->interface_intro_done = true;
@@ -912,8 +892,8 @@ static void draw_question(MapWindow* window, const MapWindowContext* context, fl
         return;
     }
     ImGui::SameLine();
-    if (countdown_button(piccolo_text(strings, Str::map_no), seconds_left(context->now_ms, window->page_started_ms, QUESTION_MS),
-                         "no") ||
+    if (retro_ui_countdown_button(piccolo_text(strings, Str::map_no),
+                                  retro_ui_seconds_left(context->now_ms, window->page_started_ms, QUESTION_MS), "no") ||
         context->now_ms - window->page_started_ms >= QUESTION_MS)
     {
         go(window, context, next_part(part));

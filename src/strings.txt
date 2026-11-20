@@ -224,6 +224,11 @@ shader_unavailable = LIBRASHADER NOT FOUND: SHADERS ARE OFF
 shader_choose = CHOOSE
 shader_picker_title = SHADER PRESET
 shader_picker_use = USE
+shader_slow_title = SHADER TOO SLOW
+shader_slow_text = RUNS AT %.0f FPS. THE GAME NEEDS %.0f.
+shader_slow_question = KEEP IT?
+shader_slow_keep = KEEP
+shader_slow_revert_n = REVERT (%d)
 
 # Settings: General
 setting_language = LANGUAGE

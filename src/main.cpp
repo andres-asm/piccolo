@@ -36,6 +36,8 @@
 #include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
+#include "shader_check.h"
+#include "shader_check_window.h"
 #include "text_input_window.h"
 #include "settings_window.h"
 #include "host_fs.h"
@@ -183,6 +185,17 @@ struct App
     std::string   shader_scale_paths[3];
     std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
     std::string   shader_preset_seen;         // the preset setting those failures are for
+    // A preset just applied that's too slow asks KEEP / REVERT
+    // (shader_check.h). REVERT puts the preset setting of every layer
+    // (global, core, game) back as it was before the change.
+    ShaderCheck   shader_check = {};
+    uint64_t      shader_check_asked_ms = 0;
+    uint32_t      shader_layers_start = UINT32_MAX;   // game_starts the layers below are from
+    bool          shader_layer_set[3] = {};           // the preset setting in each layer now
+    std::string   shader_layer_value[3];
+    bool          shader_revert_set[3] = {};          // ... and before the change being checked
+    std::string   shader_revert_value[3];
+    bool          shader_reverted = false;            // the next change is REVERT's: not checked
     float         pass0_applied[PICCOLO_PASS0_CONTROL_COUNT] = {};   // what pass 0's parameters hold
     float         profile_applied[PICCOLO_PROFILE_PARAM_COUNT] = {};  // the same for the color profile's
     bool          pass0_stale = true;         // set them all (pass 0 was just loaded)
@@ -1106,10 +1119,75 @@ static void refresh_audio_devices(App* app)
     }
 }
 
+// The slow shader question is up (shader_check.h).
+static bool shader_check_asking(const App* app)
+{
+    return app->shader_check.state == ShaderCheckState::asking;
+}
+
+constexpr SettingLayer SHADER_LAYERS[3] = {SettingLayer::global, SettingLayer::core, SettingLayer::game};
+
+// The preset setting as each layer holds it now (absent or a value).
+static void shader_layers_read(const App* app, bool set[3], std::string value[3])
+{
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        const char* text = settings_get_layer(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET);
+        set[i] = text != nullptr;
+        value[i] = text != nullptr ? text : "";
+    }
+}
+
+// KEEP: nothing changes. REVERT: every layer's preset setting as before the
+// change, saved. Either way the check is over until the next change.
+static void shader_check_answer(App* app, ShaderCheckChoice choice)
+{
+    shader_check_stop(&app->shader_check);
+    if (choice != ShaderCheckChoice::revert)
+    {
+        return;
+    }
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        if (app->shader_revert_set[i])
+        {
+            settings_set(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET, app->shader_revert_value[i].c_str());
+        }
+        else
+        {
+            settings_reset(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET);
+        }
+    }
+    app->shader_reverted = true;
+    save_settings(app);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shader preset too slow: reverted");
+}
+
+// Once per loop that ran core frames: times the loop for the check. The
+// target is a display refresh in Vsync timing (each loop presents one), a
+// core frame in Exact. Fast forward is fast on purpose: not a sample.
+static void measure_shader_check(App* app)
+{
+    const FrameTiming* timing = &app->session.timing;
+    double hz = timing->effective == TimingMode::vsync ? timing->display_hz : timing->core_fps;
+    if (hz <= 0.0)
+    {
+        return;
+    }
+    bool sample = !core_session_fast_forwarding(&app->session);
+    if (shader_check_loop(&app->shader_check, sample, SDL_GetTicksNS(), 1e9 / hz))
+    {
+        app->shader_check_asked_ms = SDL_GetTicks();
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shader preset too slow: %.1f fps, target %.1f",
+                    1e9 / app->shader_check.measured_ns, hz);
+    }
+}
+
 // A window is open over the menu bar (or the game).
 static bool any_window_open(const App* app)
 {
-    return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
+    return app->picker.open || app->shader_picker.open || shader_check_asking(app) || app->settings_window.open ||
+           app->settings_window.image_open ||
            app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window) || text_input_pending(app);
@@ -1135,6 +1213,10 @@ static void close_topmost_or_toggle_menu(App* app)
         if (text_input_pending(app))
         {
             libretro_host_text_input_answer(app->session.host, nullptr);   // the core's box is on top: cancelled
+        }
+        else if (shader_check_asking(app))
+        {
+            shader_check_answer(app, ShaderCheckChoice::revert);   // on top of everything: Esc reverts
         }
         else if (map_window_open_now(&app->map_window))
         {
@@ -1753,6 +1835,34 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         return;
     }
     const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
+    // A preset applied while this game runs is checked for speed; the one a
+    // game starts with (its core / game layers) isn't: that's not a change
+    // made now, and there's nothing to revert to.
+    bool new_game = app->shader_layers_start != app->game_starts;
+    if (new_game || app->shader_preset_seen != preset)
+    {
+        if (!new_game && preset[0] != '\0' && !app->shader_reverted)
+        {
+            // Changed again while a check runs: REVERT still goes back to
+            // before the first change (the last preset that was fine).
+            if (app->shader_check.state == ShaderCheckState::idle)
+            {
+                for (uint32_t i = 0; i < 3; i++)
+                {
+                    app->shader_revert_set[i] = app->shader_layer_set[i];
+                    app->shader_revert_value[i] = app->shader_layer_value[i];
+                }
+            }
+            shader_check_start(&app->shader_check);
+        }
+        else
+        {
+            shader_check_stop(&app->shader_check);
+        }
+        shader_layers_read(app, app->shader_layer_set, app->shader_layer_value);
+        app->shader_layers_start = app->game_starts;
+        app->shader_reverted = false;
+    }
     if (app->shader_preset_seen != preset)
     {
         app->shader_preset_seen = preset;   // a new choice: everything may be tried again
@@ -3578,6 +3688,7 @@ int main(int argc, char** argv)
         if (ran == CoreSessionFrame::ran)
         {
             net_stream_frame(app);
+            measure_shader_check(app);
         }
         if (ran != CoreSessionFrame::skipped || !game_running(app))
         {
@@ -3780,6 +3891,27 @@ int main(int argc, char** argv)
                     {
                         net_answer_load(app, NetContentStatus::failed);   // not started after all
                     }
+                }
+            }
+            if (shader_check_asking(app))
+            {
+                std::string name = app->shader_preset_seen;
+                size_t slash = name.find_last_of("/\\");
+                name = slash == std::string::npos ? name : name.substr(slash + 1);
+                size_t dot = name.rfind('.');
+                name = dot == std::string::npos ? name : name.substr(0, dot);
+                for (size_t i = 0; i < name.size(); i++)
+                {
+                    name[i] = static_cast<char>(SDL_toupper(static_cast<unsigned char>(name[i])));   // the pixel font has capitals
+                }
+                const FrameTiming* timing = &app->session.timing;
+                double target = timing->effective == TimingMode::vsync ? timing->display_hz : timing->core_fps;
+                ShaderCheckChoice answer = shader_check_window_draw(
+                    app->pixel_font, app->ui_scale, &app->strings, name.c_str(), 1e9 / app->shader_check.measured_ns,
+                    target, app->shader_check_asked_ms, SDL_GetTicks());
+                if (answer != ShaderCheckChoice::none)
+                {
+                    shader_check_answer(app, answer);
                 }
             }
             if (text_input_pending(app))
