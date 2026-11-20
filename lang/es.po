@@ -810,6 +810,18 @@ msgctxt "value_scaling_auto"
 msgid "AUTO"
 msgstr "AUTO"
 
+msgctxt "value_osk_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_osk_on"
+msgid "ON"
+msgstr "ACTIVADO"
+
+msgctxt "value_osk_off"
+msgid "OFF"
+msgstr "DESACTIVADO"
+
 msgctxt "value_filter_nearest"
 msgid "NEAREST"
 msgstr "VECINO MÁS CERCANO"
@@ -2035,6 +2047,14 @@ msgstr "PUERTOS"
 msgctxt "setting_input_ports_help"
 msgid "How many of the core's ports QUICK MENU > CONTROLS shows (1 to 4; per core: 2 for a SNES core, say). A controller on a port not shown stays there."
 msgstr "Cuántos de los puertos del core muestra MENÚ RÁPIDO > CONTROLES (1 a 4; por core: 2 para un core de SNES, por ejemplo). Un control en un puerto que no se muestra sigue ahí."
+
+msgctxt "setting_input_osk"
+msgid "ON-SCREEN KEYBOARD"
+msgstr "TECLADO EN PANTALLA"
+
+msgctxt "setting_input_osk_help"
+msgid "Show the system's on-screen keyboard when a text field is chosen, or when a core asks for the keyboard. AUTO: on for phones, TVs and handhelds (Steam Deck), off on a PC. On a PC it shows only where the system has one (Steam's keyboard; on Wayland the desktop decides)."
+msgstr "Muestra el teclado en pantalla del sistema al elegir un campo de texto, o cuando un core pide el teclado. AUTO: activado en teléfonos, TVs y portátiles (Steam Deck), desactivado en un PC. En un PC solo aparece donde el sistema tiene uno (el teclado de Steam; en Wayland decide el escritorio)."
 
 msgctxt "setting_input_share_port1_help"
 msgid "The keyboard starts on port 1, and the first gamepad to press START joins it there (QUICK MENU > CONTROLS can take it off). Off: the keyboard joins its own port with START."

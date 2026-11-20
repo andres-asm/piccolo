@@ -1662,6 +1662,7 @@ static void app_update_input(App* app)
     bool ui_up = ui_is_up(app);
     app->input.settings.ui_active = ui_up;   // the INTERFACE layer
     piccolo_settings_input(&app->settings, &app->input.settings);   // SETTINGS > INPUT, per core / game too
+    text_input_set_osk(&app->shell.text_input, piccolo_settings_osk(&app->settings) ? TextInputOsk::on : TextInputOsk::off);
     // The core and the device on each port: a controller's bindings for them.
     app->input.core_name = game_running(app) ? app->core_name : "";
     app->input.game_name = game_running(app) ? app->game_name : "";   // a game's own remaps
@@ -3934,6 +3935,10 @@ int main(int argc, char** argv)
             {
                 TextInputChoice answer = text_input_window_draw(&app->text_input_window, &app->session.host->text_input,
                                                                 app->pixel_font, app->ui_scale, &app->strings);
+                if (app->session.host->text_input.type == RETRO_EXT_TEXT_INPUT_TYPE_NUMBER)
+                {
+                    text_input_ui_field_number(&app->shell.text_input);   // the OSK's number keypad
+                }
                 if (answer == TextInputChoice::ok)
                 {
                     libretro_host_text_input_answer(app->session.host, app->text_input_window.buffer);

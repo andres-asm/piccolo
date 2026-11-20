@@ -10,7 +10,9 @@
 //   | [OK] [CANCEL]                     |
 //   +-----------------------------------+
 //
-// On a phone, Dear ImGui's field opens the on-screen keyboard by itself.
+// The field brings up the on-screen keyboard like any of piccolo's text fields
+// (INPUT > ON-SCREEN KEYBOARD; text_input in frontends-common); main.cpp asks
+// for the number keypad when the core wants a NUMBER.
 
 #include <cstdint>
 
