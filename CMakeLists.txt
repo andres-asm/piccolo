@@ -185,6 +185,7 @@ add_executable(piccolo
     src/piccolo_text.cpp
     src/recent_games.cpp
     src/core_options_ui.cpp
+    src/cores_window.cpp
     src/safe_start_window.cpp
     src/quick_menu.cpp
 )

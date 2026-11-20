@@ -168,6 +168,10 @@ static const SettingDescriptor SETTINGS[] = {
      .help = text_id(Str::setting_path_saves_help)},
     {.key = PICCOLO_PATH_STATES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_states),
      .help = text_id(Str::setting_path_states_help)},
+    {.key = PICCOLO_CORE_SERVER, .type = SettingType::text, .default_value = "https://cores.get-piccolo.app",
+     .label = text_id(Str::setting_core_server), .help = text_id(Str::setting_core_server_help)},
+    {.key = PICCOLO_CORE_SERVER_INSECURE, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_core_server_insecure), .help = text_id(Str::setting_core_server_insecure_help)},
 
     // Video: Picture (overridable per core / game)
     {.key = PICCOLO_VIDEO_ASPECT, .type = SettingType::enumeration, .default_value = "core", .overridable = true,

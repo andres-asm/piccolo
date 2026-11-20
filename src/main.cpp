@@ -38,6 +38,8 @@
 #include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
+#include "core_updater.h"
+#include "cores_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -188,6 +190,11 @@ struct App
     CoreOptionsUiState core_options_state;
     bool               core_options_manager = false;   // the window is open
     bool               core_options_manager_was_open = false;
+
+    // TOOLS > CORES: the core downloader (core_updater.h) and its window. Set
+    // up when the window opens (the server and cores folder may have changed).
+    CoreUpdater        core_updater;
+    CoresWindow        cores_window;
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -648,6 +655,40 @@ static CoreOptionsUiContext core_options_context(App* app)
     return context;
 }
 
+// The running core's file name ("snes9x_libretro.so"), "" when no game runs:
+// the core downloader never replaces or removes it.
+static std::string running_core_file(const App* app)
+{
+    if (!game_running(app))
+    {
+        return std::string();
+    }
+    const char* slash = std::strrchr(app->last_core, '/');
+    return slash != nullptr ? std::string(slash + 1) : std::string(app->last_core);
+}
+
+// TOOLS > CORES: the downloader is set up again on every open (unless it's
+// busy), so a changed CORE SERVER or cores folder applies.
+static void open_cores_window(App* app)
+{
+    if (app->core_updater.state == CoreUpdaterState::idle && !app->paths.root.empty())
+    {
+        const char* keys[CORE_UPDATER_MAX_KEYS] = {};
+        int32_t key_count = core_updater_key_count();
+        key_count = key_count < CORE_UPDATER_MAX_KEYS ? key_count : CORE_UPDATER_MAX_KEYS;
+        for (int32_t i = 0; i < key_count; i++)
+        {
+            keys[i] = core_updater_key_hex(i);
+        }
+        std::string work = app->paths.cache + "/downloads";
+        core_updater_init(&app->core_updater, "piccolo/" PICCOLO_VERSION,
+                          settings_get_text(&app->settings, PICCOLO_CORE_SERVER),
+                          settings_get_bool(&app->settings, PICCOLO_CORE_SERVER_INSECURE), keys, key_count,
+                          core_index_build_target(), app->cores_directory.c_str(), work.c_str());
+    }
+    cores_window_open(&app->cores_window, &app->core_updater);
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -702,6 +743,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::options_manager:
             core_options_manager_open(&app->core_options_manager, &app->core_options_state);
+            break;
+        case MenuAction::cores:
+            open_cores_window(app);
             break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
@@ -915,7 +959,8 @@ static void refresh_audio_devices(App* app)
 static bool any_window_open(const App* app)
 {
     return app->picker.open || app->settings_window.open || app->settings_window.image_open || app->quick_menu.open ||
-           app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open ||
+           app->core_options_manager || app->cores_window.open || app->safe_start_open || app->show_debug_window ||
+           app->input_window.open ||
            map_window_open_now(&app->map_window);
 }
 
@@ -947,6 +992,10 @@ static void close_topmost_or_toggle_menu(App* app)
         else if (app->core_options_manager)
         {
             app->core_options_manager = false;
+        }
+        else if (app->cores_window.open)
+        {
+            app->cores_window.open = false;
         }
         else if (app->input_window.open)
         {
@@ -1941,6 +1990,20 @@ int main(int argc, char** argv)
                 save_core_options(app);   // what was deleted
             }
             app->core_options_manager_was_open = app->core_options_manager;
+            // The core downloader: pick up what finished; the catalog sees
+            // installed or removed cores right away.
+            core_updater_poll(&app->core_updater);
+            if (app->core_updater.cores_changed)
+            {
+                app->core_updater.cores_changed = false;
+                core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
+            }
+            std::string running_file = running_core_file(app);
+            CoresWindowContext cores_context = {};
+            cores_context.strings = &app->strings;
+            cores_context.updater = &app->core_updater;
+            cores_context.running_file = running_file.c_str();
+            cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
             InputWindowContext input_context = {};
             input_context.input = &app->input;
             input_context.sdl = &app->input_sdl;
@@ -2030,6 +2093,7 @@ int main(int argc, char** argv)
     save_settings(app);
     save_learned_latency(app);
     save_core_options(app);
+    core_updater_shutdown(&app->core_updater);   // cancels a download in progress
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     remove_running_marker(app);   // quit properly (a marker found at launch stays if no game ran)
     game_mode_set(&app->game_mode, false);

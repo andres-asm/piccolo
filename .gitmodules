@@ -41,3 +41,6 @@
 	path = deps/7zip
 	url = https://github.com/ip7z/7zip.git
 	shallow = true
+[submodule "deps/monocypher"]
+	path = deps/monocypher
+	url = https://github.com/LoupVaillant/Monocypher.git
