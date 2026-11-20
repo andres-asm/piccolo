@@ -248,6 +248,8 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_LATENCY_FRAME_DELAY_AUTO, .type = SettingType::boolean, .default_value = "true",
      .overridable = true, .label = text_id(Str::setting_frame_delay_auto),
      .help = text_id(Str::setting_frame_delay_auto_help)},
+    {.key = PICCOLO_LATENCY_RUN_AHEAD, .type = SettingType::integer, .default_value = "0", .overridable = true,
+     .min = 0, .max = 4, .label = text_id(Str::setting_run_ahead), .help = text_id(Str::setting_run_ahead_help)},
 
     // Video: Display (global-only)
     {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = text_id(Str::setting_fullscreen),

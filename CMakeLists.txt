@@ -288,6 +288,12 @@ if(ANDROID)
 endif()
 multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 
+# Development tool: what remote play's lossless codec (frame_delta.h) sends for a
+# real game, and its cost (netcode milestone 6).
+add_executable(stream_measure tools/stream_measure.cpp)
+target_link_libraries(stream_measure PRIVATE host_libretro frontend_common)
+multitap_set_project_flags(stream_measure)
+
 # Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
 add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
 target_link_libraries(pixel_font_preview PRIVATE piccolo_font)

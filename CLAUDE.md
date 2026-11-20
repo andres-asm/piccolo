@@ -129,12 +129,14 @@ src/
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
-tools/                    pixel_font_preview, strings_check, recent_games_test, lsan-suppressions.txt
+tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
+                          codec on real games), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
                               vk_* (context, swapchain, texture, barrier), renderer, debug_ui, audio_output (+DRC),
-                              frame_timing, frame_delay, rate_control, settings_file / settings (layers global ->
+                              frame_timing, frame_delay, rate_control, frame_delta (lossless
+                              frame codec for remote play), settings_file / settings (layers global ->
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
@@ -147,7 +149,9 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_settings (settings and actions described by the host), net_speed (speed
+                              net_service (the network on its own thread; remote play is coded and sent
+                              there), net_stream (remote play packets), net_settings (settings and
+                              actions described by the host), net_speed (speed
                               test), net_wire (fields);
                               tools/strings_generator, net_probe; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
@@ -190,7 +194,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-63 tests with test-libretro (44 without). Before calling a larger change done:
+67 tests with test-libretro (48 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -218,7 +222,8 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
   gamepad / stream / full; remote pads (standard pads remapped here, or RetroPad mapped
   on the phone), what runs, actions (save / load state, slot, fast forward, pause,
   reset, close), settings, controllers per port, game folders browsed and games loaded
-  from the client. SETTINGS > NETWORK. Remote play (streaming) not started.
+  from the client. SETTINGS > NETWORK. Remote play: lossless frames (frame_delta) and audio streamed
+  from the network thread; piccoletto's side not written yet.
 - Next: shaders (milestone 6): librashader is in deps/, not wired yet.
 - Release plan (early December): piccolo + piccoletto (Android: remote input,
   streaming). Branches `android`, `big-picture` still need adapting to deps/.

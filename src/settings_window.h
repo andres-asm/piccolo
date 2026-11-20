@@ -80,6 +80,7 @@ struct SettingsWindowContext
     const char*              window_size = "";   // what the window mode gives, for the Display tab
     const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
     const char*              frame_delay = "";   // the frame delay in use (AUTO), for the Sync tab
+    const char*              run_ahead = "";     // what the running core does with RUN-AHEAD, for the Sync tab
     bool                     frame_delay_found = false;   // this game has a locked AUTO delay (SEARCH AGAIN shown)
     const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
     uint32_t                 audio_device_count = 0;

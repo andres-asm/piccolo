@@ -335,12 +335,12 @@ msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
 msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
 
 msgctxt "setting_pause_on_disconnect_help"
-msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START resumes."
-msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START reanuda."
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START, or closing the menu, resumes."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START, o cerrar el menú, reanuda."
 
 msgctxt "status_paused_disconnected"
-msgid "PAUSED: CONTROLLER DISCONNECTED. START TO GO ON"
-msgstr "EN PAUSA: CONTROL DESCONECTADO. START PARA SEGUIR"
+msgid "PAUSED: CONTROLLER DISCONNECTED. START OR THE MENU TO GO ON"
+msgstr "EN PAUSA: CONTROL DESCONECTADO. START O EL MENÚ PARA SEGUIR"
 
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
@@ -2805,3 +2805,27 @@ msgstr "LOS CORES NO LIBRES SE PUEDEN USAR GRATIS, PERO SUS LICENCIAS NO SON DE 
 msgctxt "cores_non_free_confirm_yes"
 msgid "SHOW THEM"
 msgstr "MOSTRARLOS"
+
+msgctxt "setting_run_ahead"
+msgid "RUN-AHEAD"
+msgstr "RUN-AHEAD"
+
+msgctxt "setting_run_ahead_help"
+msgid "Runs the game this many frames ahead and shows that, hiding the game's own input lag. For now only cores with their own run-ahead do it (bsnes, built for piccolo); for the others it does nothing yet. Each frame costs a full emulated frame more."
+msgstr "Corre el juego esta cantidad de frames por delante y muestra eso, ocultando el retraso propio del juego. Por ahora solo lo hacen los cores con run-ahead propio (bsnes, compilado para piccolo); en los demás todavía no hace nada. Cada frame cuesta un frame emulado completo más."
+
+msgctxt "run_ahead_none"
+msgid "THIS CORE HAS NO RUN-AHEAD OF ITS OWN (OTHERS: NOT YET)"
+msgstr "ESTE CORE NO TIENE RUN-AHEAD PROPIO (LOS DEMÁS: TODAVÍA NO)"
+
+msgctxt "run_ahead_in_use"
+msgid "RUN-AHEAD IN USE"
+msgstr "RUN-AHEAD EN USO"
+
+msgctxt "run_ahead_most"
+msgid "THIS CORE DOES UP TO"
+msgstr "ESTE CORE HACE HASTA"
+
+msgctxt "run_ahead_no_game"
+msgid "NO GAME RUNNING"
+msgstr "NINGÚN JUEGO CORRIENDO"

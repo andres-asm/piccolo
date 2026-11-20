@@ -71,6 +71,9 @@ constexpr const char* PICCOLO_LATENCY_FRAMES_IN_FLIGHT = "latency_frames_in_flig
 constexpr const char* PICCOLO_LATENCY_WAIT_FOR_PRESENT = "latency_wait_for_present";
 constexpr const char* PICCOLO_LATENCY_FRAME_DELAY = "latency_frame_delay";
 constexpr const char* PICCOLO_LATENCY_FRAME_DELAY_AUTO = "latency_frame_delay_auto";
+// Run-ahead frames: for now done by cores with their own run-ahead
+// (libretro_extensions.h); piccolo's own (savestates) comes later.
+constexpr const char* PICCOLO_LATENCY_RUN_AHEAD = "latency_run_ahead";
 constexpr const char* PICCOLO_VIDEO_CATCH_UP = "video_catch_up";
 constexpr const char* PICCOLO_DISPLAY_FULLSCREEN = "display_fullscreen";
 constexpr const char* PICCOLO_DISPLAY_FULLSCREEN_TYPE = "display_fullscreen_type";

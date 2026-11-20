@@ -82,6 +82,7 @@ static void build_layout(std::vector<LayoutRow>* rows)
     add_row(rows, Str::tab_video, sync, latency, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
     add_row(rows, Str::tab_video, sync, latency, PICCOLO_LATENCY_FRAME_DELAY);
     add_row(rows, Str::tab_video, sync, latency, PICCOLO_LATENCY_FRAME_DELAY_AUTO);
+    add_row(rows, Str::tab_video, sync, latency, PICCOLO_LATENCY_RUN_AHEAD);
 
     uint32_t advanced = text_id(Str::section_advanced);
     add_row(rows, Str::tab_sound, none, none, PICCOLO_AUDIO_DEVICE);
