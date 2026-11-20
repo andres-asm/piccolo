@@ -10,6 +10,8 @@
 #include "host_fs.h"
 #include "imgui.h"
 
+#include "app_paths.h"
+
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -196,6 +198,10 @@ static bool is_shader_preset(const char* name)
 // Whether a file goes in the list.
 static bool listed_file(const FilePicker* picker, const LibretroCoreInfo* core, const char* name)
 {
+    if (picker->mode == FilePickerMode::folder)
+    {
+        return false;   // folders only
+    }
     if (picker->mode == FilePickerMode::shader_preset)
     {
         return is_shader_preset(name);
@@ -260,10 +266,130 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
 // Public functions
 // ---------------------------------------------------------------------------
 
-// Opens the window in `directory`, or the home folder when it's gone.
-static void open_in(FilePicker* picker, const char* directory)
+static bool is_directory(const char* path)
+{
+    SDL_PathInfo info = {};
+    return path[0] != '\0' && SDL_GetPathInfo(path, &info) && info.type == SDL_PATHTYPE_DIRECTORY;
+}
+
+static void go_home(FilePicker* picker)
+{
+    const char* home = app_paths_home_folder();   // /sdcard on Android
+    std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
+    host_fs_forward_slashes(picker->directory);
+}
+
+// Is `directory` `folder` or inside it ("/roms" holds "/roms/snes" and
+// "/roms/a.7z#x", not "/roms2")? Forward slashes on both.
+static bool folder_holds(const std::string* folder, const char* directory)
+{
+    size_t length = folder->size();
+    while (length > 1 && (*folder)[length - 1] == '/')
+    {
+        length--;
+    }
+    if (std::strncmp(directory, folder->c_str(), length) != 0)
+    {
+        return false;
+    }
+    char next = directory[length];
+    return next == '\0' || next == '/' || (length > 0 && (*folder)[length - 1] == '/');
+}
+
+// FOLDER's text: the game folder we're in (the longest, if they nest),
+// else HOME when we're right there, else where we are.
+static const char* folder_preview(const FilePicker* picker, const Localization* strings)
+{
+    int32_t best = -1;
+    for (size_t i = 0; i < picker->game_folders.size(); i++)
+    {
+        if (folder_holds(&picker->game_folders[i], picker->directory) &&
+            (best < 0 || picker->game_folders[i].size() > picker->game_folders[static_cast<size_t>(best)].size()))
+        {
+            best = static_cast<int32_t>(i);
+        }
+    }
+    if (best >= 0)
+    {
+        return picker->game_folders[static_cast<size_t>(best)].c_str();
+    }
+    const char* home = app_paths_home_folder();   // /sdcard on Android
+    if (home != nullptr)
+    {
+        char home_path[LIBRETRO_PATH_MAX] = {};
+        std::snprintf(home_path, sizeof(home_path), "%s", home);
+        host_fs_forward_slashes(home_path);
+        std::string home_folder = home_path;
+        if (folder_holds(&home_folder, picker->directory) && home_folder.size() + 1 >= std::strlen(picker->directory))
+        {
+            return piccolo_text(strings, Str::picker_home);   // the home folder itself (with or without its trailing '/')
+        }
+    }
+    return picker->directory;
+}
+
+// The first game folder that exists, else the home folder.
+static void go_to_first_game_folder(FilePicker* picker)
+{
+    go_home(picker);
+    for (size_t i = 0; i < picker->game_folders.size(); i++)
+    {
+        if (is_directory(picker->game_folders[i].c_str()))
+        {
+            std::snprintf(picker->directory, sizeof(picker->directory), "%s", picker->game_folders[i].c_str());
+            return;
+        }
+    }
+}
+
+void file_picker_open_folder(FilePicker* picker, const char* directory, const std::vector<std::string>* game_folders)
 {
     picker->open = true;
+    picker->mode = FilePickerMode::folder;
+    picker->game_folders = *game_folders;
+    picker->listing_stale = true;
+    picker->selected_file = -1;
+    picker->archive_path.clear();
+    picker->archive_entries.clear();
+    if (directory != nullptr && is_directory(directory))
+    {
+        std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
+        host_fs_forward_slashes(picker->directory);
+    }
+    else
+    {
+        go_to_first_game_folder(picker);
+    }
+}
+
+void file_picker_open_shader(FilePicker* picker, const char* directory)
+{
+    picker->open = true;
+    picker->mode = FilePickerMode::shader_preset;
+    picker->core_index = -1;
+    picker->show_all = false;
+    picker->game_folders.clear();
+    picker->listing_stale = true;
+    picker->selected_file = -1;
+    picker->archive_path.clear();
+    picker->archive_entries.clear();
+    if (directory != nullptr && is_directory(directory))
+    {
+        std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
+        host_fs_forward_slashes(picker->directory);   // so the presets picked from it don't mix separators
+    }
+    else
+    {
+        go_home(picker);
+    }
+}
+
+void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path,
+                      const std::vector<std::string>* game_folders)
+{
+    picker->open = true;
+    picker->mode = FilePickerMode::game;
+    picker->game_folders = *game_folders;
     picker->listing_stale = true;
 
     picker->archive_path.clear();   // the archive may have changed since: read it again
@@ -280,19 +406,12 @@ static void open_in(FilePicker* picker, const char* directory)
     if (usable)
     {
         std::snprintf(picker->directory, sizeof(picker->directory), "%s", directory);
+        host_fs_forward_slashes(picker->directory);   // so the files picked from it don't mix separators
     }
     else
     {
-        const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
-        std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
+        go_to_first_game_folder(picker);
     }
-    host_fs_forward_slashes(picker->directory);   // so the files picked from it don't mix separators
-}
-
-void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path)
-{
-    picker->mode = FilePickerMode::game;
-    open_in(picker, directory);
 
     // The given core if it's in the catalog, else the first usable one that
     // needs content (the catalog lists usable cores first).
@@ -316,16 +435,8 @@ void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char
     }
 }
 
-void file_picker_open_shader(FilePicker* picker, const char* directory)
-{
-    picker->mode = FilePickerMode::shader_preset;
-    picker->core_index = -1;
-    picker->show_all = false;
-    open_in(picker, directory);
-}
-
 // The selected file, if it's an archive in a real folder (archives inside
-// archives are plain files: they aren't browsed). Never when picking a shader.
+// archives are plain files: they aren't browsed). Only in LOAD GAME.
 static bool selected_archive(const FilePicker* picker)
 {
     std::string archive;
@@ -417,6 +528,25 @@ static bool load_selected(FilePicker* picker, const CoreCatalog* catalog, FilePi
     }
     browse_selected(picker);
     return false;
+}
+
+// CHOOSE FOLDER's bottom row: USE THIS FOLDER (the folder shown) at the right.
+static bool draw_folder_buttons(FilePicker* picker, const Localization* strings, FilePickerChoice* choice)
+{
+    bool picked = false;
+    const char* use = piccolo_text(strings, Str::picker_use_folder);
+    float use_width = ImGui::CalcTextSize(use).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - use_width);
+    ImGui::PushID("use_folder");
+    if (retro_ui_button(use))
+    {
+        *choice = FilePickerChoice{};
+        std::snprintf(choice->content_path, sizeof(choice->content_path), "%s", picker->directory);
+        picker->open = false;
+        picked = true;
+    }
+    ImGui::PopID();
+    return picked;
 }
 
 // The shader picker's bottom row: NONE and USE at the right.
@@ -531,9 +661,14 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
 
     bool keep_open = true;
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-    bool shader = picker->mode == FilePickerMode::shader_preset;
     char title[200] = {};
-    if (shader)
+    bool choosing_folder = picker->mode == FilePickerMode::folder;
+    bool shader = picker->mode == FilePickerMode::shader_preset;
+    if (choosing_folder)
+    {
+        std::snprintf(title, sizeof(title), "%s###choose_folder", piccolo_text(strings, Str::picker_folder_title));
+    }
+    else if (shader)
     {
         std::snprintf(title, sizeof(title), "%s###shader_preset", piccolo_text(strings, Str::shader_picker_title));
     }
@@ -549,36 +684,71 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             keep_open = false;
         }
 
-        // Core first: it decides which files are shown. Not for shaders.
+        // Core first: it decides which files are shown. Neither the core nor
+        // the game folders matter when picking a shader preset.
         const LibretroCoreInfo* core = selected_core(picker, catalog);
-        if (!shader)
+        bool core_row = !choosing_folder && !shader;
+        char preview[LIBRETRO_INFO_TEXT_MAX * 2 + 8] = {};
+        std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : piccolo_text(strings, Str::picker_no_cores),
+                      core != nullptr ? core->version : "");
+        const char* core_label = piccolo_text(strings, Str::picker_core);
+        const char* folder_label = piccolo_text(strings, Str::picker_folder);
+        float label_width = core_row ? ImGui::CalcTextSize(core_label).x : 0.0f;
+        float folder_label_width = ImGui::CalcTextSize(folder_label).x;
+        label_width = (label_width > folder_label_width ? label_width : folder_label_width) + ImGui::GetStyle().ItemSpacing.x;
+        float combo_x = ImGui::GetCursorPosX() + label_width;
+        if (core_row)
         {
-            char preview[LIBRETRO_INFO_TEXT_MAX * 2 + 8] = {};
-            std::snprintf(preview, sizeof(preview), "%s %s", core != nullptr ? core->name : piccolo_text(strings, Str::picker_no_cores),
-                          core != nullptr ? core->version : "");
             ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(piccolo_text(strings, Str::picker_core));
-            ImGui::SameLine();
+            ImGui::TextUnformatted(core_label);
+            ImGui::SameLine(combo_x);
             ImGui::SetNextItemWidth(-FLT_MIN);
-            if (retro_ui_begin_combo("##core", preview))
+        }
+        if (core_row && retro_ui_begin_combo("##core", preview))
+        {
+            for (int32_t i = 0; i < catalog->count; i++)
             {
-                for (int32_t i = 0; i < catalog->count; i++)
+                const CoreCatalogEntry* entry = &catalog->entries[i];
+                if (!entry->info.usable)
                 {
-                    const CoreCatalogEntry* entry = &catalog->entries[i];
-                    if (!entry->info.usable)
-                    {
-                        continue;
-                    }
-                    char label[LIBRETRO_INFO_TEXT_MAX * 2 + 280] = {};
-                    std::snprintf(label, sizeof(label), "%s %s##%s", entry->info.name, entry->info.version, entry->file_name);
-                    if (ImGui::Selectable(label, i == picker->core_index))
-                    {
-                        picker->core_index = i;
-                        picker->listing_stale = true;
-                    }
+                    continue;
                 }
-                ImGui::EndCombo();
+                char label[LIBRETRO_INFO_TEXT_MAX * 2 + 280] = {};
+                std::snprintf(label, sizeof(label), "%s %s##%s", entry->info.name, entry->info.version, entry->file_name);
+                if (ImGui::Selectable(label, i == picker->core_index))
+                {
+                    picker->core_index = i;
+                    picker->listing_stale = true;
+                }
             }
+            ImGui::EndCombo();
+        }
+
+        // Where to start: a game folder or HOME.
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(folder_label);
+        ImGui::SameLine(combo_x);
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        if (retro_ui_begin_combo("##folder", folder_preview(picker, strings)))
+        {
+            for (size_t i = 0; i < picker->game_folders.size(); i++)
+            {
+                ImGui::PushID(static_cast<int>(i));
+                if (ImGui::Selectable(picker->game_folders[i].c_str()))
+                {
+                    std::snprintf(picker->directory, sizeof(picker->directory), "%s", picker->game_folders[i].c_str());
+                    picker->listing_stale = true;
+                }
+                ImGui::PopID();
+            }
+            ImGui::PushID("home");
+            if (ImGui::Selectable(piccolo_text(strings, Str::picker_home)))
+            {
+                go_home(picker);
+                picker->listing_stale = true;
+            }
+            ImGui::PopID();
+            ImGui::EndCombo();
         }
 
         // Files (left) and folders (right), leaving room for two rows below.
@@ -586,8 +756,15 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         float list_height = ImGui::GetContentRegionAvail().y - row * 2.0f;
         float files_width = ImGui::GetContentRegionAvail().x * 0.62f;
 
-        retro_ui_begin_list("files", files_width, list_height);
-        for (int32_t i = 0; i < picker->file_count; i++)
+        if (choosing_folder)
+        {
+            files_width = 0.0f;   // folders only, the whole width
+        }
+        else
+        {
+            retro_ui_begin_list("files", files_width, list_height);
+        }
+        for (int32_t i = 0; i < picker->file_count && !choosing_folder; i++)
         {
             ImGui::PushID(i);
             if (ImGui::Selectable(picker->files[i], i == picker->selected_file, ImGuiSelectableFlags_AllowDoubleClick))
@@ -604,13 +781,15 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             }
             ImGui::PopID();
         }
-        if (picker->file_count == 0)
+        if (!choosing_folder)
         {
-            ImGui::TextDisabled("%s", piccolo_text(strings, Str::picker_nothing_here));
+            if (picker->file_count == 0)
+            {
+                ImGui::TextDisabled("%s", piccolo_text(strings, Str::picker_nothing_here));
+            }
+            retro_ui_end_list();
+            ImGui::SameLine();
         }
-        retro_ui_end_list();
-
-        ImGui::SameLine();
         retro_ui_begin_list("folders", 0.0f, list_height);
         const char* open_folder = nullptr;
         if (ImGui::Selectable(".."))
@@ -670,10 +849,20 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             ImGui::TextDisabled("%s", picker->directory);
         }
 
-        // Bottom row.
-        // (A double click above may have picked already.)
-        bool clicked = shader ? draw_shader_buttons(picker, strings, choice)
-                              : draw_game_buttons(picker, catalog, core, strings, choice);
+        // Bottom row. (A double click above may have picked already.)
+        bool clicked = false;
+        if (choosing_folder)
+        {
+            clicked = draw_folder_buttons(picker, strings, choice);
+        }
+        else if (shader)
+        {
+            clicked = draw_shader_buttons(picker, strings, choice);
+        }
+        else
+        {
+            clicked = draw_game_buttons(picker, catalog, core, strings, choice);
+        }
         picked = picked || clicked;
 
         retro_ui_end_window();

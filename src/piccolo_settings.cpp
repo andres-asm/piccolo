@@ -156,6 +156,8 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_pause_in_menu), .help = text_id(Str::setting_pause_in_menu_help)},
     {.key = PICCOLO_PAUSE_ON_FOCUS_LOSS, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_pause_on_focus_loss), .help = text_id(Str::setting_pause_on_focus_loss_help)},
+    {.key = PICCOLO_PAUSE_ON_DISCONNECT, .type = SettingType::boolean, .default_value = "true",
+     .label = text_id(Str::setting_pause_on_disconnect), .help = text_id(Str::setting_pause_on_disconnect_help)},
     {.key = PICCOLO_SCREENSAVER_WHEN_PAUSED, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_screensaver),
      .help = text_id(Str::setting_screensaver_help)},
@@ -178,6 +180,13 @@ static const SettingDescriptor SETTINGS[] = {
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_GAME_MODE, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_game_mode), .help = text_id(Str::setting_game_mode_help)},
+    // Network (CONFIG > NETWORK); 55420 = NET_DEFAULT_PORT.
+    {.key = PICCOLO_NET_ENABLED, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_net_enabled), .help = text_id(Str::setting_net_enabled_help)},
+    {.key = PICCOLO_NET_PORT, .type = SettingType::integer, .default_value = "55420", .min = 1024, .max = 65535,
+     .label = text_id(Str::setting_net_port), .help = text_id(Str::setting_net_port_help)},
+    {.key = PICCOLO_NET_NAME, .type = SettingType::text, .default_value = "PICCOLO",
+     .label = text_id(Str::setting_net_name), .help = text_id(Str::setting_net_name_help)},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
      .help = text_id(Str::setting_path_cores_help)},
     {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),
@@ -186,6 +195,28 @@ static const SettingDescriptor SETTINGS[] = {
      .help = text_id(Str::setting_path_saves_help)},
     {.key = PICCOLO_PATH_STATES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_states),
      .help = text_id(Str::setting_path_states_help)},
+    {.key = PICCOLO_CORE_SERVER, .type = SettingType::text, .default_value = "https://cores.get-piccolo.app",
+     .label = text_id(Str::setting_core_server), .help = text_id(Str::setting_core_server_help)},
+    {.key = PICCOLO_CORE_SERVER_INSECURE, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_core_server_insecure), .help = text_id(Str::setting_core_server_insecure_help)},
+    {.key = PICCOLO_CORES_SHOW_NON_FREE, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::cores_show_non_free), .help = text_id(Str::cores_show_non_free_help)},
+    {.key = PICCOLO_PATH_GAMES[0], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[1], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[2], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[3], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[4], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[5], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[6], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
+    {.key = PICCOLO_PATH_GAMES[7], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
+     .help = text_id(Str::setting_path_games_help)},
 
     // Video: Picture (overridable per core / game)
     {.key = PICCOLO_VIDEO_ASPECT, .type = SettingType::enumeration, .default_value = "core", .overridable = true,
@@ -276,6 +307,8 @@ static const SettingDescriptor SETTINGS[] = {
     {.key = PICCOLO_LATENCY_FRAME_DELAY_AUTO, .type = SettingType::boolean, .default_value = "true",
      .overridable = true, .label = text_id(Str::setting_frame_delay_auto),
      .help = text_id(Str::setting_frame_delay_auto_help)},
+    {.key = PICCOLO_LATENCY_RUN_AHEAD, .type = SettingType::integer, .default_value = "0", .overridable = true,
+     .min = 0, .max = 4, .label = text_id(Str::setting_run_ahead), .help = text_id(Str::setting_run_ahead_help)},
 
     // Video: Display (global-only)
     {.key = PICCOLO_DISPLAY_FULLSCREEN, .type = SettingType::boolean, .default_value = "false", .label = text_id(Str::setting_fullscreen),
@@ -509,6 +542,45 @@ void piccolo_settings_viewport(const Settings* settings, ViewportInput* input)
 TimingMode piccolo_settings_timing(const Settings* settings)
 {
     return settings_get_enum(settings, PICCOLO_VIDEO_TIMING) == 0 ? TimingMode::vsync : TimingMode::exact;
+}
+
+void piccolo_settings_game_folders(const Settings* settings, std::vector<std::string>* folders)
+{
+    folders->clear();
+    for (uint32_t i = 0; i < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        std::string folder = settings_get_text(settings, PICCOLO_PATH_GAMES[i]);
+        if (folder.empty())
+        {
+            continue;   // a file edited by hand may have gaps: skipped
+        }
+        host_fs_forward_slashes(&folder[0]);
+        folders->push_back(folder);
+    }
+}
+
+bool piccolo_settings_remove_game_folder(Settings* settings, uint32_t index)
+{
+    if (index >= PICCOLO_GAME_FOLDER_MAX ||
+        settings_get_layer(settings, SettingLayer::global, PICCOLO_PATH_GAMES[index]) == nullptr)
+    {
+        return false;
+    }
+    for (uint32_t i = index; i + 1 < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        const char* next = settings_get_layer(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i + 1]);
+        if (next == nullptr || next[0] == '\0')
+        {
+            settings_reset(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i]);
+        }
+        else
+        {
+            std::string moved = next;   // the next set below may move the text it points into
+            settings_set(settings, SettingLayer::global, PICCOLO_PATH_GAMES[i], moved.c_str());
+        }
+    }
+    settings_reset(settings, SettingLayer::global, PICCOLO_PATH_GAMES[PICCOLO_GAME_FOLDER_MAX - 1]);
+    return true;
 }
 
 double piccolo_settings_window_aspect(const Settings* settings)

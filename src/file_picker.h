@@ -3,7 +3,8 @@
 // piccolo's "load game" window, in the retro style (retro_ui theme):
 //
 //   +- LOAD GAME ------------------------------------------+
-//   | CORE  [ Snes9x 1.63                              v ] |
+//   | CORE   [ Snes9x 1.63                             v ] |
+//   | FOLDER [ /home/user/roms                         v ] |
 //   | +- files -----------------------+ +- folders -----+ |
 //   | | Super Mario World (USA).sfc   | | ..            | |
 //   | | ...                           | | Nintendo - .. | |
@@ -23,9 +24,16 @@
 //   - else, exactly one file inside the core can load: that file
 //     ("a.7z#dir/Game.sfc", extracted by the core session);
 //   - else: opens it as a folder, like BROWSE, which always does that.
+// FOLDER jumps to one of the game folders (SETTINGS > GENERAL) or HOME, and
+// shows the one we're in. The picker isn't limited to them: they're only
+// places to start (the network is limited to them, not the local user).
 // Esc or the window's close button closes the picker.
 //
-// The same window picks a shader preset (FilePickerMode::shader_preset, from
+// The same window chooses a folder (file_picker_open_folder: SETTINGS' game
+// folders): CHOOSE FOLDER, no core, only folders (archives aren't folders
+// here), and USE THIS FOLDER picks the folder shown.
+//
+// It also picks a shader preset (FilePickerMode::shader_preset, from
 // SETTINGS > SHADER > CHOOSE): no core row, only .slangp files, no archives
 // (presets are always plain files), and NONE / USE instead of the game
 // buttons. It can go to any folder (e.g. a full slang-shaders checkout).
@@ -45,17 +53,19 @@ constexpr size_t  FILE_PICKER_NAME_MAX    = 256;
 
 enum class FilePickerMode
 {
-    game,            // LOAD GAME
+    game,            // LOAD GAME: a core and a file
+    folder,          // CHOOSE FOLDER: a folder
     shader_preset,   // a .slangp for the SHADER setting
 };
 
 struct FilePicker
 {
-    FilePickerMode mode = FilePickerMode::game;
     bool open = false;
+    FilePickerMode mode = FilePickerMode::game;
     char directory[LIBRETRO_PATH_MAX] = {};
 
     int32_t core_index = -1;   // index into the catalog; -1 = none chosen yet
+    std::vector<std::string> game_folders;   // FOLDER's choices (copied at open), then HOME
     bool    show_all   = false;
 
     // Current folder's contents, sorted (case-insensitive). Re-read when the
@@ -78,8 +88,8 @@ struct FilePicker
     std::string peek_single;         // the one file, when peek_loadable == 1
 };
 
-// What the user chose. In shader_preset mode only content_path is used: the
-// preset, or empty for NONE.
+// What the user chose. CHOOSE FOLDER: the folder in content_path, no core.
+// Shader preset: the preset in content_path, or empty for NONE; no core.
 struct FilePickerChoice
 {
     char core_path[LIBRETRO_PATH_MAX]    = {};
@@ -87,8 +97,14 @@ struct FilePickerChoice
 };
 
 // Opens the window in `directory` with `core_path` preselected (either may be
-// "" or not exist: then the home folder / the first usable core).
-void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path);
+// "" or not exist: then the first game folder that exists, else the home
+// folder / the first usable core).
+void file_picker_open(FilePicker* picker, const CoreCatalog* catalog, const char* directory, const char* core_path,
+                      const std::vector<std::string>* game_folders);
+
+// Opens CHOOSE FOLDER in `directory` (if it's a folder that exists; else
+// the first game folder that does, else the home folder).
+void file_picker_open_folder(FilePicker* picker, const char* directory, const std::vector<std::string>* game_folders);
 
 // Opens the window to pick a shader preset, in `directory` (if it doesn't
 // exist: the home folder).

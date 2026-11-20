@@ -23,6 +23,7 @@
 #include "app_icon.h"
 #include "app_paths.h"
 #include "app_shell.h"
+#include "bundled_files.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
@@ -39,6 +40,8 @@
 #include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
+#include "core_updater.h"
+#include "cores_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -47,6 +50,14 @@
 #include "input_sdl.h"
 #include "input_window.h"
 #include "map_window.h"
+#include "input_net.h"
+#include "net_access.h"
+#include "net_service.h"
+#include "net_games.h"
+#include "net_remote.h"
+#include "net_speed.h"
+#include "net_trust.h"
+#include "net_window.h"
 #include "file_picker.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
@@ -93,6 +104,62 @@ struct App
 
     CoreSession session = {};
     CoreCatalog catalog = {};
+
+    // Network (CONFIG > NETWORK): the listener with access control and
+    // pairing, while net_enabled. The device key and the paired devices live
+    // in <settings>/net_identity.cfg and net_devices.cfg.
+    bool       net_ready = false;        // net_init() succeeded
+    bool       net_running = false;      // `net` is listening
+    bool       net_listen_failed = false;
+    bool       net_has_identity = false;
+    NetKeypair net_identity = {};
+    char       net_fingerprint[32] = "";
+    uint16_t   net_port = 0;             // what `net` listens on
+    bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
+    // stream_tuning (net_stream.h): what streaming devices asked for, kept only
+    // here (never in the settings or the files: a crash leaves nothing changed).
+    bool            stream_tuning_set[NET_MAX_PEERS] = {};
+    NetStreamTuning stream_tuning_asked[NET_MAX_PEERS];
+    uint64_t        stream_tuning_order[NET_MAX_PEERS] = {};   // the newest request wins
+    uint64_t        stream_tuning_count = 0;
+    bool            stream_tuning_on = false;   // one applies now (`stream_tuning`)
+    NetStreamTuning stream_tuning;
+    int32_t         stream_tuning_from = -1;    // the peer whose request applies
+    AutoFrameDelay  stream_auto_delay = {};     // AUTO for the stream: its own, never saved
+    uint64_t        stream_delay_last_ns = 0;
+    NetStreamTuning stream_tuning_sent[NET_MAX_PEERS];   // the result each was last told
+    bool            stream_tuning_told[NET_MAX_PEERS] = {};
+    uint32_t   stream_loop = 0;          // the loop number the stream carries
+    uint64_t   stream_serial = 0;        // the core frame last handed over (a repeat isn't sent again)
+    NetService net_service;              // the listener on its own thread (net_service.h); its NetAccess:
+                                         // net_service.access, used between net_service_lock / _unlock
+    InputNet   input_net = {};           // paired devices' pads, in the input router
+    NetGames   net_games = {};           // games from devices with FULL access (net_games.h)
+    bool       net_load_waiting = false; // a load_request is in pending_start: answered once it ran
+    uint32_t   net_load_peer = NET_NO_PEER;
+    uint32_t   net_load_id = 0;
+    NetRemote  net_remote = {};          // settings and actions from devices (net_remote.h)
+    bool       net_remote_ready = false;
+    bool       net_paused = false;       // PAUSE from a device
+    // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
+    bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
+    bool       disconnect_paused = false;     // START, a controller joining, or closing the menu resumes
+    bool       menu_was_open = false;         // last loop: for "closing the menu resumes"
+    uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
+    char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
+    bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
+    NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
+    uint64_t   net_controllers_sent[NET_MAX_PEERS] = {};   // a summary of the controllers each device was last sent
+    bool       net_devices_wanted[NET_MAX_PEERS] = {};     // asked for `devices` once: gets it again on changes
+    uint64_t   net_devices_sent[NET_MAX_PEERS] = {};       // a summary of the `devices` each was last sent
+    NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
+    NetSpeedReceiver net_speed_receiver;   // a speed test, up
+    bool             net_speed_reporting = false;   // the sender finished: its report goes out
+    std::vector<NetSpeedSummary> net_speed_results;  // what devices' speed tests found (SETTINGS > NETWORK)
+    NetAccessLevel   net_actions_level[NET_MAX_PEERS] = {};   // the level each device's action list was made for
+    // What the devices were last told runs (game_state): sent again when it changes.
+    std::string net_sent_core;           // "" = nothing runs
+    std::string net_sent_content;
     FilePicker  picker  = {};
     FilePicker  shader_picker = {};   // SETTINGS > SHADER > CHOOSE
     bool        menu_visible = true;   // only hideable while a game runs
@@ -130,6 +197,7 @@ struct App
     Settings       settings = {};
     std::string    settings_path;
     SettingsWindow settings_window = {};
+    const char*    choose_folder_key = nullptr;   // the folder setting CHOOSE FOLDER sets
     bool           settings_window_was_open = false;
     bool           options_window_was_open = false;   // the quick menu or the options manager
     std::string    cores_directory;   // the one the catalog lists now
@@ -202,6 +270,11 @@ struct App
     CoreOptionsUiState core_options_state;
     bool               core_options_manager = false;   // the window is open
     bool               core_options_manager_was_open = false;
+
+    // TOOLS > CORES: the core downloader (core_updater.h) and its window. Set
+    // up when the window opens (the server and cores folder may have changed).
+    CoreUpdater        core_updater;
+    CoresWindow        cores_window;
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -405,8 +478,11 @@ static void update_pause(App* app)
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
-    bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
-    bool pause = game_running(app) && (pause_for_menu || pause_for_focus);
+    // Not while a device streams: whoever plays is looking at the phone, not
+    // at this window.
+    bool pause_for_focus = !app->window_focused && !app->net_streaming &&
+                           settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
+    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused || app->disconnect_paused);
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
@@ -562,13 +638,14 @@ static bool needs_safe_start(App* app, const FilePickerChoice* choice)
     return true;
 }
 
-static void start_game(App* app, const FilePickerChoice* choice)
+// True if the game started (false also when it waits for SAFE START).
+static bool start_game(App* app, const FilePickerChoice* choice)
 {
     if (!app->safe_start_confirmed && needs_safe_start(app, choice))
     {
         app->safe_start_pending = *choice;
         app->safe_start_open = true;   // started (or not) when it's answered
-        return;
+        return false;
     }
     app->safe_start_confirmed = false;
     remove_running_marker(app);   // the previous game, if any, ended properly
@@ -620,6 +697,7 @@ static void start_game(App* app, const FilePickerChoice* choice)
                            app->session.host->content_path);
     }
     set_status(app, app->session.message);
+    return started;
 }
 
 // Saves the session's slot with a thumbnail of the picture as shown: the
@@ -662,6 +740,40 @@ static CoreOptionsUiContext core_options_context(App* app)
     return context;
 }
 
+// The running core's file name ("snes9x_libretro.so"), "" when no game runs:
+// the core downloader never replaces or removes it.
+static std::string running_core_file(const App* app)
+{
+    if (!game_running(app))
+    {
+        return std::string();
+    }
+    const char* slash = std::strrchr(app->last_core, '/');
+    return slash != nullptr ? std::string(slash + 1) : std::string(app->last_core);
+}
+
+// TOOLS > CORES: the downloader is set up again on every open (unless it's
+// busy), so a changed CORE SERVER or cores folder applies.
+static void open_cores_window(App* app)
+{
+    if (app->core_updater.state == CoreUpdaterState::idle && !app->paths.root.empty())
+    {
+        const char* keys[CORE_UPDATER_MAX_KEYS] = {};
+        int32_t key_count = core_updater_key_count();
+        key_count = key_count < CORE_UPDATER_MAX_KEYS ? key_count : CORE_UPDATER_MAX_KEYS;
+        for (int32_t i = 0; i < key_count; i++)
+        {
+            keys[i] = core_updater_key_hex(i);
+        }
+        std::string work = app->paths.cache + "/downloads";
+        core_updater_init(&app->core_updater, "piccolo/" PICCOLO_VERSION,
+                          settings_get_text(&app->settings, PICCOLO_CORE_SERVER),
+                          settings_get_bool(&app->settings, PICCOLO_CORE_SERVER_INSECURE), keys, key_count,
+                          core_index_build_target(), app->cores_directory.c_str(), work.c_str());
+    }
+    cores_window_open(&app->cores_window, &app->core_updater);
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -669,9 +781,13 @@ static void handle_menu_action(App* app, MenuAction action)
         case MenuAction::none:
             return;
         case MenuAction::load_game:
+        {
             core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
-            file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core);
+            std::vector<std::string> game_folders;
+            piccolo_settings_game_folders(&app->settings, &game_folders);
+            file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core, &game_folders);
             break;
+        }
         case MenuAction::reset:
             if (game_running(app))
             {
@@ -716,6 +832,12 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::options_manager:
             core_options_manager_open(&app->core_options_manager, &app->core_options_state);
+            break;
+        case MenuAction::cores:
+            open_cores_window(app);
+            break;
+        case MenuAction::network:
+            settings_window_open(&app->settings_window, SettingsTab::network);
             break;
         case MenuAction::debug_window:
             app->show_debug_window = !app->show_debug_window;
@@ -801,8 +923,57 @@ static void search_frame_delay_again(App* app)
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Frame delay: searching again (automatic)");
 }
 
+// Does a streaming device's tuning decide the frame delay now (not "host")?
+static bool stream_delay_overrides(const App* app)
+{
+    return app->stream_tuning_on && app->stream_tuning.delay != NetStreamDelay::host;
+}
+
+// The frame delay a streaming device asked for (stream_tuning): OFF, N ms or
+// AUTO with its own search. Only in memory: nothing is saved, and the game's
+// local AUTO isn't fed (its minute starts over, as for a pause).
+static void stream_frame_delay(App* app)
+{
+    auto_frame_delay_interrupt(&app->auto_delay);
+    app->frame_delay_ms = 0;
+    bool applies = game_running(app) && !app->session.paused && !core_session_fast_forwarding(&app->session) &&
+                   app->session.timing.effective == TimingMode::vsync &&
+                   app->stream_tuning.delay != NetStreamDelay::off;
+    if (!applies)
+    {
+        app->stream_delay_last_ns = 0;
+        auto_frame_delay_interrupt(&app->stream_auto_delay);
+        return;
+    }
+    uint32_t use = app->stream_tuning.delay_ms;
+    if (app->stream_tuning.delay == NetStreamDelay::automatic)
+    {
+        // The player is on the phone: focus doesn't matter here, the menu does.
+        if (app->menu_visible || app->picker.open || app->settings_window.open || app->settings_window.image_open)
+        {
+            auto_frame_delay_interrupt(&app->stream_auto_delay);
+        }
+        uint64_t now = SDL_GetTicksNS();
+        double elapsed =
+            app->stream_delay_last_ns > 0 ? static_cast<double>(now - app->stream_delay_last_ns) / 1e9 : 0.0;
+        app->stream_delay_last_ns = now;
+        use = auto_frame_delay_update(&app->stream_auto_delay, app->session.timing.missed, elapsed,
+                                      auto_frame_delay_start_ms(app->session.timing.display_hz));
+    }
+    app->frame_delay_ms = use;
+    if (use > 0)
+    {
+        SDL_DelayPrecise(static_cast<Uint64>(use) * 1000000u);
+    }
+}
+
 static void frame_delay(App* app)
 {
+    if (stream_delay_overrides(app))
+    {
+        stream_frame_delay(app);
+        return;
+    }
     bool automatic = settings_get_bool(&app->settings, PICCOLO_LATENCY_FRAME_DELAY_AUTO);
     int32_t manual_ms = settings_get_int(&app->settings, PICCOLO_LATENCY_FRAME_DELAY);
     bool waits = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
@@ -887,22 +1058,7 @@ static void update_language(App* app)
     app->language_setting = setting;
     uint32_t language = piccolo_settings_language(&app->settings);
     app->session.language = piccolo_language_retro(language);
-    if (language == 0)
-    {
-        localization_use_english(&app->strings);
-        refresh_recent_labels(app);
-        return;
-    }
-
-    // lang/<code>.po: the user's copy in piccolo's folder wins over the one
-    // that comes with piccolo (next to the program).
-    std::string file = std::string("lang/") + piccolo_language_code(language) + ".po";
-    std::string user_copy = app->paths.root.empty() ? std::string() : app->paths.root + "/" + file;
-    const char* base = SDL_GetBasePath();   // ends with a separator; SDL owns it
-    std::string bundled = base != nullptr ? std::string(base) + file : file;
-    host_fs_forward_slashes(bundled.data());
-    const std::string* path = !user_copy.empty() && host_fs_exists(user_copy.c_str()) ? &user_copy : &bundled;
-    localization_load_po(&app->strings, path->c_str(), piccolo_language_code(language));
+    piccolo_text_load_language(&app->strings, language, app->paths.root.c_str());
     refresh_recent_labels(app);
 }
 
@@ -929,8 +1085,8 @@ static void refresh_audio_devices(App* app)
 static bool any_window_open(const App* app)
 {
     return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
-           app->quick_menu.open ||
-           app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open ||
+           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
+           app->show_debug_window || app->input_window.open ||
            map_window_open_now(&app->map_window);
 }
 
@@ -963,6 +1119,10 @@ static void close_topmost_or_toggle_menu(App* app)
         {
             app->core_options_manager = false;
         }
+        else if (app->cores_window.open)
+        {
+            app->cores_window.open = false;
+        }
         else if (app->input_window.open)
         {
             if (!app->input_window.capturing)   // Escape cancels a SET instead
@@ -973,6 +1133,10 @@ static void close_topmost_or_toggle_menu(App* app)
         else if (app->shader_picker.open)   // opened from SETTINGS: closes before it
         {
             app->shader_picker.open = false;
+        }
+        else if (app->picker.open && app->picker.mode == FilePickerMode::folder)
+        {
+            app->picker.open = false;   // CHOOSE FOLDER sits on top of SETTINGS: it goes first
         }
         else if (app->settings_window.image_open)
         {
@@ -1317,6 +1481,70 @@ static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
 
 // Once per loop, after the events: what the controllers say (ports,
 // hotkeys), handed to the core session before it runs frames.
+
+// Is a connected gamepad (local or remote) on any port?
+static bool gamepad_on_a_port(const App* app)
+{
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (device != nullptr && device->connected && device->kind == InputDeviceKind::gamepad &&
+            input_controller_port(&app->input, static_cast<uint32_t>(c)) != INPUT_NO_PORT)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// PAUSE WHEN CONTROLLERS DISCONNECT: notes whether a gamepad or the keyboard
+// played last (a RetroPad input held in the game), and resumes on START.
+static void follow_what_plays(App* app, const InputFrame* frame)
+{
+    uint32_t pad_actions = static_cast<uint32_t>(InputAction::pad_turbo);   // the RetroPad's buttons and sticks
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputController* controller = &app->input.controllers[c];
+        if (controller->layer != InputLayer::game)
+        {
+            continue;
+        }
+        bool playing = false;
+        for (uint32_t a = 0; a < pad_actions && !playing; a++)
+        {
+            playing = controller->held_last[a];
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, controller->device_id);
+        if (playing && device != nullptr)
+        {
+            app->played_with_gamepad = device->kind == InputDeviceKind::gamepad;
+        }
+    }
+    // Closing the menu (or any window) resumes too: with every pad gone and
+    // the keyboard on no port, nothing else could (Andrés).
+    bool menu_open = app->menu_visible || any_window_open(app);
+    bool menu_closed = app->menu_was_open && !menu_open;
+    app->menu_was_open = menu_open;
+    if (!app->disconnect_paused)
+    {
+        return;
+    }
+    bool start = frame->joined_port != INPUT_NO_PORT;
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT && !start; p++)
+    {
+        start = (frame->pad_buttons[p] & (1u << 3)) != 0;   // RETRO_DEVICE_ID_JOYPAD_START
+    }
+    if (start || menu_closed || !game_running(app))
+    {
+        app->disconnect_paused = false;
+        if (start || menu_closed)
+        {
+            set_status(app, piccolo_text(&app->strings, Str::status_resumed));
+            SDL_Log("Resumed: %s", start ? "START" : "the menu closed");
+        }
+    }
+}
+
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
@@ -1352,11 +1580,17 @@ static void app_update_input(App* app)
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
         set_status(app, message);
         SDL_Log("%s", message);
-        if (game_running(app) && !app->quick_menu.open)
+        // No CONTROLS here (Andrés): joining again is just START. The game
+        // pauses if that was the last gamepad playing (the setting).
+        if (game_running(app) && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_DISCONNECT) &&
+            app->played_with_gamepad && !gamepad_on_a_port(app))
         {
-            quick_menu_open_controls(&app->quick_menu, app->session.state_slot);   // rearrange the ports
+            app->disconnect_paused = true;
+            set_status(app, piccolo_text(&app->strings, Str::status_paused_disconnected));
+            SDL_Log("Paused: the last gamepad playing went away");
         }
     }
+    follow_what_plays(app, &frame);
     app_handle_hotkeys(app, &frame);
     drive_ui_with_gamepads(app, &frame, ui_up);
     if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])
@@ -1372,8 +1606,13 @@ static void app_update_input(App* app)
     }
     retro_ui_set_page_request(page);
     core_session_set_pads(&app->session, frame.pad_buttons, frame.analog);
+    bool net_fast_forward = false;
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        net_fast_forward = net_fast_forward || app->net_fast_forward[i];
+    }
     app->session.fast_forward_held =
-        game_running(app) && frame.held[static_cast<uint32_t>(InputAction::hotkey_fast_forward)];
+        game_running(app) && (frame.held[static_cast<uint32_t>(InputAction::hotkey_fast_forward)] || net_fast_forward);
     if (app->session.host != nullptr)
     {
         input_sdl_rumble(&app->input_sdl, &app->input, app->session.host->rumble, LIBRETRO_MAX_PORTS);
@@ -1586,6 +1825,93 @@ static void draw_game(App* app)
     }
 }
 
+// A folder field or GAME FOLDERS' "+" in SETTINGS: CHOOSE FOLDER, starting
+// at the folder the setting has (or the default one, or the first game
+// folder).
+static void choose_folder_start(App* app)
+{
+    const char* key = app->settings_window.choose_folder_key;
+    app->settings_window.choose_folder_key = nullptr;
+    if (key == nullptr)
+    {
+        return;
+    }
+    std::vector<std::string> game_folders;
+    piccolo_settings_game_folders(&app->settings, &game_folders);
+    // Not set: where the default is (what the empty field shows).
+    const char* start = settings_get_text(&app->settings, key);
+    if (start[0] == '\0' && std::strcmp(key, PICCOLO_PATH_CORES) == 0)
+    {
+        start = app->paths.cores.c_str();
+    }
+    else if (start[0] == '\0' && std::strcmp(key, PICCOLO_PATH_SYSTEM) == 0)
+    {
+        start = app->paths.system.c_str();
+    }
+    else if (start[0] == '\0' && std::strcmp(key, PICCOLO_PATH_SAVES) == 0)
+    {
+        start = app->paths.saves.c_str();
+    }
+    else if (start[0] == '\0' && std::strcmp(key, PICCOLO_PATH_STATES) == 0)
+    {
+        start = app->paths.states.c_str();
+    }
+    app->choose_folder_key = key;
+    file_picker_open_folder(&app->picker, start, &game_folders);
+}
+
+static bool is_game_folder_key(const char* key, uint32_t* slot)
+{
+    for (uint32_t i = 0; i < PICCOLO_GAME_FOLDER_MAX; i++)
+    {
+        if (std::strcmp(key, PICCOLO_PATH_GAMES[i]) == 0)
+        {
+            *slot = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+static void choose_folder_done(App* app, const FilePickerChoice* picked)
+{
+    const char* key = app->choose_folder_key;
+    app->choose_folder_key = nullptr;
+    if (key == nullptr)
+    {
+        return;
+    }
+    uint32_t wanted = 0;
+    if (!is_game_folder_key(key, &wanted))
+    {
+        settings_set(&app->settings, SettingLayer::global, key, picked->content_path);
+    }
+    else
+    {
+        // Into that row, or the first empty one: the slots have no gaps, and
+        // a row may have been removed while the picker was open.
+        uint32_t slot = 0;
+        while (slot < wanted && settings_get_text(&app->settings, PICCOLO_PATH_GAMES[slot])[0] != '\0')
+        {
+            slot++;
+        }
+        for (uint32_t i = 0; i < PICCOLO_GAME_FOLDER_MAX; i++)
+        {
+            if (i != slot &&
+                std::strcmp(settings_get_text(&app->settings, PICCOLO_PATH_GAMES[i]), picked->content_path) == 0)
+            {
+                return;   // already in the list
+            }
+        }
+        settings_set(&app->settings, SettingLayer::global, PICCOLO_PATH_GAMES[slot], picked->content_path);
+    }
+    if (!app->settings_window.open)
+    {
+        apply_folders(app);
+        save_settings(app);   // SETTINGS closed (and saved) while the folder was being chosen
+    }
+}
+
 static void draw_settings(App* app)
 {
     const CoreSession* session = &app->session;
@@ -1617,6 +1943,14 @@ static void draw_settings(App* app)
     context.image = &image;
     context.strings = &app->strings;
     context.themes = &app->themes;
+    NetWindowContext network;
+    network.settings = &app->settings;
+    network.strings = &app->strings;
+    network.access = app->net_running ? &app->net_service.access : nullptr;
+    network.listen_failed = app->net_listen_failed;
+    network.this_device = app->net_fingerprint;
+    network.speed = &app->net_speed_results;
+    context.network = &network;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
     char window_size[200] = {};
@@ -1701,8 +2035,38 @@ static void draw_settings(App* app)
                       auto_frame_delay_seconds_to_lock(auto_delay));
     }
     context.frame_delay = frame_delay_text;
+    // RUN-AHEAD: what the running core does with it.
+    char run_ahead_text[200] = {};
+    const LibretroHost* run_ahead_host = app->session.host;
+    if (!game_running(app))
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s", piccolo_text(&app->strings, Str::run_ahead_no_game));
+    }
+    else if (run_ahead_host->core_run_ahead_max == 0)
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s", piccolo_text(&app->strings, Str::run_ahead_none));
+    }
+    else
+    {
+        std::snprintf(run_ahead_text, sizeof(run_ahead_text), "%s: %u (%s %u)",
+                      piccolo_text(&app->strings, Str::run_ahead_in_use), libretro_host_run_ahead_applied(run_ahead_host),
+                      piccolo_text(&app->strings, Str::run_ahead_most), run_ahead_host->core_run_ahead_max);
+    }
+    context.run_ahead = run_ahead_text;
     context.frame_delay_found = game_running(app) && auto_delay->locked;
+    // The NETWORK tab reads and changes the NetAccess (pairing, levels,
+    // FORGET): the network thread waits meanwhile.
+    bool network_locked = app->net_running;
+    if (network_locked)
+    {
+        net_service_lock(&app->net_service);
+    }
     settings_window_draw(&app->settings_window, &context, app->pixel_font, app->ui_scale);
+    if (network_locked)
+    {
+        net_service_unlock(&app->net_service);
+    }
+    choose_folder_start(app);
     if (app->settings_window.search_frame_delay)
     {
         app->settings_window.search_frame_delay = false;
@@ -1834,6 +2198,1113 @@ static void app_draw_debug_ui(App* app)
 // Entry point
 // ---------------------------------------------------------------------------
 
+// game_state (what runs now) to one authorized peer, or to all of them
+// (NET_NO_PEER).
+static void net_send_game_state(App* app, uint32_t peer)
+{
+    size_t size = net_games_write_state(&app->net_games, &app->catalog, app->net_sent_core.c_str(),
+                                        app->net_sent_content.c_str());
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if ((peer == NET_NO_PEER || peer == i) && app->net_service.access.peers[i].state == NetAccessPeerState::authorized)
+        {
+            net_access_send(&app->net_service.access, i, NetChannel::control, app->net_games.reply.data(), size);
+        }
+    }
+}
+
+// Tells every device when what runs changed, however it changed (LOAD GAME,
+// the network, CLOSE GAME, a core that quit). Compared every loop, copied
+// only on a change.
+static void net_follow_game_state(App* app)
+{
+    bool running = game_running(app);
+    const char* core = running ? app->marker_core_path.c_str() : "";
+    const char* content = running ? app->marker_content_path.c_str() : "";
+    if (app->net_sent_core == core && app->net_sent_content == content)
+    {
+        return;
+    }
+    app->net_sent_core = core;
+    app->net_sent_content = content;
+    net_send_game_state(app, NET_NO_PEER);
+}
+
+static NetRemoteGame net_remote_game(const App* app)
+{
+    NetRemoteGame game;
+    game.running = game_running(app);
+    game.slot = app->session.state_slot;
+    game.paused = app->net_paused;
+    return game;
+}
+
+static NetAccessLevel net_peer_access(const App* app, uint32_t peer)
+{
+    int32_t device = app->net_service.access.peers[peer].device;
+    if (device < 0 || static_cast<size_t>(device) >= app->net_service.access.trust.devices.size())
+    {
+        return NetAccessLevel::gamepad;
+    }
+    return app->net_service.access.trust.devices[static_cast<size_t>(device)].access;
+}
+
+// The actions one authorized peer may trigger (`id` 0: sent unasked), or
+// to all of them (NET_NO_PEER), each with its own level.
+static void net_send_actions(App* app, uint32_t peer, uint32_t id)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    NetRemoteGame game = net_remote_game(app);
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if ((peer == NET_NO_PEER || peer == i) && app->net_service.access.peers[i].state == NetAccessPeerState::authorized)
+        {
+            app->net_actions_level[i] = net_peer_access(app, i);
+            size_t size = net_remote_write_actions(&app->net_remote, id, app->net_peer_language[i],
+                                                   app->paths.root.c_str(), app->net_actions_level[i], &game);
+            net_access_send(&app->net_service.access, i, NetChannel::control, app->net_remote.reply.data(), size);
+        }
+    }
+}
+
+// The ports the core has, as the quick menu's CONTROLS shows them: as many
+// as SETTINGS > INPUT > PORTS says, no more than the core describes. 0 when
+// no game runs.
+static uint32_t net_core_ports(const App* app)
+{
+    const LibretroHost* host = app->session.host;
+    if (!game_running(app) || host == nullptr)
+    {
+        return 0;
+    }
+    int32_t wanted = settings_get_int(&app->settings, PICCOLO_INPUT_PORTS);
+    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
+                                                                                     : INPUT_PORT_COUNT;
+    if (host->input_info.port_count > 0 && host->input_info.port_count < ports)
+    {
+        ports = host->input_info.port_count;
+    }
+    return ports;
+}
+
+// The port a peer's pad plays on, or -1.
+static int32_t net_pad_port(const App* app, uint32_t peer, uint32_t pad)
+{
+    const InputNetPad* entry = &app->input_net.pads[peer][pad];
+    if (!entry->active)
+    {
+        return -1;
+    }
+    int32_t controller = input_first_controller(&app->input, entry->device);
+    return controller < 0 ? -1 : input_controller_port(&app->input, static_cast<uint32_t>(controller));
+}
+
+// What the core expects on each port, and where this peer's pads play.
+static void net_controllers_for(const App* app, uint32_t peer, NetControllers* controllers)
+{
+    for (uint32_t pad = 0; pad < NET_CONTROLLERS_PADS; pad++)
+    {
+        controllers->pad_ports[pad] = static_cast<int8_t>(net_pad_port(app, peer, pad));
+    }
+    controllers->ports.clear();
+    uint32_t ports = net_core_ports(app);
+    const LibretroHost* host = app->session.host;
+    for (uint32_t p = 0; p < ports; p++)
+    {
+        NetPort port;
+        port.device = host->port_devices[p];
+        const LibretroInputInfo* info = &host->input_info;
+        if (p < info->port_count)
+        {
+            for (uint32_t t = 0; t < info->ports[p].count; t++)
+            {
+                NetPortDevice device;
+                device.id = info->ports[p].types[t].id;
+                device.name = info->ports[p].types[t].description;
+                port.devices.push_back(device);
+            }
+        }
+        for (uint32_t d = 0; d < info->descriptor_count; d++)
+        {
+            const LibretroInputDescriptor* in = &info->descriptors[d];
+            if (in->port != p)
+            {
+                continue;
+            }
+            NetPortDescriptor descriptor;
+            descriptor.device = static_cast<uint8_t>(in->device);
+            descriptor.index = static_cast<uint8_t>(in->index);
+            descriptor.id = static_cast<uint8_t>(in->id);
+            descriptor.name = in->description;
+            port.descriptors.push_back(descriptor);
+        }
+        controllers->ports.push_back(port);
+    }
+}
+
+// A summary of what net_controllers_for would say, compared every loop
+// (no allocation) to know when to send it again.
+static uint64_t net_controllers_summary(const App* app, uint32_t peer)
+{
+    uint64_t summary = 1469598103934665603ull;   // FNV-1a over the numbers
+    uint32_t values[16] = {};
+    uint32_t count = 0;
+    for (uint32_t pad = 0; pad < NET_CONTROLLERS_PADS; pad++)
+    {
+        values[count++] = static_cast<uint32_t>(net_pad_port(app, peer, pad) + 1);
+    }
+    uint32_t ports = net_core_ports(app);
+    values[count++] = ports;
+    if (ports > 0)
+    {
+        values[count++] = app->session.host->input_info.controller_serial;
+        values[count++] = app->session.host->input_info.descriptor_serial;
+        for (uint32_t p = 0; p < ports && count < 16; p++)
+        {
+            values[count++] = app->session.host->port_devices[p];
+        }
+    }
+    for (uint32_t i = 0; i < count; i++)
+    {
+        summary = (summary ^ values[i]) * 1099511628211ull;
+    }
+    return summary;
+}
+
+static void net_send_controllers(App* app, uint32_t peer, uint32_t id)
+{
+    NetControllers controllers;
+    net_controllers_for(app, peer, &controllers);
+    size_t size = net_settings_write_controllers(app->net_remote.reply.data(), app->net_remote.reply.size(), id,
+                                                 &controllers);
+    net_access_send(&app->net_service.access, peer, NetChannel::control, app->net_remote.reply.data(), size);
+    app->net_controllers_sent[peer] = net_controllers_summary(app, peer);
+}
+
+// port_device: the device on the port this peer's pad plays on, as the
+// quick menu's CONTROLS changes it (the core is told; kept for the core).
+static void net_change_port_device(App* app, uint32_t peer, uint8_t pad, uint32_t device_id, const char* device)
+{
+    int32_t port = net_pad_port(app, peer, pad);
+    const LibretroHost* host = app->session.host;
+    if (port < 0 || static_cast<uint32_t>(port) >= net_core_ports(app) ||
+        static_cast<uint32_t>(port) >= host->input_info.port_count)
+    {
+        return;   // not on a port, or the core offers nothing to choose there
+    }
+    const LibretroPortControllers* types = &host->input_info.ports[port];
+    bool offered = false;
+    for (uint32_t t = 0; t < types->count && !offered; t++)
+    {
+        offered = types->types[t].id == device_id;
+    }
+    if (!offered)
+    {
+        return;
+    }
+    libretro_host_set_port_device(app->session.host, static_cast<unsigned>(port), device_id);
+    settings_set_int(&app->settings, SettingLayer::core, PICCOLO_INPUT_PORT_DEVICES[port],
+                     static_cast<int32_t>(device_id));
+    if (!app->settings_window.open)
+    {
+        save_settings(app);
+    }
+    SDL_Log("Network: %s set port %d to device %u", device, port + 1, device_id);
+}
+
+// Who plays on piccolo's ports now (devices): only controllers that joined
+// a port and whose device is connected. `peer` is the device asking (its own
+// pads are marked).
+static void net_devices_for(const App* app, uint32_t peer, std::vector<NetDevice>* devices)
+{
+    devices->clear();
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        uint32_t controller = static_cast<uint32_t>(c);
+        uint8_t ports = 0;
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            if (input_port_has(&app->input, p, controller))
+            {
+                ports = static_cast<uint8_t>(ports | (1u << p));
+            }
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (ports == 0 || device == nullptr || !device->connected)
+        {
+            continue;
+        }
+        NetDevice entry;
+        entry.controller = controller;
+        entry.device = device->id;
+        entry.ports = ports;
+        entry.name = input_controller_label(&app->input, controller);
+        entry.kind = device->kind == InputDeviceKind::keyboard ? NetDeviceKind::keyboard
+                     : device->kind == InputDeviceKind::mouse  ? NetDeviceKind::mouse
+                                                                : NetDeviceKind::gamepad;
+        // A paired device's pad: whose, and which of its pads.
+        for (uint32_t owner = 0; owner < NET_MAX_PEERS; owner++)
+        {
+            for (uint32_t pad = 0; pad < NET_INPUT_MAX_PADS; pad++)
+            {
+                const InputNetPad* net_pad = &app->input_net.pads[owner][pad];
+                if (net_pad->active && net_pad->device == device->id)
+                {
+                    entry.kind = NetDeviceKind::network;
+                    entry.owner = owner == peer ? NetDeviceOwner::yours : NetDeviceOwner::other;
+                    entry.pad = static_cast<uint8_t>(pad);
+                }
+            }
+        }
+        devices->push_back(entry);
+    }
+}
+
+// A summary of net_devices_for, compared every loop (no allocation).
+static uint64_t net_devices_summary(const App* app, uint32_t peer)
+{
+    uint64_t summary = 1469598103934665603ull;
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        uint32_t controller = static_cast<uint32_t>(c);
+        uint32_t ports = 0;
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            ports |= input_port_has(&app->input, p, controller) ? (1u << p) : 0u;
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (ports == 0 || device == nullptr || !device->connected)
+        {
+            continue;
+        }
+        uint32_t values[3] = {controller, device->id, ports};
+        for (uint32_t i = 0; i < 3; i++)
+        {
+            summary = (summary ^ values[i]) * 1099511628211ull;
+        }
+    }
+    return (summary ^ peer) * 1099511628211ull;
+}
+
+static void net_send_devices(App* app, uint32_t peer, uint32_t id)
+{
+    std::vector<NetDevice> devices;
+    net_devices_for(app, peer, &devices);
+    size_t size = net_settings_write_devices(app->net_remote.reply.data(), app->net_remote.reply.size(), id, &devices);
+    net_access_send(&app->net_service.access, peer, NetChannel::control, app->net_remote.reply.data(), size);
+    app->net_devices_sent[peer] = net_devices_summary(app, peer);
+}
+
+// device_port: that controller on that port only (-1: on none), as the quick
+// menu's CONTROLS does it. Nothing is saved (START joins again next time).
+// A stale controller / device pair (the list changed meanwhile) is ignored:
+// the summary check sends the device a fresh `devices`.
+static void net_move_device(App* app, uint32_t controller, uint32_t device_id, int8_t port, const char* device)
+{
+    if (controller >= app->input.controllers.size() || app->input.controllers[controller].device_id != device_id ||
+        port >= static_cast<int8_t>(INPUT_PORT_COUNT) || port < -1)
+    {
+        return;
+    }
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    {
+        input_port_remove(&app->input, p, controller);
+    }
+    if (port >= 0)
+    {
+        input_port_add(&app->input, static_cast<uint32_t>(port), controller);
+    }
+    SDL_Log("Network: %s moved %s to port %d", device, input_controller_label(&app->input, controller).c_str(), port + 1);
+}
+
+// Every loop: settings that changed (from anywhere) go to the FULL devices,
+// and the action lists again when what they show changed.
+static void net_follow_remote(App* app)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    size_t size = net_remote_next_change(&app->net_remote, &app->settings);
+    while (size > 0)
+    {
+        for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+        {
+            if (app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
+                net_peer_access(app, i) == NetAccessLevel::full)
+            {
+                net_access_send(&app->net_service.access, i, NetChannel::control, app->net_remote.reply.data(), size);
+            }
+        }
+        size = net_remote_next_change(&app->net_remote, &app->settings);
+    }
+    // A PAUSE from a device ends with another game (or none).
+    if (app->net_paused && game_running(app) != app->net_actions_sent.running)
+    {
+        app->net_paused = false;
+    }
+    // A device whose access changed (NETWORK): its new welcome went out with
+    // net_access_set_level; its action list follows at once, and a speed test
+    // its new level doesn't cover stops. (Nothing else it holds needs more
+    // than GAMEPAD: pause, fast forward, its pads.)
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
+            net_peer_access(app, i) == app->net_actions_level[i])
+        {
+            continue;
+        }
+        net_send_actions(app, i, 0);
+        NetAccessLevel level = net_peer_access(app, i);
+        if (!net_access_allows(level, NetAccessLevel::stream))
+        {
+            if (app->net_speed_sender.active && app->net_speed_sender.peer == i)
+            {
+                app->net_speed_sender.active = false;
+                app->net_speed_reporting = false;
+            }
+            if (app->net_speed_receiver.active && app->net_speed_receiver.peer == i)
+            {
+                app->net_speed_receiver.active = false;
+            }
+            net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
+            app->stream_tuning_set[i] = false;
+        }
+    }
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_devices_wanted[i] && app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
+            net_peer_access(app, i) == NetAccessLevel::full && net_devices_summary(app, i) != app->net_devices_sent[i])
+        {
+            net_send_devices(app, i, 0);   // someone joined, left or moved
+        }
+    }
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_service.access.peers[i].state == NetAccessPeerState::authorized &&
+            net_controllers_summary(app, i) != app->net_controllers_sent[i])
+        {
+            net_send_controllers(app, i, 0);   // a pad joined or left a port, another game, another device
+        }
+    }
+    NetRemoteGame game = net_remote_game(app);
+    if (game.running != app->net_actions_sent.running || game.slot != app->net_actions_sent.slot ||
+        game.paused != app->net_actions_sent.paused)
+    {
+        app->net_actions_sent = game;
+        net_send_actions(app, NET_NO_PEER, 0);
+    }
+}
+
+// An action from a device, with the same effect as its hotkey or quick
+// menu item.
+static void net_do_action(App* app, uint32_t peer, const std::string* key, bool pressed, const char* device)
+{
+    NetRemoteGame game = net_remote_game(app);
+    if (!net_remote_action_allowed(key->c_str(), net_peer_access(app, peer), &game))
+    {
+        return;
+    }
+    if (*key == "fast_forward")
+    {
+        app->net_fast_forward[peer] = pressed;   // held until released (or the device leaves)
+        return;
+    }
+    if (!pressed)
+    {
+        return;   // the others act on the press
+    }
+    if (*key == "save_state")
+    {
+        handle_menu_action(app, MenuAction::save_state);
+    }
+    else if (*key == "load_state")
+    {
+        handle_menu_action(app, MenuAction::load_state);
+    }
+    else if (*key == "slot_next" || *key == "slot_previous")
+    {
+        uint32_t slot = app->session.state_slot;
+        if (*key == "slot_next")
+        {
+            slot = slot >= LIBRETRO_STATE_SLOT_LAST ? LIBRETRO_STATE_SLOT_FIRST : slot + 1;
+        }
+        else
+        {
+            slot = slot <= LIBRETRO_STATE_SLOT_FIRST ? LIBRETRO_STATE_SLOT_LAST : slot - 1;
+        }
+        app->session.state_slot = slot;
+        app->quick_menu.slot = slot;
+        char status[64];
+        std::snprintf(status, sizeof(status), "%s %u", piccolo_text(&app->strings, Str::quick_menu_slot), slot);
+        set_status(app, status);
+    }
+    else if (*key == "pause")
+    {
+        app->net_paused = !app->net_paused;
+        app->net_paused_by = peer;
+        char status[256];
+        if (app->net_paused)
+        {
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_paused_remotely),
+                          device);
+        }
+        else
+        {
+            std::snprintf(status, sizeof(status), "%s", piccolo_text(&app->strings, Str::status_resumed));
+        }
+        set_status(app, status);
+    }
+    else if (*key == "reset")
+    {
+        handle_menu_action(app, MenuAction::reset);
+    }
+    else if (*key == "close_game")
+    {
+        app->pending_close_game = true;   // at the top of the next loop, like the quick menu's
+    }
+}
+
+// Settings and actions messages from a device (net_remote.h).
+static void net_remote_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    if (!app->net_remote_ready)
+    {
+        return;
+    }
+    size_t size = net_remote_answer_settings(&app->net_remote, &app->settings, app->paths.root.c_str(),
+                                             &app->audio_devices, event->data, event->size);
+    if (size > 0)
+    {
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        uint32_t request_id = 0;
+        uint32_t start = 0;
+        std::string language;
+        if (event->peer < NET_MAX_PEERS &&
+            net_settings_read_request(event->data, event->size, &request_id, &start, &language))
+        {
+            std::snprintf(app->net_peer_language[event->peer], sizeof(app->net_peer_language[event->peer]), "%s",
+                          language.c_str());
+        }
+        bool changed = event->data[0] == static_cast<uint8_t>(NetSettingsMessage::setting_set);
+        if (changed && !app->settings_window.open)
+        {
+            save_settings(app);   // nobody will close SETTINGS to save it
+        }
+        return;
+    }
+    uint32_t id = 0;
+    std::string language;
+    if (net_settings_read_actions_request(event->data, event->size, &id, &language))
+    {
+        if (event->peer < NET_MAX_PEERS)
+        {
+            std::snprintf(app->net_peer_language[event->peer], sizeof(app->net_peer_language[event->peer]), "%s",
+                          language.c_str());
+        }
+        NetRemoteGame game = net_remote_game(app);
+        size = net_remote_write_actions(&app->net_remote, id, language.c_str(), app->paths.root.c_str(),
+                                        net_peer_access(app, event->peer), &game);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_remote.reply.data(), size);
+        return;
+    }
+    std::string key;
+    bool pressed = false;
+    if (net_settings_read_action(event->data, event->size, &key, &pressed))
+    {
+        net_do_action(app, event->peer, &key, pressed, device);
+        return;
+    }
+    if (event->peer >= NET_MAX_PEERS)
+    {
+        return;
+    }
+    if (net_settings_read_controllers_request(event->data, event->size, &id))
+    {
+        net_send_controllers(app, event->peer, id);
+        return;
+    }
+    uint8_t pad = 0;
+    uint32_t device_id = 0;
+    if (net_settings_read_port_device(event->data, event->size, &pad, &device_id))
+    {
+        net_change_port_device(app, event->peer, pad, device_id, device);
+        return;
+    }
+    // devices / device_port: FULL (net_access let them through only then).
+    if (net_settings_read_devices_request(event->data, event->size, &id))
+    {
+        app->net_devices_wanted[event->peer] = true;
+        net_send_devices(app, event->peer, id);
+        return;
+    }
+    uint32_t controller = 0;
+    int8_t port = 0;
+    if (net_settings_read_device_port(event->data, event->size, &controller, &device_id, &port))
+    {
+        net_move_device(app, controller, device_id, port, device);
+    }
+}
+
+// A speed test request (net_speed.h; net_access let it through only for
+// STREAM devices). One at a time: a request during another is ignored.
+static void net_speed_request(App* app, const NetAccessEvent* event)
+{
+    uint32_t id = 0;
+    NetSpeedDirection direction = NetSpeedDirection::down;
+    uint32_t rate = 0;
+    uint32_t duration = 0;
+    if (!net_speed_read_request(event->data, event->size, &id, &direction, &rate, &duration) ||
+        app->net_speed_sender.active || app->net_speed_reporting || app->net_speed_receiver.active)
+    {
+        return;
+    }
+    double now = net_seconds();
+    if (direction == NetSpeedDirection::down)
+    {
+        net_speed_sender_start(&app->net_speed_sender, id, event->peer, rate, duration, now);
+    }
+    else
+    {
+        net_speed_receiver_start(&app->net_speed_receiver, id, event->peer,
+                                 now + static_cast<double>(duration) / 1000.0 + NET_SPEED_GRACE_SECONDS);
+    }
+}
+
+// speed_result: one step of a device's speed test, as it measured it.
+static void net_speed_result(App* app, const NetAccessEvent* event)
+{
+    NetSpeedResult result;
+    if (event->device < 0 || static_cast<size_t>(event->device) >= app->net_service.access.trust.devices.size() ||
+        !net_speed_read_result(event->data, event->size, &result))
+    {
+        return;
+    }
+    const uint8_t* key = app->net_service.access.trust.devices[static_cast<size_t>(event->device)].key;
+    NetSpeedSummary* summary = nullptr;
+    for (size_t i = 0; i < app->net_speed_results.size() && summary == nullptr; i++)
+    {
+        if (std::memcmp(app->net_speed_results[i].key, key, NET_KEY_SIZE) == 0)
+        {
+            summary = &app->net_speed_results[i];
+        }
+    }
+    if (summary == nullptr)
+    {
+        NetSpeedSummary entry;
+        std::memcpy(entry.key, key, NET_KEY_SIZE);
+        app->net_speed_results.push_back(entry);
+        summary = &app->net_speed_results.back();
+    }
+    bool down = result.direction == NetSpeedDirection::down;
+    uint32_t* best = down ? &summary->down_kbps : &summary->up_kbps;
+    uint32_t* last_asked = down ? &summary->down_last_asked : &summary->up_last_asked;
+    bool* tested = down ? &summary->down_tested : &summary->up_tested;
+    if (result.asked_kbps <= *last_asked)
+    {
+        *best = 0;   // a new test (its first, lowest step)
+    }
+    *last_asked = result.asked_kbps;
+    *tested = true;
+    if (result.loss_per_mille <= NET_WINDOW_SPEED_MAX_LOSS && result.got_kbps > *best)
+    {
+        *best = result.got_kbps;
+    }
+}
+
+// Every loop: the down test's packets that are due, and the reports.
+static void net_speed_update(App* app)
+{
+    double now = net_seconds();
+    NetSpeedSender* sender = &app->net_speed_sender;
+    if (sender->active)
+    {
+        uint8_t packet[NET_SPEED_PACKET_SIZE];
+        uint32_t due = net_speed_sender_due(sender, now);
+        for (uint32_t i = 0; i < due; i++)
+        {
+            size_t size = net_speed_write_data(packet, sizeof(packet), sender->id, sender->sent);
+            net_access_send(&app->net_service.access, sender->peer, NetChannel::input, packet, size);
+            net_speed_sender_sent(sender, size);   // counted as sent even if ENet dropped it here: that's loss too
+        }
+        app->net_speed_reporting = !sender->active;
+    }
+    uint8_t out[64];
+    if (app->net_speed_reporting)
+    {
+        NetSpeedReport report;
+        report.id = sender->id;
+        report.direction = NetSpeedDirection::down;
+        report.packets = sender->sent;
+        report.bytes = sender->sent_bytes;
+        report.seconds = sender->duration;
+        size_t size = net_speed_write_report(out, sizeof(out), &report);
+        net_access_send(&app->net_service.access, sender->peer, NetChannel::control, out, size);
+        app->net_speed_reporting = false;
+    }
+    NetSpeedReceiver* receiver = &app->net_speed_receiver;
+    if (receiver->active && now >= receiver->until)
+    {
+        NetSpeedReport report;
+        net_speed_receiver_report(receiver, NetSpeedDirection::up, &report);
+        size_t size = net_speed_write_report(out, sizeof(out), &report);
+        net_access_send(&app->net_service.access, receiver->peer, NetChannel::control, out, size);
+        receiver->active = false;
+    }
+}
+
+// Which streaming device's stream_tuning applies (the newest request of the
+// ones still streaming), and what it gives: told to the devices that asked,
+// again whenever it changes (AUTO coming down).
+static void net_follow_stream_tuning(App* app)
+{
+    int32_t from = -1;
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        if (app->stream_tuning_set[peer] && app->net_service.stream.flags[peer] != 0 &&
+            (from < 0 || app->stream_tuning_order[peer] > app->stream_tuning_order[from]))
+        {
+            from = static_cast<int32_t>(peer);
+        }
+    }
+    bool changed = from != app->stream_tuning_from ||
+                   (from >= 0 && (app->stream_tuning_asked[from].delay != app->stream_tuning.delay ||
+                                  app->stream_tuning_asked[from].delay_ms != app->stream_tuning.delay_ms));
+    if (changed)
+    {
+        app->stream_auto_delay = AutoFrameDelay{};   // a new request searches from the top
+        app->stream_delay_last_ns = 0;
+    }
+    app->stream_tuning_from = from;
+    app->stream_tuning_on = from >= 0;
+    if (from >= 0)
+    {
+        app->stream_tuning = app->stream_tuning_asked[from];
+    }
+    // What applies, as each asking device should hear it.
+    NetStreamTuning result;
+    result.delay = app->stream_tuning_on ? app->stream_tuning.delay : NetStreamDelay::host;
+    result.delay_ms = static_cast<uint8_t>(app->frame_delay_ms < 255 ? app->frame_delay_ms : 255);
+    // What the running core really does (only cores with their own, for now).
+    result.run_ahead = app->session.host != nullptr && game_running(app)
+                           ? static_cast<uint8_t>(libretro_host_run_ahead_applied(app->session.host))
+                           : 0;
+    result.flags = app->shell.renderer.wait_for_present ? NET_STREAM_TUNING_WAITS_FOR_PRESENT : 0;
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        if (!app->stream_tuning_set[peer])
+        {
+            continue;
+        }
+        const NetStreamTuning* sent = &app->stream_tuning_sent[peer];
+        if (app->stream_tuning_told[peer] && sent->delay == result.delay && sent->delay_ms == result.delay_ms &&
+            sent->run_ahead == result.run_ahead && sent->flags == result.flags)
+        {
+            continue;
+        }
+        uint8_t out[8];
+        size_t size = net_stream_write_tuning(out, sizeof(out), NET_STREAM_TUNING_RESULT, &result);
+        net_access_send(&app->net_service.access, peer, NetChannel::control, out, size);
+        app->stream_tuning_sent[peer] = result;
+        app->stream_tuning_told[peer] = true;
+    }
+}
+
+// stream_start / stream_stop / keyframe_request (net_stream.h; net_access let
+// them through only for STREAM devices).
+static void net_stream_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    if (event->size == 0)
+    {
+        return;
+    }
+    uint8_t type = event->data[0];
+    uint8_t flags = 0;
+    if (net_stream_read_start(event->data, event->size, &flags))
+    {
+        net_service_set_stream(&app->net_service, event->peer, flags);
+        SDL_Log("Network: %s started remote play%s%s", device, (flags & NET_STREAM_WANT_VIDEO) != 0 ? " (video)" : "",
+                (flags & NET_STREAM_WANT_AUDIO) != 0 ? " (audio)" : "");
+    }
+    else if (type == NET_STREAM_STOP && event->size == 1)
+    {
+        net_service_set_stream(&app->net_service, event->peer, 0);
+        if (event->peer < NET_MAX_PEERS)
+        {
+            app->stream_tuning_set[event->peer] = false;
+        }
+        SDL_Log("Network: %s stopped remote play", device);
+    }
+    else if (type == NET_STREAM_KEYFRAME_REQUEST && event->size == 1)
+    {
+        net_service_request_keyframe(&app->net_service, event->peer);
+    }
+    else if (event->peer < NET_MAX_PEERS &&
+             net_stream_read_tuning(event->data, event->size, NET_STREAM_TUNING, &app->stream_tuning_asked[event->peer]))
+    {
+        app->stream_tuning_set[event->peer] = true;
+        app->stream_tuning_order[event->peer] = ++app->stream_tuning_count;
+        app->stream_tuning_told[event->peer] = false;   // answered with what applies, below
+        SDL_Log("Network: %s asks for frame delay mode %u (%u ms), run-ahead %u", device,
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].delay),
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].delay_ms),
+                static_cast<unsigned>(app->stream_tuning_asked[event->peer].run_ahead));
+    }
+}
+
+// After the frames of this loop ran: the frame shown and the audio heard go
+// to the network thread (it codes and sends; this loop never waits for it).
+// With run-ahead (later) this stays the shown frame and the real timeline's
+// audio, numbered by this loop.
+static void net_stream_frame(App* app)
+{
+    if (!app->net_streaming || !game_running(app))
+    {
+        app->session.captured_audio.clear();
+        return;
+    }
+    app->stream_loop++;
+    const LibretroHost* host = app->session.host;
+    if (!app->session.captured_audio.empty())
+    {
+        net_service_submit_audio(&app->net_service, app->session.captured_audio.data(),
+                                 app->session.captured_audio.size() / 2, app->stream_loop);
+        app->session.captured_audio.clear();
+    }
+    const LibretroVideoFrame* video = &host->video;
+    FramePixelFormat format = FramePixelFormat::xrgb8888;
+    if (video->format == RETRO_PIXEL_FORMAT_RGB565)
+    {
+        format = FramePixelFormat::rgb565;
+    }
+    else if (video->format == RETRO_PIXEL_FORMAT_0RGB1555)
+    {
+        format = FramePixelFormat::xrgb1555;
+    }
+    else if (video->format != RETRO_PIXEL_FORMAT_XRGB8888)
+    {
+        return;   // the HDR formats aren't streamed
+    }
+    if (video->pixels == nullptr || video->width == 0 || video->height == 0 || video->serial == app->stream_serial)
+    {
+        return;   // nothing new to show
+    }
+    app->stream_serial = video->serial;
+    NetStreamInfo info;
+    info.width = video->width;
+    info.height = video->height;
+    info.format = format;
+    info.aspect = static_cast<double>(host->av_info.geometry.aspect_ratio);
+    info.fps = host->av_info.timing.fps;
+    info.sample_rate = host->av_info.timing.sample_rate;
+    net_service_submit_frame(&app->net_service, video->pixels, video->width, video->height, format, app->stream_loop,
+                             &info);
+}
+
+// The load_result for the load_request waiting in pending_start.
+static void net_answer_load(App* app, NetContentStatus status)
+{
+    app->net_load_waiting = false;
+    if (!app->net_running)
+    {
+        return;
+    }
+    uint8_t reply[16];
+    size_t size = net_content_write_load_result(reply, sizeof(reply), app->net_load_id, status);
+    // Called from the main loop, outside net_update: the lock is ours to take.
+    net_service_lock(&app->net_service);
+    net_access_send(&app->net_service.access, app->net_load_peer, NetChannel::control, reply, size);
+    net_service_unlock(&app->net_service);
+}
+
+// A control message from a paired device (net_games.h). Folders and cores
+// are read when asked, never every frame.
+static void net_games_message(App* app, const NetAccessEvent* event, const char* device)
+{
+    uint8_t type = event->size > 0 ? event->data[0] : 0;
+    if (type < static_cast<uint8_t>(NetContentMessage::cores_request) ||
+        type > static_cast<uint8_t>(NetContentMessage::load_result))
+    {
+        return;   // not ours (yet)
+    }
+    std::vector<std::string> game_folders;
+    piccolo_settings_game_folders(&app->settings, &game_folders);
+    net_games_set_folders(&app->net_games, &game_folders);
+
+    size_t size = net_games_answer(&app->net_games, &app->catalog, event->data, event->size);
+    if (size > 0)
+    {
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, app->net_games.reply.data(), size);
+        return;
+    }
+    uint32_t id = 0;
+    NetContentStatus status = NetContentStatus::failed;
+    FilePickerChoice choice;
+    if (!net_games_load(&app->net_games, &app->catalog, event->data, event->size, &id, &status, &choice))
+    {
+        return;   // a result type, or a damaged request: nothing to answer
+    }
+    if (status != NetContentStatus::ok || app->has_pending_start || app->net_load_waiting)
+    {
+        if (status == NetContentStatus::ok)
+        {
+            status = NetContentStatus::failed;   // another start is already on its way
+        }
+        uint8_t reply[16];
+        size_t reply_size = net_content_write_load_result(reply, sizeof(reply), id, status);
+        net_access_send(&app->net_service.access, event->peer, NetChannel::control, reply, reply_size);
+        return;
+    }
+    SDL_Log("Network: %s starts %s %s", device, choice.core_path, choice.content_path);
+    app->pending_start = choice;   // started at the top of the next loop, like LOAD GAME's
+    app->has_pending_start = true;
+    app->picker.open = false;      // what was being picked here is overtaken
+    app->net_load_waiting = true;
+    app->net_load_peer = event->peer;
+    app->net_load_id = id;
+}
+
+// The listener, when SETTINGS has it on. Started at launch and restarted
+// when ALLOW CONNECTIONS or PORT change (net_update).
+static void net_start(App* app)
+{
+    // Any failure below is remembered with the port it was tried on, so it
+    // isn't retried every frame (net_update).
+    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    app->net_listen_failed = true;
+    if (app->paths.settings.empty())
+    {
+        return;   // nowhere to keep the device key: networking stays off
+    }
+    if (!app->net_ready)
+    {
+        app->net_ready = net_init();
+        if (!app->net_ready)
+        {
+            return;
+        }
+    }
+    if (!app->net_has_identity)
+    {
+        std::string identity_path = app->paths.settings + "/net_identity.cfg";
+        app->net_has_identity = net_identity_load_or_create(identity_path.c_str(), &app->net_identity);
+        if (!app->net_has_identity)
+        {
+            return;
+        }
+        net_key_fingerprint(app->net_identity.public_key, app->net_fingerprint, sizeof(app->net_fingerprint));
+        SDL_Log("Network: this device is %s", app->net_fingerprint);
+    }
+    app->net_service.access = NetAccess{};
+    net_games_init(&app->net_games);
+    if (!app->net_remote_ready)
+    {
+        app->net_remote_ready = net_remote_init(&app->net_remote, &app->settings);
+    }
+    std::string devices_path = app->paths.settings + "/net_devices.cfg";
+    if (!net_service_start(&app->net_service, app->net_port, settings_get_text(&app->settings, PICCOLO_NET_NAME),
+                           &app->net_identity, devices_path.c_str()))
+    {
+        return;
+    }
+    app->net_listen_failed = false;
+    app->net_running = true;
+}
+
+static void net_stop(App* app)
+{
+    if (app->net_running)
+    {
+        for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+        {
+            input_net_peer_gone(&app->input_net, &app->input, peer);   // their pads are unplugged
+        }
+        net_service_stop(&app->net_service);
+        app->net_running = false;
+    }
+}
+
+static void net_shutdown_all(App* app)
+{
+    net_stop(app);
+    net_keypair_wipe(&app->net_identity);
+    if (app->net_ready)
+    {
+        net_shutdown();
+        app->net_ready = false;
+    }
+}
+
+// Once per loop, before the input is read: follow the settings, then the
+// network's events. Paired devices are let in and their pads join the input
+// router (input_net); everyone else needs the pairing code.
+static void net_update_locked(App* app);
+
+static void net_update(App* app)
+{
+    bool enabled = settings_get_bool(&app->settings, PICCOLO_NET_ENABLED);
+    uint16_t port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    if (app->net_running && (!enabled || port != app->net_port))
+    {
+        net_stop(app);
+        app->net_listen_failed = false;
+    }
+    // After a failure (port in use) it's tried again only with another port.
+    if (enabled && !app->net_running && (!app->net_listen_failed || port != app->net_port))
+    {
+        net_start(app);
+    }
+    if (!enabled)
+    {
+        app->net_listen_failed = false;
+    }
+    if (!app->net_running)
+    {
+        return;
+    }
+    // The network thread polls; this loop handles what it queued, holding
+    // the lock for all of it (the NetAccess, its peers and lists).
+    net_service_lock(&app->net_service);
+    net_update_locked(app);
+    net_service_unlock(&app->net_service);
+}
+
+static void net_update_locked(App* app)
+{
+    // A new NAME is used at once (discovery and pairing show it).
+    const char* name = settings_get_text(&app->settings, PICCOLO_NET_NAME);
+    if (app->net_service.access.name != name)
+    {
+        app->net_service.access.name = name;
+        app->net_service.access.session.host.name = name;
+    }
+
+    NetAccessEvent event;
+    while (net_service_next(&app->net_service, &event))
+    {
+        char address[64];
+        net_address_to_text(event.address, address, sizeof(address));
+        const char* device = event.device >= 0 && static_cast<size_t>(event.device) < app->net_service.access.trust.devices.size()
+                                 ? app->net_service.access.trust.devices[static_cast<size_t>(event.device)].name.c_str()
+                                 : "?";
+        switch (event.type)
+        {
+        case NetAccessEventType::authorized:
+            SDL_Log("Network: \"%s\" connected from %s", device, address);
+            net_send_game_state(app, event.peer);   // what runs, from the start
+            net_send_actions(app, event.peer, 0);
+            net_send_controllers(app, event.peer, 0);
+            break;
+        case NetAccessEventType::paired:
+        {
+            char status[256];
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_paired), device);
+            set_status(app, status);
+            net_send_game_state(app, event.peer);
+            net_send_actions(app, event.peer, 0);
+            net_send_controllers(app, event.peer, 0);
+            break;
+        }
+        case NetAccessEventType::closed:
+            if (event.peer < NET_MAX_PEERS && app->net_speed_sender.peer == event.peer)
+            {
+                app->net_speed_sender.active = false;   // its test ends with it
+                app->net_speed_reporting = false;
+            }
+            if (event.peer < NET_MAX_PEERS && app->net_speed_receiver.peer == event.peer)
+            {
+                app->net_speed_receiver.active = false;
+            }
+            net_service_set_stream(&app->net_service, event.peer, 0);   // its stream ends with it
+            if (event.peer < NET_MAX_PEERS)
+            {
+                app->stream_tuning_set[event.peer] = false;   // and what it asked for
+            }
+            if (event.peer < NET_MAX_PEERS)
+            {
+                app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
+                app->net_peer_language[event.peer][0] = '\0';
+                app->net_devices_wanted[event.peer] = false;
+                if (app->net_paused && app->net_paused_by == event.peer)
+                {
+                    app->net_paused = false;   // nobody here could resume it
+                    set_status(app, piccolo_text(&app->strings, Str::status_resumed));
+                }
+            }
+            if (app->net_load_waiting && app->net_load_peer == event.peer)
+            {
+                app->net_load_waiting = false;   // the game still starts; nobody to tell
+            }
+            SDL_Log("Network: \"%s\" disconnected", device);
+            input_net_peer_gone(&app->input_net, &app->input, event.peer);
+            break;
+        case NetAccessEventType::pairing_failed:
+            set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_failed));
+            break;
+        case NetAccessEventType::pairing_closed:
+            set_status(app, piccolo_text(&app->strings, Str::status_net_pairing_closed));
+            break;
+        case NetAccessEventType::unpaired:
+        {
+            // The device forgot this piccolo, so it's gone from PAIRED DEVICES too.
+            char status[256];
+            std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_net_unpaired),
+                          event.name);
+            set_status(app, status);
+            SDL_Log("Network: \"%s\" unpaired itself", event.name);
+            break;
+        }
+        case NetAccessEventType::message:
+            if (event.channel == NetChannel::input && event.size > 0 && event.data[0] == NET_INPUT_TYPE_SPEED)
+            {
+                // A speed test's packet (up): counted for STREAM devices only.
+                if (net_access_allows(event.access, NetAccessLevel::stream) &&
+                    event.peer == app->net_speed_receiver.peer)
+                {
+                    net_speed_receive(&app->net_speed_receiver, event.data, event.size, net_seconds());
+                }
+            }
+            else if (event.channel == NetChannel::input && event.device >= 0)
+            {
+                const NetTrustedDevice* paired = &app->net_service.access.trust.devices[static_cast<size_t>(event.device)];
+                input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
+                                  event.data, event.size);
+            }
+            else if (event.channel == NetChannel::control)
+            {
+                if (event.size > 0 && event.data[0] == NET_SPEED_REQUEST)
+                {
+                    net_speed_request(app, &event);
+                }
+                if (event.size > 0 && event.data[0] == NET_SPEED_RESULT)
+                {
+                    net_speed_result(app, &event);
+                }
+                net_stream_message(app, &event, device);
+                net_games_message(app, &event, device);   // net_access let through only what its level covers
+                net_remote_message(app, &event, device);
+            }
+            break;
+        case NetAccessEventType::none:
+            break;
+        }
+    }
+    net_follow_game_state(app);
+    net_follow_remote(app);
+    net_speed_update(app);
+    // Remote play: frames and audio are handed over only while someone streams.
+    app->net_streaming = net_service_streaming(&app->net_service);
+    if (app->net_streaming && !app->session.capture_audio)
+    {
+        app->session.captured_audio.reserve(16384);   // once: a few frames' worth
+    }
+    app->session.capture_audio = app->net_streaming;
+    net_follow_stream_tuning(app);
+}
+
 int main(int argc, char** argv)
 {
     (void)argc;
@@ -1846,7 +3317,7 @@ int main(int argc, char** argv)
 
     AppShellConfig config = {};
     config.name       = "piccolo";
-    config.identifier = "org.multitap.piccolo";
+    config.identifier = "site.multitap.piccolo";
     config.icons      = app_icon_images;
     config.icon_count = app_icon_image_count;
 
@@ -1884,8 +3355,9 @@ int main(int argc, char** argv)
     // Everything in piccolo's folder, migrated once from ~/.host-libretro.
     // Without it nothing is saved, but games still run.
     ImGuiIO& io = ImGui::GetIO();
-    if (app_paths_init(&app->paths, "piccolo", "piccolo.cfg"))
+    if (app_paths_init(&app->paths, bundled_files_folder_name(), "piccolo.cfg"))
     {
+        bundled_files_install_cores(app->paths.cores.c_str());   // before the catalog first looks
         app->imgui_ini = app->paths.settings + "/imgui.ini";
         io.IniFilename = app->imgui_ini.c_str();
         app->settings_path = app->paths.settings + "/piccolo.cfg";
@@ -1953,8 +3425,9 @@ int main(int argc, char** argv)
     std::string database_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamecontrollerdb.txt";
     // Controller layouts: the ones next to the program, then piccolo's folder's
     // (the same id there wins), and GENERIC built in if neither has it.
-    const char* program_folder = SDL_GetBasePath();
-    std::string bundled_layouts = std::string(program_folder != nullptr ? program_folder : "") + "layouts";
+    // (next to the program; on Android a copy out of the APK: bundled_files.h)
+    std::string program_folder = bundled_files_data_folder();
+    std::string bundled_layouts = program_folder + "layouts";
     host_fs_forward_slashes(bundled_layouts.data());
     input_layouts_load_directory(&app->layouts, bundled_layouts.c_str());
     if (!app->paths.root.empty())
@@ -1964,7 +3437,7 @@ int main(int argc, char** argv)
     input_layouts_ensure_generic(&app->layouts);
     // Interface themes from files: the ones next to the program, then piccolo's
     // folder's (the same name there wins). The built-in ones are in retro_ui.cpp.
-    std::string bundled_themes = std::string(program_folder != nullptr ? program_folder : "") + "themes";
+    std::string bundled_themes = program_folder + "themes";
     host_fs_forward_slashes(bundled_themes.data());
     piccolo_themes_load_directory(&app->themes, bundled_themes.c_str());
     if (!app->paths.root.empty())
@@ -1994,6 +3467,7 @@ int main(int argc, char** argv)
     while (app->running)
     {
         app_handle_events(app);
+        net_update(app);
         if (app->pending_close_game)
         {
             app->pending_close_game = false;
@@ -2007,7 +3481,13 @@ int main(int argc, char** argv)
         if (app->has_pending_start)
         {
             app->has_pending_start = false;
-            start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
+            bool started = start_game(app, &app->pending_start);   // outside any frame: nothing drawn with the old texture yet
+            // SAFE START asking: answered once it's decided (below, or the
+            // start that follows its answer).
+            if (app->net_load_waiting && !app->safe_start_open)
+            {
+                net_answer_load(app, started ? NetContentStatus::ok : NetContentStatus::failed);
+            }
         }
         update_pause(app);
         app->session.timing.mode = piccolo_settings_timing(&app->settings);
@@ -2024,7 +3504,24 @@ int main(int argc, char** argv)
                                  static_cast<float>(back & 0xFFu) / 255.0f, 1.0f};
         renderer_set_frames_in_flight(&app->shell.renderer, &app->shell.vulkan,
                                       piccolo_settings_frames_in_flight(&app->settings));
-        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT);
+        // RUN-AHEAD: the setting, or a streaming device's tuning (in memory
+        // only) when it isn't "host's".
+        {
+            int32_t run_ahead = settings_get_int(&app->settings, PICCOLO_LATENCY_RUN_AHEAD);
+            if (stream_delay_overrides(app))
+            {
+                run_ahead = app->stream_tuning.run_ahead;
+            }
+            if (app->session.host != nullptr)
+            {
+                libretro_host_set_run_ahead(app->session.host, static_cast<unsigned>(run_ahead > 0 ? run_ahead : 0));
+            }
+        }
+        // A streaming device's frame delay needs present waits (piccolo's
+        // frame delay works only that way): turned on here, in memory only.
+        app->shell.renderer.wait_for_present = settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
+                                               (stream_delay_overrides(app) &&
+                                                app->stream_tuning.delay != NetStreamDelay::off);
         piccolo_settings_audio(&app->settings, &app->session.audio_config);
         apply_learned_latency(app);
         // Held for the whole game, paused or not: a request is a D-Bus call
@@ -2042,6 +3539,10 @@ int main(int argc, char** argv)
         }
         app_update_input(app);
         CoreSessionFrame ran = core_session_run_frame(&app->session, &app->shell, &app->cursor_input, game_has_keyboard(app));
+        if (ran == CoreSessionFrame::ran)
+        {
+            net_stream_frame(app);
+        }
         if (ran != CoreSessionFrame::skipped || !game_running(app))
         {
             input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
@@ -2056,7 +3557,7 @@ int main(int argc, char** argv)
 
         if (app_shell_begin_frame(&app->shell))
         {
-            app->ui_scale = retro_ui_scale_for_width(ImGui::GetIO().DisplaySize.x);
+            app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
             draw_game(app);   // background, behind everything
             bool menu_shown = app->menu_visible || !game_running(app);
@@ -2084,12 +3585,22 @@ int main(int argc, char** argv)
                 handle_menu_action(app, action);
             }
 
-            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
-                                 &app->pending_start))
-            {
-                app->has_pending_start = true;   // see pending_start
-            }
             draw_settings(app);
+            // After SETTINGS, so CHOOSE FOLDER opened from it is drawn on top.
+            FilePickerChoice picked;
+            bool choosing_folder = app->picker.mode == FilePickerMode::folder;
+            if (file_picker_draw(&app->picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &picked))
+            {
+                if (choosing_folder)
+                {
+                    choose_folder_done(app, &picked);
+                }
+                else
+                {
+                    app->pending_start = picked;
+                    app->has_pending_start = true;   // see pending_start
+                }
+            }
             if (!game_running(app))
             {
                 app->quick_menu.open = false;
@@ -2145,6 +3656,28 @@ int main(int argc, char** argv)
                 save_core_options(app);   // what was deleted
             }
             app->core_options_manager_was_open = app->core_options_manager;
+            // The core downloader: pick up what finished; the catalog sees
+            // installed or removed cores right away.
+            core_updater_poll(&app->core_updater);
+            if (app->core_updater.cores_changed)
+            {
+                app->core_updater.cores_changed = false;
+                core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
+            }
+            std::string running_file = running_core_file(app);
+            CoresWindowContext cores_context = {};
+            cores_context.strings = &app->strings;
+            cores_context.updater = &app->core_updater;
+            cores_context.running_file = running_file.c_str();
+            app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+            cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
+            if (app->cores_window.show_non_free_changed)
+            {
+                app->cores_window.show_non_free_changed = false;
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
+                                  app->cores_window.show_non_free);
+                save_settings(app);
+            }
             InputWindowContext input_context = {};
             input_context.input = &app->input;
             input_context.sdl = &app->input_sdl;
@@ -2201,6 +3734,10 @@ int main(int argc, char** argv)
                 if (answer != SafeStartChoice::none)
                 {
                     app->safe_start_open = false;
+                    if (app->net_load_waiting && !app->has_pending_start)
+                    {
+                        net_answer_load(app, NetContentStatus::failed);   // not started after all
+                    }
                 }
             }
             if (app->show_debug_window)
@@ -2236,6 +3773,7 @@ int main(int argc, char** argv)
     save_settings(app);
     save_learned_latency(app);
     save_core_options(app);
+    core_updater_shutdown(&app->core_updater);   // cancels a download in progress
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     remove_running_marker(app);   // quit properly (a marker found at launch stays if no game ran)
     game_mode_set(&app->game_mode, false);
@@ -2252,6 +3790,7 @@ int main(int argc, char** argv)
         input_config_save(&app->input, app->input_config_path.c_str());
     }
     input_sdl_shutdown(&app->input_sdl);
+    net_shutdown_all(app);
     app_shell_destroy(&app->shell);
     delete app;
     return 0;

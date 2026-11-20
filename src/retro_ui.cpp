@@ -156,10 +156,33 @@ static void push_invisible_text()
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 }
 
-int32_t retro_ui_scale_for_width(float window_width)
+int32_t retro_ui_scale_for_window(float window_width, float window_height)
 {
-    int32_t scale = static_cast<int32_t>(window_width / 640.0f);
+    // The biggest whole block that still leaves 640 x 360 retro pixels: the
+    // UI is then the same share of any window (and the windows fit: MAP
+    // CONTROLLER is 252 + 24 tall). The display's scale (density) isn't
+    // added on top: a bigger block wouldn't fit, and the window's size is
+    // already in the display's units (points on macOS / Wayland, pixels on
+    // Android and Windows), so the UI has the same share either way. The
+    // SHIELD Portable (1920 x 1080 at 320 dpi) gets 3.
+    int32_t across = static_cast<int32_t>(window_width / 640.0f);
+    int32_t down = static_cast<int32_t>(window_height / 360.0f);
+    int32_t scale = across < down ? across : down;
     return scale < 1 ? 1 : scale;
+}
+
+// The pixel font at exactly 8 x block pixels per line. ImGui multiplies every
+// font size by style.FontScaleMain x style.FontScaleDpi; the display's scale
+// isn't wanted on top of the block (retro_ui_scale_for_window), so it's divided out.
+static void push_pixel_font(ImFont* pixel_font, float block)
+{
+    const ImGuiStyle& style = ImGui::GetStyle();
+    float imgui_scale = style.FontScaleMain * style.FontScaleDpi;
+    if (imgui_scale <= 0.0f)
+    {
+        imgui_scale = 1.0f;
+    }
+    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block / imgui_scale);
 }
 
 // With menu boxes the box is the title's highlight: ImGui's own (wider than
@@ -293,7 +316,7 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
     // Metrics in retro pixels x scale:
     //   bar  = 2 + 8 (font line) + 2 = 12, label padding 3,
     //   item = 8 (font line) + 2 spacing = 10, panel padding 2 (+4 text indent).
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3.0f * block, 2.0f * block));
     // 4 retro pixels between menu titles (Andrés: 2 was too tight, 8 too loose).
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4.0f * block, 2.0f * block));
@@ -390,7 +413,7 @@ void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text)
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
     ImGui::Begin("##retro_status", nullptr, flags);
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     use_nearest_sampler();
     // 4 retro pixels from the left and from the bottom (line = 7, glyph starts 1 down).
     ImVec2 position = ImVec2(4.0f * block, io.DisplaySize.y - (4.0f + 6.0f) * block);
@@ -468,7 +491,7 @@ constexpr int THEME_VAR_COUNT = 12;   // the PushStyleVar calls in retro_ui_push
 void retro_ui_push_theme(ImFont* pixel_font, int32_t scale)
 {
     float block = static_cast<float>(scale);
-    ImGui::PushFont(pixel_font, PIXEL_FONT_IMGUI_UNIT * block);
+    push_pixel_font(pixel_font, block);
     push_theme_colors();
     // Same metrics as the menu bar, in retro pixels.
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4.0f * block, 4.0f * block));
@@ -618,6 +641,59 @@ bool retro_ui_button_sized(const char* label, float width, float height)
     bool disabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) != 0;
     draw_list->AddText(ImVec2(x, y), to_imgui_u32(disabled ? g_palette.text_disabled : g_palette.button_text), label, end);
     return pressed;
+}
+
+bool retro_ui_choice_buttons(const char* id, const char* const* labels, uint32_t count, uint32_t* current)
+{
+    float block = retro_pixel();
+    bool changed = false;
+    ImGui::PushID(id);
+    for (uint32_t i = 0; i < count; i++)
+    {
+        if (i > 0)
+        {
+            ImGui::SameLine(0.0f, block);   // one retro pixel apart: one control
+        }
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        bool clicked = ImGui::Button(labels[i]);
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+        if (clicked && i != *current)
+        {
+            *current = i;
+            changed = true;
+        }
+        ImVec2 min = ImGui::GetItemRectMin();
+        ImVec2 max = ImGui::GetItemRectMax();
+        bool chosen = i == *current;
+        bool held = ImGui::IsItemActive() && ImGui::IsItemHovered();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        if (chosen)
+        {
+            // Pressed in: the highlight color, sunken (dark top and left).
+            draw_list->AddRectFilled(min, max, to_imgui_u32(g_palette.highlight));
+            draw_list->AddRectFilled(min, ImVec2(max.x, min.y + block), to_imgui_u32(g_palette.button_dark));
+            draw_list->AddRectFilled(min, ImVec2(min.x + block, max.y), to_imgui_u32(g_palette.button_dark));
+        }
+        else
+        {
+            draw_button_face(min, max, held);
+            if (!held)
+            {
+                draw_raised(min, max, block);
+            }
+        }
+        const char* end = ImGui::FindRenderedTextEnd(labels[i]);
+        ImVec2 text = ImGui::CalcTextSize(labels[i], end);
+        bool down = chosen || held;
+        float x = static_cast<float>(static_cast<int32_t>(min.x + (max.x - min.x - text.x) * 0.5f)) + (chosen ? block : 0.0f);
+        float y = static_cast<float>(static_cast<int32_t>(min.y + (max.y - min.y - text.y) * 0.5f)) + (down ? block : 0.0f);
+        draw_list->AddText(ImVec2(x, y), to_imgui_u32(chosen ? g_palette.text_highlight : g_palette.button_text), labels[i],
+                           end);
+    }
+    ImGui::PopID();
+    return changed;
 }
 
 bool retro_ui_begin_list(const char* id, float width, float height)

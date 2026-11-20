@@ -31,6 +31,17 @@ struct SettingsUiContext
 // default folder); may be nullptr. Returns true if the value changed.
 bool settings_ui_row(const SettingsUiContext* context, const char* key, const char* hint);
 
+// A folder setting changed with CHOOSE FOLDER: the row of settings_ui_row,
+// but the field is read-only and a click on it returns true (the caller
+// opens the picker). `hint` as in settings_ui_row; RESET as usual.
+bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint);
+
+// The field of a folder row: `value` read-only (or `hint` when empty) and
+// "..." after it, filling the row up to `reserved` pixels from its right
+// edge (room for a button after it; 0 = none). True when either was
+// clicked (the caller opens CHOOSE FOLDER).
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint, float reserved);
+
 // A path setting's row with a button after the field (e.g. CHOOSE, which
 // opens a picker). Sets *button_clicked. Returns true if the value changed
 // (typed in the field, or reset).

@@ -27,10 +27,12 @@ static const MenuItem CONFIG_ITEMS[] = {
     { Str::menu_video,   MenuAction::video },
     { Str::menu_input,   MenuAction::input },
     { Str::menu_sound,   MenuAction::sound },
+    { Str::menu_network, MenuAction::network },
 };
 
-// Tools: the options manager now; a core installer later (Andrés, 2026-11-14).
+// Tools: the core downloader and the options manager.
 static const MenuItem TOOLS_ITEMS[] = {
+    { Str::menu_cores,           MenuAction::cores },
     { Str::menu_options_manager, MenuAction::options_manager },
 };
 
@@ -92,6 +94,8 @@ const char* menu_action_name(MenuAction action)
         case MenuAction::debug_window: return "DEBUG WINDOW";
         case MenuAction::recent_game:  return "RECENT GAME";
         case MenuAction::options_manager: return "OPTIONS MANAGER";
+        case MenuAction::cores:      return "CORES";
+        case MenuAction::network:    return "NETWORK";
         case MenuAction::separator:    return "SEPARATOR";
         default:                     return "?";
     }

@@ -168,7 +168,7 @@ add_library(piccolo_font STATIC
 target_include_directories(piccolo_font PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 multitap_set_project_flags(piccolo_font)
 
-add_executable(piccolo
+set(PICCOLO_SOURCES
     src/main.cpp
     src/menus.cpp
     src/retro_ui.cpp
@@ -178,6 +178,9 @@ add_executable(piccolo
     src/settings_ui.cpp
     src/settings_window.cpp
     src/input_window.cpp
+    src/net_window.cpp
+    src/net_games.cpp
+    src/net_remote.cpp
     src/map_window.cpp
     src/pad_picture.cpp
     src/image_window.cpp
@@ -185,9 +188,27 @@ add_executable(piccolo
     src/piccolo_text.cpp
     src/recent_games.cpp
     src/core_options_ui.cpp
+    src/cores_window.cpp
     src/safe_start_window.cpp
     src/quick_menu.cpp
 )
+if(ANDROID)
+    # Android (hosts-common's cmake/android-toolchain.cmake, android/build-apk.sh):
+    # the same piccolo as libmain.so, which SDL's Java activity loads and whose
+    # SDL_main (main.cpp's main, renamed by SDL_main.h) it calls.
+    add_library(piccolo SHARED ${PICCOLO_SOURCES} src/bundled_files_android.cpp)
+    set_target_properties(piccolo PROPERTIES
+        OUTPUT_NAME "main"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")   # where build-apk.sh picks it up
+    target_link_libraries(piccolo PRIVATE android log)
+    # Test libretro goes into the APK too (build-apk.sh), when its submodule is there.
+    if(TARGET test_libretro)
+        add_dependencies(piccolo test_libretro)
+        set_target_properties(test_libretro PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+    endif()
+else()
+    add_executable(piccolo ${PICCOLO_SOURCES} src/bundled_files.cpp)
+endif()
 
 # UI text: src/strings.txt is the one English source. The build turns it into
 # the string IDs (enum class Str), the English table and piccolo.pot (the
@@ -277,7 +298,7 @@ else()
     message(STATUS "piccolo: deps/piccolo-shaders not checked out, no curated shader presets")
 endif()
 
-target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
+target_link_libraries(piccolo PRIVATE frontend_libretro frontend_net piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
 # tools/make_app_icon.py from the same PNGs as the window icon).
@@ -297,7 +318,16 @@ multitap_write_version_header("${PICCOLO_GENERATED}" piccolo PICCOLO_VERSION "${
 message(STATUS "piccolo ${PICCOLO_VERSION}")
 
 multitap_set_project_flags(piccolo)
+if(ANDROID)
+    return()   # the APK needs only libmain.so (and Test libretro); no tools or tests
+endif()
 multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
+
+# Development tool: what remote play's lossless codec (frame_delta.h) sends for a
+# real game, and its cost (netcode milestone 6).
+add_executable(stream_measure tools/stream_measure.cpp)
+target_link_libraries(stream_measure PRIVATE host_libretro frontend_common)
+multitap_set_project_flags(stream_measure)
 
 # Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
 add_executable(pixel_font_preview tools/pixel_font_preview.cpp)

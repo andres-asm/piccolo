@@ -4,7 +4,7 @@
 //
 //   +- SETTINGS ------------------------------------------+
 //   | SCOPE [ THIS CORE (SNES9X)                       v ] |   only while a game runs
-//   | [GENERAL] [INTERFACE] [VIDEO] [SOUND]               |
+//   | [GENERAL] [INTERFACE] [VIDEO] [SOUND] [NETWORK]     |
 //   |   [PICTURE] [DISPLAY] [SYNC]                        |
 //   |   ASPECT RATIO  [ CORE PROVIDED            v ]      |
 //   | C SCALING       [ INTEGER (OVER)           v ] [RESET]
@@ -25,6 +25,7 @@
 #include "app_paths.h"
 #include "image_window.h"
 #include "localization.h"
+#include "net_window.h"
 #include "piccolo_settings.h"
 #include "settings.h"
 
@@ -36,6 +37,15 @@ enum class SettingsTab
     interface,
     video,
     sound,
+    network,
+};
+
+// Which of GENERAL's folder sections is open (one at a time).
+enum class FolderSection
+{
+    none,
+    folders,        // CORES, SYSTEM, SAVES, STATES
+    game_folders,
 };
 
 struct SettingsWindow
@@ -54,6 +64,9 @@ struct SettingsWindow
     bool         choose_shader_request = false;   // SHADER's CHOOSE was pressed (piccolo opens the picker, then clears it)
     std::string  theme_choice;                 // the theme last picked or saved: the lists show it first when several match
     bool         theme_custom = false;         // THEME was set to CUSTOM (else CUSTOM only when no shipped theme matches)
+    FolderSection folder_section = FolderSection::game_folders;   // GAME FOLDERS open at first
+    const char*  choose_folder_key = nullptr; // a folder field or GAME FOLDERS' "+" was clicked: that setting
+                                               // (piccolo opens CHOOSE FOLDER, sets it, then clears this)
 };
 
 // What the window needs from piccolo this frame.
@@ -68,12 +81,14 @@ struct SettingsWindowContext
     const char*              window_size = "";   // what the window mode gives, for the Display tab
     const char*              present_wait = "";  // how WAIT FOR PRESENT works on this GPU, for the Sync tab
     const char*              frame_delay = "";   // the frame delay in use (AUTO), for the Sync tab
+    const char*              run_ahead = "";     // what the running core does with RUN-AHEAD, for the Sync tab
     bool                     frame_delay_found = false;   // this game has a locked AUTO delay (SEARCH AGAIN shown)
     const char* const*       audio_devices = nullptr;   // playback devices connected now, for the Sound tab
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
     const char*              game_mode = "";      // GameMode's state, for the General tab
     const std::vector<PiccoloThemeFile>* themes = nullptr;   // themes/*.cfg, for THEME
+    const NetWindowContext*  network = nullptr;  // the NETWORK tab
 };
 
 void settings_window_open(SettingsWindow* window, SettingsTab tab);

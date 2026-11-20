@@ -315,6 +315,78 @@ bool settings_ui_row(const SettingsUiContext* context, const char* key, const ch
     return changed;
 }
 
+bool settings_ui_folder_field(const SettingsUiContext* context, const char* value, const char* hint, float reserved)
+{
+    // Read-only: it looks like any other field (and a long path can be
+    // scrolled), but a click opens CHOOSE FOLDER, as "..." does for whoever
+    // doesn't think of clicking the field.
+    const char* dots = "...";
+    float dots_width = ImGui::CalcTextSize(dots).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    char buffer[LIBRETRO_PATH_MAX] = {};
+    std::snprintf(buffer, sizeof(buffer), "%s", value);
+    // Up to the right edge (Andrés: no empty column after it), less what
+    // the caller's button needs.
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - reserved - dots_width - spacing);
+    retro_ui_push_field_text();
+    ImGui::InputTextWithHint("##value", hint != nullptr ? hint : "", buffer, sizeof(buffer),
+                             ImGuiInputTextFlags_ReadOnly);
+    retro_ui_pop_field_text();
+    bool clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
+    ImGui::SameLine();
+    ImGui::PushID("choose");
+    if (retro_ui_button(dots))
+    {
+        clicked = true;
+    }
+    ImGui::PopID();
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::game_folder_choose_help));
+    return clicked;
+}
+
+bool settings_ui_folder_row(const SettingsUiContext* context, const char* key, const char* hint)
+{
+    const SettingDescriptor* descriptor = settings_find(context->settings, key);
+    if (descriptor == nullptr)
+    {
+        return false;
+    }
+    bool global_only_here = !descriptor->overridable && context->scope != SettingLayer::global;
+    const char* value = settings_get_at(context->settings, context->scope, key, nullptr);
+    bool clicked = false;
+
+    ImGui::PushID(key);
+    settings_ui_marker(context, key);
+    if (global_only_here)
+    {
+        ImGui::BeginDisabled();
+    }
+    label_column(context, descriptor);
+    // RESET only when this scope sets the folder: then its room is kept.
+    float reserved = 0.0f;
+    if (!global_only_here && settings_get_layer(context->settings, context->scope, key) != nullptr)
+    {
+        reserved = ImGui::CalcTextSize(piccolo_text(context->strings, Str::reset)).x +
+                   ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+    }
+    clicked = settings_ui_folder_field(context, value, hint, reserved) && !global_only_here;
+    if (global_only_here)
+    {
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            retro_ui_tooltip(piccolo_text(context->strings, Str::global_only_help));
+        }
+    }
+    else
+    {
+        settings_ui_reset_button(context, key);
+    }
+    ImGui::PopID();
+    return clicked;
+}
+
 bool settings_ui_path_row_with_button(const SettingsUiContext* context, const char* key, const char* hint,
                                       const char* button, bool* button_clicked)
 {
