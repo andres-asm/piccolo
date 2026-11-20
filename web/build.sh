@@ -42,9 +42,11 @@ if ! command -v emcmake >/dev/null 2>&1; then
     exit 1
 fi
 
-# The strings generator, built for this machine.
+# The strings generator, built for this machine. SDL_UNIX_CONSOLE_BUILD:
+# nothing here opens a window, so SDL needn't find X11 / Wayland development
+# packages on the build machine (CI runners; same as android/build-apk.sh).
 cmake -S "$root" -B "$host_build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_BUILD_TESTS=OFF \
-    -DMULTITAP_GPU_VULKAN=OFF -DMULTITAP_PICCOLO_DIR= >/dev/null
+    -DMULTITAP_GPU_VULKAN=OFF -DMULTITAP_PICCOLO_DIR= -DSDL_UNIX_CONSOLE_BUILD=ON >/dev/null
 cmake --build "$host_build" --target multitap_strings_generator
 generator=$(find "$host_build" -type f -name multitap_strings_generator | head -n 1)
 
