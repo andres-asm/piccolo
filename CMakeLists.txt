@@ -178,6 +178,9 @@ add_executable(piccolo
     src/settings_ui.cpp
     src/settings_window.cpp
     src/input_window.cpp
+    src/net_window.cpp
+    src/net_games.cpp
+    src/net_remote.cpp
     src/map_window.cpp
     src/pad_picture.cpp
     src/image_window.cpp
@@ -243,7 +246,7 @@ if(MULTITAP_PICCOLO_DIR)
         VERBATIM)
 endif()
 
-target_link_libraries(piccolo PRIVATE frontend_libretro piccolo_font)
+target_link_libraries(piccolo PRIVATE frontend_libretro frontend_net piccolo_font)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
 # tools/make_app_icon.py from the same PNGs as the window icon).

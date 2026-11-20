@@ -10,6 +10,7 @@
 
 #include "game_mode.h"
 #include "imgui.h"
+#include "libretro_host.h"   // LIBRETRO_PATH_MAX
 
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -42,23 +43,126 @@ static void draw_scope(SettingsWindow* window, const SettingsWindowContext* cont
                       &window->choose_scope);
 }
 
-static void draw_general(const SettingsUiContext* ui, const SettingsWindowContext* context)
+// GAME FOLDERS: one row per folder, then "+". Clicking a row's field or
+// "+" asks piccolo for CHOOSE FOLDER (choose_game_folder); "-" removes the
+// row. Global only, like the other folders (greyed out in other scopes).
+// FOLDERS and GAME FOLDERS: one open at a time (opening one closes the
+// other; Andrés: their rows needn't line up then). True if `section` is open.
+static bool folder_section(SettingsWindow* window, FolderSection section, const char* label, const char* id)
+{
+    char header[200] = {};
+    ImGui::SetNextItemOpen(window->folder_section == section, ImGuiCond_Always);
+    bool open = retro_ui_collapsing_header(with_id(header, sizeof(header), label, id), 0);
+    if (open)
+    {
+        window->folder_section = section;
+    }
+    else if (window->folder_section == section)
+    {
+        window->folder_section = FolderSection::none;   // closed by its header
+    }
+    return open;
+}
+
+static void draw_game_folders(SettingsWindow* window, const SettingsUiContext* ui)
+{
+    if (!folder_section(window, FolderSection::game_folders, piccolo_text(ui->strings, Str::section_game_folders),
+                        "game_folders"))
+    {
+        return;
+    }
+    bool global = ui->scope == SettingLayer::global;
+    if (!global)
+    {
+        ImGui::BeginDisabled();
+    }
+    uint32_t set = 0;
+    while (set < PICCOLO_GAME_FOLDER_MAX && settings_get_text(ui->settings, PICCOLO_PATH_GAMES[set])[0] != '\0')
+    {
+        set++;
+    }
+    // The field up to "-" at the right edge.
+    float remove_width = ImGui::CalcTextSize("-").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const char* label = piccolo_text(ui->strings, Str::setting_path_games);
+    int32_t remove = -1;
+    for (uint32_t i = 0; i < set; i++)
+    {
+        ImGui::PushID(PICCOLO_PATH_GAMES[i]);
+        ImGui::Dummy(ImGui::CalcTextSize("C"));   // the marker column, so rows line up with the others
+        ImGui::SameLine();
+        ImGui::AlignTextToFramePadding();
+        float start = ImGui::GetCursorPosX();
+        ImGui::TextUnformatted(label);
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::setting_path_games_help));
+        ImGui::SameLine(start + ui->label_width);
+
+        if (settings_ui_folder_field(ui, settings_get_text(ui->settings, PICCOLO_PATH_GAMES[i]), nullptr,
+                                     remove_width + ImGui::GetStyle().ItemSpacing.x))
+        {
+            window->choose_folder_key = PICCOLO_PATH_GAMES[i];
+        }
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - remove_width);
+        if (retro_ui_button("-"))
+        {
+            remove = static_cast<int32_t>(i);
+        }
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_remove_help));
+        ImGui::PopID();
+    }
+    if (remove >= 0)
+    {
+        piccolo_settings_remove_game_folder(ui->settings, static_cast<uint32_t>(remove));
+    }
+    ImGui::Dummy(ImGui::CalcTextSize("C"));
+    ImGui::SameLine();
+    ImGui::BeginDisabled(set >= PICCOLO_GAME_FOLDER_MAX);
+    ImGui::PushID("add_game_folder");
+    if (retro_ui_button("+"))
+    {
+        window->choose_folder_key = PICCOLO_PATH_GAMES[set];
+    }
+    ImGui::PopID();
+    ImGui::EndDisabled();
+    retro_ui_item_tooltip(piccolo_text(ui->strings, Str::game_folder_add_help));
+    if (!global)
+    {
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            retro_ui_tooltip(piccolo_text(ui->strings, Str::global_only_help));
+        }
+    }
+}
+
+static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, const SettingsWindowContext* context)
 {
     settings_ui_row(ui, PICCOLO_LANGUAGE, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_IN_MENU, nullptr);
     settings_ui_row(ui, PICCOLO_PAUSE_ON_FOCUS_LOSS, nullptr);
+    settings_ui_row(ui, PICCOLO_PAUSE_ON_DISCONNECT, nullptr);
     settings_ui_row(ui, PICCOLO_SCREENSAVER_WHEN_PAUSED, nullptr);
     if (game_mode_supported())   // Linux only: nothing to turn on elsewhere
     {
         settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
         ImGui::TextDisabled("%s", context->game_mode);
     }
-    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_folders));
-    settings_ui_row(ui, PICCOLO_PATH_CORES, context->paths->cores.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_SYSTEM, context->paths->system.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_SAVES, context->paths->saves.c_str());
-    settings_ui_row(ui, PICCOLO_PATH_STATES, context->paths->states.c_str());
-    ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+    // FOLDERS: rarely changed, closed until opened. A click on a field
+    // opens CHOOSE FOLDER (piccolo); RESET goes back to the default shown.
+    if (folder_section(window, FolderSection::folders, piccolo_text(ui->strings, Str::section_folders), "folders"))
+    {
+        const char* keys[4] = {PICCOLO_PATH_CORES, PICCOLO_PATH_SYSTEM, PICCOLO_PATH_SAVES, PICCOLO_PATH_STATES};
+        const char* hints[4] = {context->paths->cores.c_str(), context->paths->system.c_str(),
+                                context->paths->saves.c_str(), context->paths->states.c_str()};
+        for (uint32_t i = 0; i < 4; i++)
+        {
+            if (settings_ui_folder_row(ui, keys[i], hints[i]))
+            {
+                window->choose_folder_key = keys[i];
+            }
+        }
+        ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::folders_next_game));
+    }
+    draw_game_folders(window, ui);
 }
 
 static long crop_at_scope(const SettingsUiContext* ui, const char* key)
@@ -562,7 +666,7 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
     {
         return;
     }
-    int target = retro_ui_tab_switch(static_cast<int>(window->tab), 4);
+    int target = retro_ui_tab_switch(static_cast<int>(window->tab), 5);
     if (target >= 0)
     {
         window->tab = static_cast<SettingsTab>(target);
@@ -576,13 +680,15 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->select_tab && window->tab == SettingsTab::video ? ImGuiTabItemFlags_SetSelected : 0;
     ImGuiTabItemFlags sound_flags =
         window->select_tab && window->tab == SettingsTab::sound ? ImGuiTabItemFlags_SetSelected : 0;
+    ImGuiTabItemFlags network_flags =
+        window->select_tab && window->tab == SettingsTab::network ? ImGuiTabItemFlags_SetSelected : 0;
     window->select_tab = false;
     if (ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::tab_general), "general"), nullptr,
                             general_flags))
     {
         window->tab = SettingsTab::general;
         begin_tab_content();
-        draw_general(ui, context);
+        draw_general(window, ui, context);
         end_tab_content();
         ImGui::EndTabItem();
     }
@@ -632,6 +738,16 @@ static void draw_tabs(SettingsWindow* window, const SettingsUiContext* ui, const
         window->tab = SettingsTab::sound;
         begin_tab_content();
         draw_sound(ui, context);
+        end_tab_content();
+        ImGui::EndTabItem();
+    }
+    if (context->network != nullptr &&
+        ImGui::BeginTabItem(with_id(label, sizeof(label), piccolo_text(strings, Str::net_title), "network"), nullptr,
+                            network_flags))
+    {
+        window->tab = SettingsTab::network;
+        begin_tab_content();
+        net_window_draw_tab(context->network, ui->label_width);
         end_tab_content();
         ImGui::EndTabItem();
     }

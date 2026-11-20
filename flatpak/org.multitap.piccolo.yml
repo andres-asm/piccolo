@@ -12,7 +12,7 @@ sdk: org.freedesktop.Sdk
 command: piccolo
 finish-args:
   - --share=ipc
-  - --share=network         # TOOLS > CORES downloads cores (cores.get-piccolo.app)
+  - --share=network         # TOOLS > CORES downloads (cores.get-piccolo.app), the network listener
   - --socket=wayland
   - --socket=fallback-x11
   - --socket=pulseaudio

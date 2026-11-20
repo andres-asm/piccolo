@@ -620,6 +620,59 @@ bool retro_ui_button_sized(const char* label, float width, float height)
     return pressed;
 }
 
+bool retro_ui_choice_buttons(const char* id, const char* const* labels, uint32_t count, uint32_t* current)
+{
+    float block = retro_pixel();
+    bool changed = false;
+    ImGui::PushID(id);
+    for (uint32_t i = 0; i < count; i++)
+    {
+        if (i > 0)
+        {
+            ImGui::SameLine(0.0f, block);   // one retro pixel apart: one control
+        }
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        bool clicked = ImGui::Button(labels[i]);
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+        if (clicked && i != *current)
+        {
+            *current = i;
+            changed = true;
+        }
+        ImVec2 min = ImGui::GetItemRectMin();
+        ImVec2 max = ImGui::GetItemRectMax();
+        bool chosen = i == *current;
+        bool held = ImGui::IsItemActive() && ImGui::IsItemHovered();
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+        if (chosen)
+        {
+            // Pressed in: the highlight color, sunken (dark top and left).
+            draw_list->AddRectFilled(min, max, to_imgui_u32(g_palette.highlight));
+            draw_list->AddRectFilled(min, ImVec2(max.x, min.y + block), to_imgui_u32(g_palette.button_dark));
+            draw_list->AddRectFilled(min, ImVec2(min.x + block, max.y), to_imgui_u32(g_palette.button_dark));
+        }
+        else
+        {
+            draw_button_face(min, max, held);
+            if (!held)
+            {
+                draw_raised(min, max, block);
+            }
+        }
+        const char* end = ImGui::FindRenderedTextEnd(labels[i]);
+        ImVec2 text = ImGui::CalcTextSize(labels[i], end);
+        bool down = chosen || held;
+        float x = static_cast<float>(static_cast<int32_t>(min.x + (max.x - min.x - text.x) * 0.5f)) + (chosen ? block : 0.0f);
+        float y = static_cast<float>(static_cast<int32_t>(min.y + (max.y - min.y - text.y) * 0.5f)) + (down ? block : 0.0f);
+        draw_list->AddText(ImVec2(x, y), to_imgui_u32(chosen ? g_palette.text_highlight : g_palette.button_text), labels[i],
+                           end);
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 bool retro_ui_begin_list(const char* id, float width, float height)
 {
     // ImGui's border off; the padding a bordered child would have kept.

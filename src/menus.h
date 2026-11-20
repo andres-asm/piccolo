@@ -26,6 +26,7 @@ enum class MenuAction
     recent_game,   // from the RECENT menu (see retro_ui_menu_bar)
     options_manager,   // TOOLS > OPTIONS MANAGER (stored core options)
     cores,         // TOOLS > CORES (the core downloader)
+    network,       // CONFIG > NETWORK (listener, pairing, paired devices)
     separator,     // not an action: a line between items (its label isn't shown)
 };
 

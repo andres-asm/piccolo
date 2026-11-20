@@ -35,8 +35,9 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder + SHA-256, no PPMd), `deps/monocypher` (signature checks);
-  libcurl from the system (Linux) for the core downloader
+  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
+  signatures); libcurl from the system (Linux) for the core downloader
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
@@ -113,12 +114,17 @@ src/
   piccolo_settings.*      piccolo's settings table (settings/piccolo.cfg)
   settings_ui.* settings_window.* image_window.* piccolo_window.*   SETTINGS, IMAGE SETTINGS, display
   file_picker.*           LOAD GAME: core first, files filtered by its extensions; zip/7z: LOAD
-                          (whole / the one loadable file / folder, peeked on selection) or BROWSE
+                          (whole / the one loadable file / folder, peeked on selection) or BROWSE;
+                          FOLDER: the game folders (SETTINGS > GENERAL, "+") or HOME;
+                          CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
+  net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
+  net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
+  net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)
@@ -134,7 +140,16 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
                               content_cache (extracted files, LRU); frontend_download (signature, net_http,
                               file_hash: the core downloader; built where libcurl is found);
-                              tools/strings_generator; tests/
+                              frontend_net (optional, with deps/enet):
+                              net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
+                              net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
+                              net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              access levels gamepad / stream / full), net_input + input_net (remote pads
+                              in the router, game-only), net_content (browse / load games: messages) +
+                              net_content_folders (host: game folders as virtual paths, never left),
+                              net_settings (settings and actions described by the host), net_speed (speed
+                              test), net_wire (fields);
+                              tools/strings_generator, net_probe; tests/
 deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment / video / audio / options / input;
                               tools/core_info.cpp (libretro_core_info); tests/ (test core, unit tests, Test libretro runs)
 deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, core_options_store / cache,
@@ -175,7 +190,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-52 tests with test-libretro (33 without). Before calling a larger change done:
+63 tests with test-libretro (44 without). Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -198,6 +213,12 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
   overlay, on-screen messages redesign.
 - Untested on hardware: SN30 over USB (unknown pad), Genesis / Saturn layouts,
   Shield touchpad pointer, mouse grab, lightguns (Zapper, Super Scope).
+- Network (merged 2026-11-19; pending work in docs/netcode-pending.md): one UDP port
+  (ENet) with LAN discovery, Noise XX encryption, 6-digit pairing, access levels
+  gamepad / stream / full; remote pads (standard pads remapped here, or RetroPad mapped
+  on the phone), what runs, actions (save / load state, slot, fast forward, pause,
+  reset, close), settings, controllers per port, game folders browsed and games loaded
+  from the client. SETTINGS > NETWORK. Remote play (streaming) not started.
 - Next: shaders (milestone 6): librashader is in deps/, not wired yet.
 - Release plan (early December): piccolo + piccoletto (Android: remote input,
   streaming). Branches `android`, `big-picture` still need adapting to deps/.

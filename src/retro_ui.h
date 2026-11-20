@@ -124,6 +124,11 @@ void retro_ui_raised_item_edge();
 bool retro_ui_button(const char* label);
 bool retro_ui_button_sized(const char* label, float width, float height);
 
+// A choice among a few values as a row of buttons (not a combo): the chosen
+// one stays pressed in (sunken, the highlight color, its label down a pixel),
+// the others raised. True when another one was clicked (*current changed).
+bool retro_ui_choice_buttons(const char* id, const char* const* labels, uint32_t count, uint32_t* current);
+
 // The theme's mouse cursor, when the palette has one: hides the system's and
 // draws ours at the mouse. Call once per frame, after the UI; `visible`: the
 // UI is up (while a game plays without it, the theme cursor isn't drawn).

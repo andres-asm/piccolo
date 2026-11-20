@@ -90,6 +90,22 @@ msgctxt "picker_core"
 msgid "CORE"
 msgstr "CORE"
 
+msgctxt "picker_folder"
+msgid "FOLDER"
+msgstr "CARPETA"
+
+msgctxt "picker_home"
+msgid "HOME"
+msgstr "INICIO"
+
+msgctxt "picker_folder_title"
+msgid "CHOOSE FOLDER"
+msgstr "ELEGIR CARPETA"
+
+msgctxt "picker_use_folder"
+msgid "USE THIS FOLDER"
+msgstr "USAR ESTA CARPETA"
+
 msgctxt "picker_no_cores"
 msgid "NO CORES FOUND"
 msgstr "NO HAY CORES"
@@ -314,6 +330,18 @@ msgctxt "setting_pause_on_focus_loss_help"
 msgid "Pause while another window is active."
 msgstr "Pausa mientras otra ventana está activa."
 
+msgctxt "setting_pause_on_disconnect"
+msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
+msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
+
+msgctxt "setting_pause_on_disconnect_help"
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START resumes."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START reanuda."
+
+msgctxt "status_paused_disconnected"
+msgid "PAUSED: CONTROLLER DISCONNECTED. START TO GO ON"
+msgstr "EN PAUSA: CONTROL DESCONECTADO. START PARA SEGUIR"
+
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
 msgstr "PERMITIR PROTECTOR DE PANTALLA EN PAUSA"
@@ -353,6 +381,30 @@ msgstr "ESTADOS"
 msgctxt "setting_path_states_help"
 msgid "Folder for savestates. Empty: the states folder in piccolo's folder."
 msgstr "Carpeta para los estados guardados. Vacía: la carpeta states dentro de la de piccolo."
+
+msgctxt "setting_path_games"
+msgid "GAME FOLDER"
+msgstr "CARPETA DE JUEGOS"
+
+msgctxt "setting_path_games_help"
+msgid "A folder with games. LOAD GAME offers it as a place to start, and devices with FULL access can browse and load games from it over the network (never from outside these folders)."
+msgstr "Una carpeta con juegos. CARGAR JUEGO la ofrece como punto de partida, y los dispositivos con acceso COMPLETO pueden explorarla y cargar juegos de ella por la red (nunca de fuera de estas carpetas)."
+
+msgctxt "section_game_folders"
+msgid "GAME FOLDERS"
+msgstr "CARPETAS DE JUEGOS"
+
+msgctxt "game_folder_add_help"
+msgid "Adds a game folder."
+msgstr "Agrega una carpeta de juegos."
+
+msgctxt "game_folder_choose_help"
+msgid "Opens CHOOSE FOLDER to pick another folder."
+msgstr "Abre ELEGIR CARPETA para escoger otra carpeta."
+
+msgctxt "game_folder_remove_help"
+msgid "Removes this folder from the list. Nothing is deleted."
+msgstr "Quita esta carpeta de la lista. No se borra nada."
 
 msgctxt "setting_aspect"
 msgid "ASPECT RATIO"
@@ -2538,3 +2590,198 @@ msgstr "PERMITIR SERVIDOR DE CORES INSEGURO"
 msgctxt "setting_core_server_insecure_help"
 msgid "Development only: CORE SERVER may be http:// or file://. Cores are still checked against the signed list."
 msgstr "Solo para desarrollo: SERVIDOR DE CORES puede ser http:// o file://. Los cores se siguen comprobando contra la lista firmada."
+
+msgctxt "menu_network"
+msgid "NETWORK..."
+msgstr "RED..."
+
+msgctxt "net_title"
+msgid "NETWORK"
+msgstr "RED"
+
+msgctxt "setting_net_enabled"
+msgid "ALLOW CONNECTIONS"
+msgstr "PERMITIR CONEXIONES"
+
+msgctxt "setting_net_enabled_help"
+msgid "Lets paired devices (PICCOLETTO, another PICCOLO) connect to this one over the network. Off: nothing listens."
+msgstr "Deja que los dispositivos vinculados (PICCOLETTO, otro PICCOLO) se conecten a este por la red. Apagado: nada escucha."
+
+msgctxt "setting_net_name"
+msgid "NAME"
+msgstr "NOMBRE"
+
+msgctxt "setting_net_name_help"
+msgid "What other devices see when they look for this one."
+msgstr "Lo que ven los otros dispositivos cuando buscan este."
+
+msgctxt "setting_net_port"
+msgid "PORT"
+msgstr "PUERTO"
+
+msgctxt "setting_net_port_help"
+msgid "The UDP port for everything network. Change it only if another program uses it."
+msgstr "El puerto UDP para todo lo de red. Cámbialo solo si otro programa lo usa."
+
+msgctxt "net_this_device"
+msgid "THIS DEVICE"
+msgstr "ESTE DISPOSITIVO"
+
+msgctxt "net_this_device_help"
+msgid "This device's key, in short. The other device shows the same when it pairs with this one."
+msgstr "La llave de este dispositivo, en corto. El otro dispositivo muestra la misma cuando se vincula con este."
+
+msgctxt "net_off"
+msgid "NETWORKING IS OFF"
+msgstr "LA RED ESTÁ APAGADA"
+
+msgctxt "net_listen_failed"
+msgid "THE PORT COULD NOT BE OPENED (IN USE?)"
+msgstr "NO SE PUDO ABRIR EL PUERTO (¿EN USO?)"
+
+msgctxt "net_section_pairing"
+msgid "PAIRING"
+msgstr "VINCULAR"
+
+msgctxt "net_pair_button"
+msgid "PAIR A DEVICE"
+msgstr "VINCULAR UN DISPOSITIVO"
+
+msgctxt "net_pair_button_help"
+msgid "Shows a code to type on the other device."
+msgstr "Muestra un código para escribir en el otro dispositivo."
+
+msgctxt "net_pair_code"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "net_pair_instructions"
+msgid "Type this code on the other device. It changes after a wrong try."
+msgstr "Escribe este código en el otro dispositivo. Cambia después de un intento fallido."
+
+msgctxt "net_pair_validity"
+msgid "VALIDITY"
+msgstr "VALIDEZ"
+
+msgctxt "net_pair_stop"
+msgid "STOP"
+msgstr "DETENER"
+
+msgctxt "net_pair_refresh"
+msgid "REFRESH"
+msgstr "RENOVAR"
+
+msgctxt "net_section_devices"
+msgid "PAIRED DEVICES"
+msgstr "DISPOSITIVOS VINCULADOS"
+
+msgctxt "net_no_devices"
+msgid "NO DEVICES PAIRED YET"
+msgstr "TODAVÍA NO HAY DISPOSITIVOS VINCULADOS"
+
+
+
+msgctxt "net_device_connected"
+msgid "CONNECTED"
+msgstr "CONECTADO"
+
+msgctxt "net_device_forget"
+msgid "FORGET"
+msgstr "OLVIDAR"
+
+msgctxt "net_device_forget_help"
+msgid "Unpairs this device: if it's connected now it forgets this piccolo too; either way it has to pair again to connect."
+msgstr "Desempareja este dispositivo: si está conectado ahora también olvida este piccolo; en todo caso tiene que emparejarse de nuevo para conectarse."
+
+msgctxt "status_net_paired"
+msgid "PAIRED WITH"
+msgstr "VINCULADO CON"
+
+msgctxt "status_net_pairing_failed"
+msgid "WRONG PAIRING CODE: A NEW ONE IS SHOWN"
+msgstr "CÓDIGO DE VINCULACIÓN INCORRECTO: SE MUESTRA UNO NUEVO"
+
+msgctxt "status_net_pairing_closed"
+msgid "PAIRING CLOSED"
+msgstr "VINCULACIÓN CERRADA"
+
+
+msgctxt "net_device_access_help"
+msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."
+msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego."
+
+msgctxt "net_access_gamepad"
+msgid "GAMEPAD"
+msgstr "GAMEPAD"
+
+msgctxt "net_access_stream"
+msgid "STREAM"
+msgstr "STREAM"
+
+msgctxt "net_access_full"
+msgid "FULL"
+msgstr "COMPLETO"
+
+msgctxt "action_slot_next"
+msgid "NEXT SLOT"
+msgstr "SLOT SIGUIENTE"
+
+msgctxt "action_slot_previous"
+msgid "PREVIOUS SLOT"
+msgstr "SLOT ANTERIOR"
+
+msgctxt "action_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
+msgctxt "action_reset"
+msgid "RESET"
+msgstr "REINICIAR"
+
+msgctxt "status_paused_remotely"
+msgid "PAUSED FROM"
+msgstr "EN PAUSA DESDE"
+
+msgctxt "status_resumed"
+msgid "RESUMED"
+msgstr "REANUDADO"
+
+msgctxt "status_net_unpaired"
+msgid "UNPAIRED:"
+msgstr "DESEMPAREJADO:"
+
+msgctxt "net_device_ping_help"
+msgid "The round trip to this device and back, as the connection measures it."
+msgstr "El viaje de ida y vuelta hasta este dispositivo, como lo mide la conexión."
+
+msgctxt "net_section_connected"
+msgid "CONNECTED DEVICES"
+msgstr "DISPOSITIVOS CONECTADOS"
+
+msgctxt "net_no_connected"
+msgid "NO DEVICES CONNECTED"
+msgstr "NINGÚN DISPOSITIVO CONECTADO"
+
+msgctxt "net_jitter"
+msgid "JITTER"
+msgstr "JITTER"
+
+msgctxt "net_loss"
+msgid "LOSS"
+msgstr "PÉRDIDA"
+
+msgctxt "net_speed_test"
+msgid "SPEED TEST"
+msgstr "PRUEBA DE VELOCIDAD"
+
+msgctxt "net_speed_test_help"
+msgid "The last speed test the device ran: the best rate each way that lost almost nothing. DOWN: from this piccolo to the device. UP: from the device to this piccolo."
+msgstr "La última prueba de velocidad que hizo el dispositivo: la mejor tasa en cada sentido casi sin pérdidas. BAJADA: de este piccolo al dispositivo. SUBIDA: del dispositivo a este piccolo."
+
+msgctxt "net_speed_down"
+msgid "DOWN"
+msgstr "BAJADA"
+
+msgctxt "net_speed_up"
+msgid "UP"
+msgstr "SUBIDA"
