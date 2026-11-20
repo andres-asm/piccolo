@@ -137,6 +137,8 @@ tools/                    pixel_font_preview, strings_check, recent_games_test, 
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
+                              video_texture / video_output (what frontends draw the picture with: Vulkan's
+                              picture + shader_chain underneath, GL next: docs/gl.md, branch gl),
                               vk_* (context, swapchain, texture, barrier), renderer, debug_ui, audio_output (+DRC),
                               frame_timing, frame_delay, rate_control, frame_delta (lossless
                               frame codec for remote play), settings_file / settings (layers global ->
