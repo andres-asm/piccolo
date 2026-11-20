@@ -3349,6 +3349,13 @@ int main(int argc, char** argv)
         delete app;
         return 1;
     }
+    // A build from a branch other than main has the branch in its version ("0.3-osk"):
+    // show it in the window title, so a test build says which branch opened it.
+    constexpr std::string_view version = PICCOLO_VERSION;
+    if (version.find('-') != std::string_view::npos)
+    {
+        SDL_SetWindowTitle(app->shell.window, "piccolo " PICCOLO_VERSION);
+    }
     debug_ui_set_draw_data_hook(add_text_shadows, app);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
