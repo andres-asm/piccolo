@@ -685,7 +685,17 @@ static bool start_game(App* app, const FilePickerChoice* choice)
     update_settings_context(app);
     if (started)
     {
-        // The emulated device on each port, as kept for this core (or game).
+        // The adapter on each physical port (cores with port adapters), then
+        // the emulated device on each port (player), as kept for this core (or game).
+        for (uint32_t physical = 0; physical < app->session.host->port_layout.port_count; physical++)
+        {
+            int32_t adapter = settings_get_int(&app->settings, PICCOLO_INPUT_PORT_ADAPTERS[physical]);
+            unsigned wanted = adapter < 0 ? LIBRETRO_ADAPTER_AUTO : static_cast<unsigned>(adapter);
+            if (wanted != app->session.host->port_layout.wanted[physical])
+            {
+                libretro_host_set_port_adapter(app->session.host, physical, wanted);
+            }
+        }
         for (unsigned port = 0; port < LIBRETRO_MAX_PORTS; port++)
         {
             int32_t device = settings_get_int(&app->settings, PICCOLO_INPUT_PORT_DEVICES[port]);

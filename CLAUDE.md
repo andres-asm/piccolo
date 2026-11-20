@@ -223,7 +223,9 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 - libretro extensions (Multitap's private environment calls, host-libretro
   `src/libretro_extensions.h`): run-ahead (0x4D01/02) and text input (0x4D03:
   KEYS opens a phone's on-screen keyboard only when the core asks, TEXT shows
-  piccolo's text box). Planned: multitap adapters, media slots (docs/design-notes.md).
+  piccolo's text box), port adapters (0x4D04/05: multitaps on physical ports, 8 players,
+  ADAPTER in CONTROLS, NONE by default, AUTO = the core's suggestion). Planned: media slots
+  (docs/design-notes.md).
 - TOOLS > CORES: the core downloader (core_updater in frontend-libretro, signed
   index); SHOW NON-FREE CORES off by default, confirmed when turned on.
 - Input (done for this version): N:N ports (hotkeys and UI from port 1 + the

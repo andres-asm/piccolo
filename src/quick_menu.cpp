@@ -1974,6 +1974,91 @@ static float button_width(const char* text)
     return ImGui::CalcTextSize(text).x + ImGui::GetStyle().FramePadding.x * 2.0f;
 }
 
+// Port adapters (cores with Multitap's extension): the name of a choice on a
+// physical port. AUTO says what it gives: "AUTO: MULTITAP".
+static std::string adapter_label(const LibretroPortLayout* layout, uint32_t physical, unsigned wanted,
+                                 const Localization* strings)
+{
+    const char* none = piccolo_text(strings, Str::input_adapter_none);
+    if (wanted == LIBRETRO_ADAPTER_AUTO)
+    {
+        const LibretroAdapter* suggested = libretro_ports_adapter(layout, physical, layout->suggested[physical]);
+        std::string label = piccolo_text(strings, Str::input_adapter_auto);
+        label += ": ";
+        label += suggested != nullptr ? suggested->description : none;
+        return label;
+    }
+    const LibretroAdapter* adapter = libretro_ports_adapter(layout, physical, wanted);
+    return adapter != nullptr ? adapter->description : none;
+}
+
+// One physical port's row: its name and ADAPTER [NONE / AUTO / the core's
+// adapters v], or "USED BY <adapter>" when the adapter before took it.
+static void draw_adapter_row(const QuickMenuContext* context, uint32_t physical, float label_width)
+{
+    LibretroHost* host = context->host;
+    const Localization* strings = context->strings;
+    const LibretroPortLayout* layout = &host->port_layout;
+    const LibretroPhysicalPort* port = &layout->ports[physical];
+    ImGui::PushID(static_cast<int>(300 + physical));
+    ImGui::AlignTextToFramePadding();
+    retro_ui_push_section_text();
+    ImGui::TextUnformatted(port->description);
+    retro_ui_pop_section_text();
+    if (layout->first_port[physical] == RETRO_EXT_PORT_UNUSED)
+    {
+        const LibretroAdapter* taker =
+            physical > 0 ? libretro_ports_adapter(layout, physical - 1, layout->applied[physical - 1]) : nullptr;
+        ImGui::SameLine(label_width);
+        ImGui::BeginDisabled();
+        ImGui::Text("%s %s", piccolo_text(strings, Str::input_adapter_taken), taker != nullptr ? taker->description : "");
+        ImGui::EndDisabled();
+        ImGui::PopID();
+        return;
+    }
+    if (port->adapter_count == 0)
+    {
+        ImGui::PopID();
+        return;   // nothing to plug in: just the name, over its player
+    }
+    const char* adapter_text = piccolo_text(strings, Str::input_adapter);
+    ImGui::SameLine(label_width);
+    ImGui::TextUnformatted(adapter_text);
+    retro_ui_item_tooltip(piccolo_text(strings, Str::input_adapter_help));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    unsigned wanted = layout->wanted[physical];
+    std::string current = adapter_label(layout, physical, wanted, strings);
+    if (retro_ui_begin_combo("##adapter", current.c_str()))
+    {
+        // NONE, AUTO, then the core's own adapters for this port.
+        unsigned choices[LIBRETRO_ADAPTERS_MAX + 2] = {0, LIBRETRO_ADAPTER_AUTO};
+        uint32_t choice_count = 2;
+        for (uint32_t a = 0; a < port->adapter_count; a++)
+        {
+            choices[choice_count] = port->adapters[a].id;
+            choice_count++;
+        }
+        for (uint32_t c = 0; c < choice_count; c++)
+        {
+            ImGui::PushID(static_cast<int>(c));
+            std::string label = adapter_label(layout, physical, choices[c], strings);
+            if (ImGui::Selectable(label.c_str(), choices[c] == wanted))
+            {
+                libretro_host_set_port_adapter(host, physical, choices[c]);
+                if (context->settings != nullptr)
+                {
+                    int32_t kept = choices[c] == LIBRETRO_ADAPTER_AUTO ? -1 : static_cast<int32_t>(choices[c]);
+                    settings_set_int(context->settings, SettingLayer::core, PICCOLO_INPUT_PORT_ADAPTERS[physical], kept);
+                }
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::PopID();
+}
+
 // CONTROLS: the core's ports, each a section (one open at a time; its header
 // says who is on it): its CORE DEVICE, its controllers (N:N) with REMAP and
 // UNASSIGN (that port only), ADD (any connected controller not on it), MOVE
@@ -2006,7 +2091,20 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     {
         ports = host->input_info.port_count;   // (no more than the core has)
     }
-    bool shown[INPUT_PORT_COUNT] = {true, true, true, true};
+    // Port adapters: the players the adapters give, all of them (PORTS doesn't
+    // hide a multitap's players), grouped under their physical port.
+    const LibretroPortLayout* layout = host != nullptr && host->game_loaded && host->port_layout.offered
+                                           ? &host->port_layout : nullptr;
+    if (layout != nullptr)
+    {
+        ports = layout->player_count < INPUT_PORT_COUNT ? layout->player_count : INPUT_PORT_COUNT;
+    }
+    uint32_t next_physical = 0;   // the next physical port row to draw
+    bool shown[INPUT_PORT_COUNT] = {};
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    {
+        shown[p] = true;
+    }
     float label_width = 60.0f * block;
     bool anybody = false;
     // One port open at a time: its CORE DEVICE, its controllers, ADD, MOVE UP / DOWN.
@@ -2025,8 +2123,37 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
             who += input_controller_label(input, input->ports[p][m]);
         }
         char header[400] = {};
-        std::snprintf(header, sizeof(header), "%s %u   %s###port%u", piccolo_text(strings, Str::input_port), static_cast<unsigned>(p + 1),
-                      who.empty() ? piccolo_text(strings, Str::input_port_empty) : who.c_str(), static_cast<unsigned>(p));
+        uint32_t physical = 0;
+        uint32_t sub_port = 0;
+        if (layout != nullptr && libretro_ports_player(layout, p, &physical, &sub_port))
+        {
+            // The physical ports up to this player's (a taken one included), then
+            // the player under its port: "P3  2-B   who".
+            for (; next_physical <= physical; next_physical++)
+            {
+                draw_adapter_row(context, next_physical, label_width);
+            }
+            char where[16] = {};
+            if (layout->applied[physical] != 0)
+            {
+                std::snprintf(where, sizeof(where), "  %u-%c", static_cast<unsigned>(physical + 1),
+                              static_cast<char>('A' + sub_port));
+            }
+            std::snprintf(header, sizeof(header), "%s%u%s   %s###port%u", piccolo_text(strings, Str::input_player_short),
+                          static_cast<unsigned>(p + 1), where,
+                          who.empty() ? piccolo_text(strings, Str::input_port_empty) : who.c_str(), static_cast<unsigned>(p));
+        }
+        else
+        {
+            std::snprintf(header, sizeof(header), "%s %u   %s###port%u", piccolo_text(strings, Str::input_port),
+                          static_cast<unsigned>(p + 1), who.empty() ? piccolo_text(strings, Str::input_port_empty) : who.c_str(),
+                          static_cast<unsigned>(p));
+        }
+        float player_indent = layout != nullptr ? ImGui::GetStyle().IndentSpacing : 0.0f;
+        if (player_indent > 0.0f)
+        {
+            ImGui::Indent(player_indent);
+        }
         ImGui::SetNextItemOpen(menu->ports_selected == p, ImGuiCond_Always);
         bool open = retro_ui_collapsing_header(header, 0);
         if (open && menu->ports_selected != p)
@@ -2039,6 +2166,10 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         }
         if (!open)
         {
+            if (player_indent > 0.0f)
+            {
+                ImGui::Unindent(player_indent);
+            }
             continue;
         }
         ImGui::PushID(static_cast<int>(p));
@@ -2134,6 +2265,15 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
         ImGui::EndDisabled();
         ImGui::Unindent(ImGui::GetStyle().IndentSpacing);
         ImGui::PopID();
+        if (player_indent > 0.0f)
+        {
+            ImGui::Unindent(player_indent);
+        }
+    }
+    // Physical ports after the last player (one a two-port adapter took).
+    for (; layout != nullptr && next_physical < layout->port_count; next_physical++)
+    {
+        draw_adapter_row(context, next_physical, label_width);
     }
     if (!anybody)
     {

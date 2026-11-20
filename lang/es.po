@@ -2146,6 +2146,38 @@ msgctxt "quick_menu_device"
 msgid "CORE DEVICE"
 msgstr "DISPOSITIVO DEL CORE"
 
+msgctxt "setting_input_port_adapter"
+msgid "ADAPTER"
+msgstr "ADAPTADOR"
+
+msgctxt "setting_input_port_adapter_help"
+msgid "What is plugged into this port of the console: nothing, or an adapter like a multitap (its own list). AUTO: what the core picks for the game."
+msgstr "Qué está enchufado en este puerto de la consola: nada, o un adaptador como un multitap (su propia lista). AUTO: lo que el core elige para el juego."
+
+msgctxt "input_adapter"
+msgid "ADAPTER"
+msgstr "ADAPTADOR"
+
+msgctxt "input_adapter_help"
+msgid "What is plugged into this port of the console: a multitap gives it more players. AUTO: what the core picks for this game."
+msgstr "Qué está enchufado en este puerto de la consola: un multitap le da más jugadores. AUTO: lo que el core elige para este juego."
+
+msgctxt "input_adapter_none"
+msgid "NONE"
+msgstr "NINGUNO"
+
+msgctxt "input_adapter_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "input_adapter_taken"
+msgid "USED BY"
+msgstr "LO USA"
+
+msgctxt "input_player_short"
+msgid "P"
+msgstr "J"
+
 msgctxt "quick_menu_ports"
 msgid "PORTS"
 msgstr "PUERTOS"
