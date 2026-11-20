@@ -1174,6 +1174,18 @@ msgctxt "safe_start_cancel"
 msgid "CANCEL"
 msgstr "CANCELAR"
 
+msgctxt "text_input_title"
+msgid "ENTER TEXT"
+msgstr "ESCRIBIR TEXTO"
+
+msgctxt "text_input_ok"
+msgid "OK"
+msgstr "ACEPTAR"
+
+msgctxt "text_input_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
 msgctxt "quick_menu_title"
 msgid "QUICK MENU"
 msgstr "MENÚ RÁPIDO"
