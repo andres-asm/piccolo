@@ -126,7 +126,8 @@ struct App
     bool       net_paused = false;       // PAUSE from a device
     // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
     bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
-    bool       disconnect_paused = false;     // START resumes
+    bool       disconnect_paused = false;     // START, a controller joining, or closing the menu resumes
+    bool       menu_was_open = false;         // last loop: for "closing the menu resumes"
     uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
@@ -1387,6 +1388,11 @@ static void follow_what_plays(App* app, const InputFrame* frame)
             app->played_with_gamepad = device->kind == InputDeviceKind::gamepad;
         }
     }
+    // Closing the menu (or any window) resumes too: with every pad gone and
+    // the keyboard on no port, nothing else could (Andrés).
+    bool menu_open = app->menu_visible || any_window_open(app);
+    bool menu_closed = app->menu_was_open && !menu_open;
+    app->menu_was_open = menu_open;
     if (!app->disconnect_paused)
     {
         return;
@@ -1396,13 +1402,13 @@ static void follow_what_plays(App* app, const InputFrame* frame)
     {
         start = (frame->pad_buttons[p] & (1u << 3)) != 0;   // RETRO_DEVICE_ID_JOYPAD_START
     }
-    if (start || !game_running(app))
+    if (start || menu_closed || !game_running(app))
     {
         app->disconnect_paused = false;
-        if (start)
+        if (start || menu_closed)
         {
             set_status(app, piccolo_text(&app->strings, Str::status_resumed));
-            SDL_Log("Resumed: START");
+            SDL_Log("Resumed: %s", start ? "START" : "the menu closed");
         }
     }
 }

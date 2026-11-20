@@ -335,12 +335,12 @@ msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
 msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
 
 msgctxt "setting_pause_on_disconnect_help"
-msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START resumes."
-msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START reanuda."
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START, or closing the menu, resumes."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START, o cerrar el menú, reanuda."
 
 msgctxt "status_paused_disconnected"
-msgid "PAUSED: CONTROLLER DISCONNECTED. START TO GO ON"
-msgstr "EN PAUSA: CONTROL DESCONECTADO. START PARA SEGUIR"
+msgid "PAUSED: CONTROLLER DISCONNECTED. START OR THE MENU TO GO ON"
+msgstr "EN PAUSA: CONTROL DESCONECTADO. START O EL MENÚ PARA SEGUIR"
 
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
