@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds (build-apk.sh without a release key): this folder is an
+     overlay over android/res, with its own name and banner, so a debug build
+     can be told apart from a release one (they install side by side:
+     site.multitap.piccolo.debug, folder /sdcard/piccolo-debug). -->
+<resources>
+    <string name="app_name">piccolo debug</string>
+</resources>

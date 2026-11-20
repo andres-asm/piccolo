@@ -1,0 +1,100 @@
+# Builds piccolo's Android APK (arm64-v8a) with android/build-apk.sh, the
+# same script as on the development machine, and uploads it as an artifact.
+# Install it with:
+#   adb install --no-incremental -r piccolo.apk
+# Signed with the release key from the repository secrets
+# ANDROID_KEYSTORE_BASE64 (the PKCS12 keystore, base64) and
+# ANDROID_KEYSTORE_PASS: package site.multitap.piccolo, updates install over
+# each other. Where the secrets aren't available (pull requests from forks)
+# it's a debug build: site.multitap.piccolo.debug, "piccolo debug", signed by
+# a key made for that run.
+#
+# The development machine (Linux arm64) uses the distro's clang with the
+# NDK's sysroot; on GitHub's x86_64 runners the NDK's own clang does the same
+# job (MULTITAP_LLVM_ROOT). The SDK's build tools (aapt2, d8, zipalign,
+# apksigner) come with the runner.
+name: Android
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: r30
+  ANDROID_API: '35'
+  BUILD_TOOLS: '35.0.0'
+
+jobs:
+  android:
+    name: Android (arm64-v8a)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # versionCode is the commit count
+
+      # Only the submodules the build uses; Test libretro goes into the APK.
+      # Some nested submodules (imguisw's third_party) have SSH URLs, which
+      # the runner has no key for: GitHub's are fetched over HTTPS instead.
+      - name: Submodules
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive --depth 1 \
+            deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
+            deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher \
+            deps/common/hosts-common deps/common/frontends-common \
+            deps/libretro/host-libretro deps/libretro/frontend-libretro
+          git submodule update --init --recursive --checkout --depth 1 deps/test-libretro
+
+      # r30: its libc++ has std::from_chars for double (frontends-common's
+      # settings); the NDK the runner comes with may be older.
+      - name: Cache the NDK
+        id: ndk-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/android-ndk-${{ env.NDK_VERSION }}
+          key: android-ndk-${{ env.NDK_VERSION }}-linux
+
+      - name: Download the NDK
+        if: steps.ndk-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/ndk.zip" "https://dl.google.com/android/repository/android-ndk-${NDK_VERSION}-linux.zip"
+          unzip -q "$RUNNER_TEMP/ndk.zip" -d "$HOME"
+
+      # The host build (strings generator) configures all of piccolo, so it
+      # needs the Vulkan headers (SDL is a console build there: no X11).
+      - name: SDK platform, build tools, Ninja, host packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-${ANDROID_API}" "build-tools;${BUILD_TOOLS}" > /dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y -q ninja-build libvulkan-dev
+
+      - name: Build the APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PICCOLO_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            export PICCOLO_KEYSTORE="$RUNNER_TEMP/release.p12"
+            export PICCOLO_KEY_ALIAS=piccolo
+          fi
+          ndk="$HOME/android-ndk-${NDK_VERSION}"
+          tools="$ANDROID_HOME/build-tools/${BUILD_TOOLS}"
+          export PATH="$tools:$PATH"
+          export ANDROID_NDK_ROOT="$ndk"
+          export MULTITAP_LLVM_ROOT="$ndk/toolchains/llvm/prebuilt/linux-x86_64"
+          export ANDROID_JAR="$ANDROID_HOME/platforms/android-${ANDROID_API}/android.jar"
+          export AAPT_ANDROID_JAR="$ANDROID_JAR"
+          export D8_JAR="$tools/lib/d8.jar"
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          export BUILD_TYPE=Release
+          android/build-apk.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: piccolo-android-arm64
+          path: android/build/piccolo.apk

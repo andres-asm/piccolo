@@ -10,6 +10,8 @@
 #include "host_fs.h"
 #include "imgui.h"
 
+#include "app_paths.h"
+
 #include "piccolo_text.h"
 #include "retro_ui.h"
 
@@ -254,7 +256,7 @@ static bool is_directory(const char* path)
 
 static void go_home(FilePicker* picker)
 {
-    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+    const char* home = app_paths_home_folder();   // /sdcard on Android
     std::snprintf(picker->directory, sizeof(picker->directory), "%s", home != nullptr ? home : "/");
     host_fs_forward_slashes(picker->directory);
 }
@@ -293,7 +295,7 @@ static const char* folder_preview(const FilePicker* picker, const Localization* 
     {
         return picker->game_folders[static_cast<size_t>(best)].c_str();
     }
-    const char* home = SDL_GetUserFolder(SDL_FOLDER_HOME);
+    const char* home = app_paths_home_folder();   // /sdcard on Android
     if (home != nullptr)
     {
         char home_path[LIBRETRO_PATH_MAX] = {};

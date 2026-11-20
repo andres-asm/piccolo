@@ -1,4 +1,4 @@
-# Builds piccolo's Flatpak (flatpak/org.multitap.piccolo.yml) for x86_64 and
+# Builds piccolo's Flatpak (flatpak/site.multitap.piccolo.yml) for x86_64 and
 # aarch64, and uploads each .flatpak bundle as an artifact. Install one with:
 #   flatpak install --user piccolo-<arch>.flatpak
 name: Flatpak
@@ -57,6 +57,6 @@ jobs:
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: piccolo-${{ matrix.arch }}.flatpak
-          manifest-path: flatpak/org.multitap.piccolo.yml
+          manifest-path: flatpak/site.multitap.piccolo.yml
           arch: ${{ matrix.arch }}
           cache-key: flatpak-builder-${{ matrix.arch }}-${{ github.sha }}
