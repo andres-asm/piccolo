@@ -179,6 +179,7 @@ set(PICCOLO_SOURCES
     src/settings_window.cpp
     src/input_window.cpp
     src/net_window.cpp
+    src/headless.cpp
     src/net_games.cpp
     src/net_remote.cpp
     src/map_window.cpp

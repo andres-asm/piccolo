@@ -2871,6 +2871,26 @@ msgctxt "net_beacon_unreachable"
 msgid "THE BEACON SERVER DOESN'T ANSWER"
 msgstr "EL SERVIDOR BEACON NO RESPONDE"
 
+msgctxt "headless_show"
+msgid "SHOW PICCOLO"
+msgstr "MOSTRAR PICCOLO"
+
+msgctxt "headless_play_here"
+msgid "PLAY HERE AGAIN"
+msgstr "JUGAR AQUÍ DE NUEVO"
+
+msgctxt "headless_tooltip"
+msgid "PICCOLO: THE GAME IS ON A DEVICE"
+msgstr "PICCOLO: EL JUEGO ESTÁ EN UN DISPOSITIVO"
+
+msgctxt "status_headless_back"
+msgid "BACK ON PICCOLO"
+msgstr "DE VUELTA EN PICCOLO"
+
+msgctxt "status_headless_paused"
+msgid "THE DEVICE WITH THE GAME LEFT: PAUSED"
+msgstr "EL DISPOSITIVO CON EL JUEGO SE FUE: EN PAUSA"
+
 msgctxt "net_this_device"
 msgid "THIS DEVICE"
 msgstr "ESTE DISPOSITIVO"
