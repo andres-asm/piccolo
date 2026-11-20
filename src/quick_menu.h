@@ -10,6 +10,8 @@
 //   | +--------------+  [SAVE] [LOAD]                             |
 //   | [RESET] [CLOSE GAME]                                        |
 //   | > CORE OPTIONS                                              |   the running core's, live
+//   | > CONTROLS                                                  |
+//   | > SHADER                                                    |   the preset (CHOOSE) and FILTER
 //   +-----------------------------------------------------------+
 //
 // Slots 1..9: arrows or 1-9 pick one (also the slot F2 / F4 use), S saves, L
@@ -45,7 +47,7 @@ enum class QuickMenuAction
 struct QuickMenu
 {
     bool          open = false;
-    int           tab = 0;              // 0 SAVESTATES, 1 CORE OPTIONS, 2 CONTROLS (for PAGE LEFT / RIGHT)
+    int           tab = 0;              // 0 SAVESTATES, 1 CORE OPTIONS, 2 CONTROLS, 3 SHADER (for PAGE LEFT / RIGHT)
     int           open_on_tab = 0;      // the tab it opens on
 
     // CONTROLS can show the remap of one port's controller for the running
@@ -89,6 +91,12 @@ struct QuickMenu
     std::vector<uint64_t> macro_record_times;   // a change of the RetroPad buttons: when...
     std::vector<uint16_t> macro_record_buttons; // ...and to what
     bool          input_dirty = false;
+    // SHADER: the settings scope it edits (GLOBAL / THIS CORE / THIS GAME,
+    // the most specific one in use when the menu opens), and CHOOSE, which
+    // piccolo answers by opening the shader picker for that scope.
+    SettingLayer  shader_scope = SettingLayer::global;
+    bool          shader_choose_scope = true;
+    bool          choose_shader_request = false;
     uint32_t      slot = LIBRETRO_STATE_SLOT_FIRST;   // the selected slot
     StateSlotInfo slots[LIBRETRO_STATE_SLOT_LAST + 1] = {};   // [1..9]
     bool          refresh = true;   // read the slots again on the next draw
@@ -118,6 +126,9 @@ struct QuickMenuContext
     const InputSdl*      sdl = nullptr;        // CONTROLS: button names
     const InputLayouts*  layouts = nullptr;    // CONTROLS: the controllers' button names
     uint64_t             now_ms = 0;
+    const char*          core_name = "";         // SHADER: the scope selector's names
+    const char*          game_name = "";
+    bool                 shaders_available = false;   // librashader was found
 };
 
 // Opens on `slot` (the session's current slot), on the tab it was last closed on.

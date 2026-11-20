@@ -618,6 +618,7 @@ input_mapping = MAPPING
 input_joined = %s: PORT %d
 input_left = %s DISCONNECTED (PORT %d)
 quick_menu_tab_controls = CONTROLS
+quick_menu_tab_shader = SHADER
 quick_menu_no_ports = NOBODY HAS JOINED: PRESS START ON A CONTROLLER
 input_port = PORT
 input_port_empty = PRESS START TO JOIN

@@ -2122,6 +2122,10 @@ msgctxt "quick_menu_tab_controls"
 msgid "CONTROLS"
 msgstr "CONTROLES"
 
+msgctxt "quick_menu_tab_shader"
+msgid "SHADER"
+msgstr "SHADER"
+
 msgctxt "quick_menu_no_ports"
 msgid "NOBODY HAS JOINED: PRESS START ON A CONTROLLER"
 msgstr "NADIE SE UNIÓ: PRESIONA START EN UN CONTROL"

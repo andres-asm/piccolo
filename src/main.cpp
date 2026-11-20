@@ -164,7 +164,8 @@ struct App
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
     FilePicker  picker  = {};
-    FilePicker  shader_picker = {};   // SETTINGS > SHADER > CHOOSE
+    FilePicker  shader_picker = {};   // SHADER > CHOOSE (SETTINGS or the QUICK MENU)
+    SettingLayer shader_picker_scope = SettingLayer::global;   // where its pick goes
     bool        menu_visible = true;   // only hideable while a game runs
 
     // What the LOAD GAME window picked, started at the top of the NEXT loop:
@@ -1222,6 +1223,10 @@ static void close_topmost_or_toggle_menu(App* app)
         {
             map_window_close(&app->map_window, &app->input);
         }
+        else if (app->shader_picker.open)   // opened from SETTINGS or the QUICK MENU: closes before them
+        {
+            app->shader_picker.open = false;
+        }
         else if (app->quick_menu.open)
         {
             app->quick_menu.open = false;
@@ -1240,10 +1245,6 @@ static void close_topmost_or_toggle_menu(App* app)
             {
                 app->input_window.open = false;
             }
-        }
-        else if (app->shader_picker.open)   // opened from SETTINGS: closes before it
-        {
-            app->shader_picker.open = false;
         }
         else if (app->picker.open && app->picker.mode == FilePickerMode::folder)
         {
@@ -2051,6 +2052,47 @@ static void choose_folder_done(App* app, const FilePickerChoice* picked)
     }
 }
 
+// SHADER > CHOOSE (SETTINGS or the QUICK MENU): the picker opens in the
+// chosen preset's folder, else in the curated presets. What's picked goes to
+// `scope`, the scope the window that opened it edits.
+static void open_shader_picker(App* app, SettingLayer scope)
+{
+    std::string folder = settings_get_at(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, nullptr);
+    size_t slash = folder.find_last_of("/\\");
+    folder = slash == std::string::npos ? app->shader_presets_folder : folder.substr(0, slash);
+    if (!host_fs_exists(folder.c_str()))
+    {
+        folder = app->shader_presets_folder;
+    }
+    app->shader_picker_scope = scope;
+    file_picker_open_shader(&app->shader_picker, folder.c_str());
+}
+
+// Drawn over SETTINGS and the QUICK MENU, whichever opened it.
+static void draw_shader_picker(App* app)
+{
+    FilePickerChoice choice = {};
+    if (!file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &choice))
+    {
+        return;
+    }
+    // NONE: no preset at this scope. Globally that's the default; a core or
+    // game says it explicitly, so a global preset doesn't apply there.
+    SettingLayer scope = app->shader_picker_scope;
+    if (choice.content_path[0] != '\0' || scope != SettingLayer::global)
+    {
+        settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, choice.content_path);
+    }
+    else
+    {
+        settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
+    }
+    if (!app->settings_window.open)
+    {
+        save_settings(app);   // from the QUICK MENU: SETTINGS isn't there to save it when it closes
+    }
+}
+
 static void draw_settings(App* app)
 {
     const CoreSession* session = &app->session;
@@ -2228,36 +2270,10 @@ static void draw_settings(App* app)
         }
     }
 
-    // SHADER > CHOOSE: the picker opens in the chosen preset's folder, else
-    // in the curated presets.
     if (app->settings_window.choose_shader_request)
     {
         app->settings_window.choose_shader_request = false;
-        std::string folder = settings_get_at(&app->settings, app->settings_window.scope, PICCOLO_VIDEO_SHADER_PRESET,
-                                             nullptr);
-        size_t slash = folder.find_last_of("/\\");
-        folder = slash == std::string::npos ? app->shader_presets_folder : folder.substr(0, slash);
-        if (!host_fs_exists(folder.c_str()))
-        {
-            folder = app->shader_presets_folder;
-        }
-        file_picker_open_shader(&app->shader_picker, folder.c_str());
-    }
-    FilePickerChoice shader_choice = {};
-    if (file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
-                         &shader_choice))
-    {
-        // NONE: no preset at this scope. Globally that's the default; a core
-        // or game says it explicitly, so a global preset doesn't apply there.
-        SettingLayer scope = app->settings_window.scope;
-        if (shader_choice.content_path[0] != '\0' || scope != SettingLayer::global)
-        {
-            settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, shader_choice.content_path);
-        }
-        else
-        {
-            settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
-        }
+        open_shader_picker(app, app->settings_window.scope);
     }
 
     // Closed (by its button or Esc): apply the folders and save. The shader
@@ -3764,8 +3780,17 @@ int main(int argc, char** argv)
             quick.sdl = &app->input_sdl;
             quick.layouts = &app->layouts;
             quick.now_ms = SDL_GetTicks();
+            quick.core_name = app->core_name;
+            quick.game_name = app->game_name;
+            quick.shaders_available = app->shader_library.loaded;
             QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
             draw_remap_prompt(app);
+            if (app->quick_menu.choose_shader_request)
+            {
+                app->quick_menu.choose_shader_request = false;
+                open_shader_picker(app, app->quick_menu.shader_scope);
+            }
+            draw_shader_picker(app);   // over SETTINGS and the QUICK MENU
             if (app->quick_menu.slot != slot_before || app->quick_menu.open)
             {
                 app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot
