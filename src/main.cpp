@@ -1586,6 +1586,9 @@ static void app_update_input(App* app)
     {
         app->input.port_devices[port] = app->session.host->port_devices[port];
     }
+    // START joins the ports the core described (4 when it says nothing, as before 8 ports).
+    uint32_t core_ports = app->session.host->input_info.port_count;
+    app->input.join_ports = core_ports > 0 ? core_ports : 4;
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());

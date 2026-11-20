@@ -33,8 +33,9 @@ constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // bin
 constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
-constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "input_port2_device", "input_port3_device",
-                                                       "input_port4_device"};
+constexpr const char* PICCOLO_INPUT_PORT_DEVICES[8] = {"input_port1_device", "input_port2_device", "input_port3_device",
+                                                       "input_port4_device", "input_port5_device", "input_port6_device",
+                                                       "input_port7_device", "input_port8_device"};
 // Network: listen for piccoletto / other piccolos on one UDP port, answer LAN
 // discovery, pair devices (CONFIG > NETWORK). Off by default.
 constexpr const char* PICCOLO_NET_ENABLED = "net_enabled";
