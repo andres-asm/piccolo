@@ -4,10 +4,15 @@
 // that's what the Tegra 4 takes. Needs a display: without one (or without
 // GLES) it says SKIP and exits 77.
 //
-// Usage: piccolo_gl_presets_check <shaders/gl folder>
+// Usage: piccolo_gl_presets_check <shaders/gl folder> [--frames N]
+//   --frames N: also times N frames of each (pass 0 + the preset, 256x224 to
+//   1280x720 like the SHIELD Portable's screen, vsync off, glFinish each
+//   frame) and prints the milliseconds per frame.
 
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -43,8 +48,13 @@ int main(int argc, char** argv)
 {
     if (argc < 2)
     {
-        std::printf("usage: piccolo_gl_presets_check <shaders/gl folder>\n");
+        std::printf("usage: piccolo_gl_presets_check <shaders/gl folder> [--frames N]\n");
         return 2;
+    }
+    uint32_t timed_frames = 0;
+    if (argc >= 4 && std::strcmp(argv[2], "--frames") == 0)
+    {
+        timed_frames = static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 10));
     }
     std::vector<std::string> presets;
     find_presets(argv[1], &presets);
@@ -68,7 +78,11 @@ int main(int argc, char** argv)
     }
 
     VideoTexture texture = {};
-    std::vector<uint16_t> pixels(64 * 48, 0x7BEF);
+    std::vector<uint16_t> pixels(256 * 224, 0x7BEF);
+    if (timed_frames > 0)
+    {
+        app_shell_set_vsync(&shell, false);
+    }
     int32_t failures = 0;
     std::string pass0 = std::string(argv[1]) + "/pass0.glpreset";
     for (size_t i = 0; i < presets.size(); i++)
@@ -81,18 +95,45 @@ int main(int argc, char** argv)
         viewport.height = 144;
         viewport.source_width = 64;
         viewport.source_height = 48;
+        if (timed_frames > 0)
+        {
+            viewport.width = 960;   // 256x224 at 4:3, x3.2: what a 720p screen shows
+            viewport.height = 720;
+            viewport.source_width = 256;
+            viewport.source_height = 224;
+        }
         bool ran = false;
         if (loaded && (video_texture_created(&texture) ||
-                       video_texture_create(&texture, &shell, 64, 48, FramePixelFormat::rgb565, true)) &&
+                       video_texture_create(&texture, &shell, 256, 224, FramePixelFormat::rgb565, true)) &&
             app_shell_begin_frame(&shell) && app_shell_acquire(&shell))
         {
-            ran = video_texture_upload(&texture, &shell, pixels.data(), 64, 48) &&
+            ran = video_texture_upload(&texture, &shell, pixels.data(), viewport.source_width, viewport.source_height) &&
                   gl_shader_chain_prepare(&chain, &shell.gl, &texture.gl, texture.has_content, &viewport);
             if (ran)
             {
                 gl_shader_chain_record(&chain, &shell.gl, &texture.gl);
             }
             app_shell_present(&shell, ClearColor{ 0.0f, 0.0f, 0.0f, 1.0f });
+        }
+        double ms_per_frame = 0.0;
+        if (ran && timed_frames > 0)
+        {
+            // The same work as a game frame on screen: upload, the chain, ImGui
+            // (nothing), present; glFinish so each frame's GPU time is counted.
+            uint64_t started = SDL_GetTicksNS();
+            for (uint32_t frame = 0; frame < timed_frames; frame++)
+            {
+                if (!app_shell_begin_frame(&shell) || !app_shell_acquire(&shell))
+                {
+                    continue;
+                }
+                video_texture_upload(&texture, &shell, pixels.data(), viewport.source_width, viewport.source_height);
+                gl_shader_chain_prepare(&chain, &shell.gl, &texture.gl, texture.has_content, &viewport);
+                gl_shader_chain_record(&chain, &shell.gl, &texture.gl);
+                app_shell_present(&shell, ClearColor{ 0.0f, 0.0f, 0.0f, 1.0f });
+                shell.gl.gl.Finish();
+            }
+            ms_per_frame = static_cast<double>(SDL_GetTicksNS() - started) / 1e6 / static_cast<double>(timed_frames);
         }
         GLenum error = shell.gl.gl.GetError();
         if (!loaded || !ran || error != GL_NO_ERROR)
@@ -103,7 +144,14 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::printf("ok %s\n", presets[i].c_str());
+            if (timed_frames > 0)
+            {
+                std::printf("ok %s: %.2f ms per frame\n", presets[i].c_str(), ms_per_frame);
+            }
+            else
+            {
+                std::printf("ok %s\n", presets[i].c_str());
+            }
         }
         gl_shader_chain_destroy(&chain, &shell.gl);
     }
