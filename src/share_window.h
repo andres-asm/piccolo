@@ -33,6 +33,7 @@
 #include "localization.h"
 #include "net_share.h"
 #include "net_share_folders.h"
+#include "net_share_link.h"
 
 struct ImFont;
 
@@ -75,6 +76,14 @@ struct ShareWindow
     SharePane local;
     SharePane remote;
     std::vector<NetShareEntry> remote_roots;   // the other side's shared folders (its root listing)
+    std::vector<NetShareEntry> local_roots;    // ours, read with this side's listing
+    std::string message;             // what the last copy said, when it didn't go well
+
+    // Connecting (the other side, while no piccolo is connected with OWNER).
+    int32_t found_selected = -1;     // in the link's found list
+    char    code[8] = {};            // the 6 digits it shows, only the first time
+    bool    connect = false;         // CONNECT clicked: the caller connects
+    bool    disconnect = false;      // DISCONNECT clicked
     std::vector<ShareCopy> copies;   // asked for, taken by the caller
     bool      cancel = false;        // CANCEL clicked: the caller stops the copy running
 };
@@ -83,7 +92,7 @@ struct ShareWindowContext
 {
     const Localization*      strings = nullptr;
     const NetShareFolders*   local_folders = nullptr;   // this piccolo's shared folders
-    const char*              remote_name = "";          // "" = no piccolo connected with OWNER access
+    const NetShareLinkStatus* link = nullptr;           // our connection to another piccolo (nullptr: none)
     const ShareTransferLine* line = nullptr;
 };
 

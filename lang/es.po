@@ -3193,3 +3193,83 @@ msgstr "EN PAUSA: JUEGO REMOTO"
 msgctxt "share_cancel"
 msgid "CANCEL"
 msgstr "CANCELAR"
+
+msgctxt "share_network_off"
+msgid "THE NETWORK COULDN'T START (SEE THE LOG)."
+msgstr "LA RED NO PUDO ARRANCAR (MIRA EL REGISTRO)."
+
+msgctxt "share_needs_owner"
+msgid "CONNECTED, BUT THIS PICCOLO DIDN'T GIVE US OWNER ACCESS. GIVE IT ON THAT PICCOLO: SETTINGS > NETWORK, THIS DEVICE, OWNER."
+msgstr "CONECTADO, PERO ESTE PICCOLO NO NOS DIO ACCESO DE DUEÑO. DALO EN ESE PICCOLO: AJUSTES > RED, ESTE DISPOSITIVO, DUEÑO."
+
+msgctxt "share_disconnect"
+msgid "DISCONNECT"
+msgstr "DESCONECTAR"
+
+msgctxt "share_found"
+msgid "PICCOLOS ON THIS NETWORK"
+msgstr "PICCOLOS EN ESTA RED"
+
+msgctxt "share_found_none"
+msgid "LOOKING... (THE OTHER PICCOLO NEEDS NETWORK ON IN SETTINGS > NETWORK)"
+msgstr "BUSCANDO... (EL OTRO PICCOLO NECESITA LA RED ACTIVADA EN AJUSTES > RED)"
+
+msgctxt "share_code"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "share_code_help"
+msgid "The first time only: the 6 digits the other piccolo shows after SETTINGS > NETWORK > PAIR A DEVICE."
+msgstr "Sólo la primera vez: los 6 dígitos que muestra el otro piccolo tras AJUSTES > RED > VINCULAR UN DISPOSITIVO."
+
+msgctxt "share_connect"
+msgid "CONNECT"
+msgstr "CONECTAR"
+
+msgctxt "share_connecting"
+msgid "CONNECTING..."
+msgstr "CONECTANDO..."
+
+msgctxt "share_refused_not_paired"
+msgid "NOT PAIRED YET: TYPE THE CODE IT SHOWS."
+msgstr "AÚN NO EMPAREJADOS: ESCRIBE EL CÓDIGO QUE MUESTRA."
+
+msgctxt "share_refused_pairing_closed"
+msgid "IT ISN'T PAIRING NOW: OPEN PAIRING ON IT FIRST."
+msgstr "NO ESTÁ EMPAREJANDO: ABRE EL EMPAREJAMIENTO EN ÉL PRIMERO."
+
+msgctxt "share_refused_wrong_code"
+msgid "WRONG CODE."
+msgstr "CÓDIGO INCORRECTO."
+
+msgctxt "share_refused_unknown_host"
+msgid "IT ISN'T THE PICCOLO WE PAIRED WITH."
+msgstr "NO ES EL PICCOLO CON EL QUE NOS EMPAREJAMOS."
+
+msgctxt "share_refused_connection"
+msgid "COULDN'T CONNECT."
+msgstr "NO SE PUDO CONECTAR."
+
+msgctxt "share_done_exists"
+msgid "ALREADY THERE"
+msgstr "YA ESTÁ AHÍ"
+
+msgctxt "share_done_no_space"
+msgid "NOT ENOUGH SPACE"
+msgstr "NO HAY ESPACIO"
+
+msgctxt "share_done_mismatch"
+msgid "ARRIVED DAMAGED, THROWN AWAY"
+msgstr "LLEGÓ DAÑADO, DESCARTADO"
+
+msgctxt "share_done_refused"
+msgid "NOT ALLOWED"
+msgstr "NO PERMITIDO"
+
+msgctxt "share_done_busy"
+msgid "THE OTHER PICCOLO IS BUSY, TRY AGAIN"
+msgstr "EL OTRO PICCOLO ESTÁ OCUPADO, INTÉNTALO DE NUEVO"
+
+msgctxt "share_done_failed"
+msgid "FAILED"
+msgstr "FALLÓ"

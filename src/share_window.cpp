@@ -275,6 +275,105 @@ static void draw_pane(SharePane* pane, std::vector<NetShareEntry>* roots, const 
     }
 }
 
+static Str refusal_text(NetClientRefusal refusal)
+{
+    switch (refusal)
+    {
+    case NetClientRefusal::not_paired:
+        return Str::share_refused_not_paired;
+    case NetClientRefusal::pairing_closed:
+        return Str::share_refused_pairing_closed;
+    case NetClientRefusal::wrong_code:
+        return Str::share_refused_wrong_code;
+    case NetClientRefusal::unknown_host:
+        return Str::share_refused_unknown_host;
+    default:
+        return Str::share_refused_connection;
+    }
+}
+
+// The other side while no piccolo is connected with OWNER access: the
+// piccolos on this network, the code (only the first time) and CONNECT; or,
+// connected at a lower level, what to ask for there.
+static void draw_connect(ShareWindow* window, const NetShareLinkStatus* link, const PaneLayout* layout,
+                         const Localization* strings)
+{
+    ImGui::BeginGroup();
+    ImGui::PushID("connect");
+    ImGui::TextUnformatted(piccolo_text(strings, Str::share_other_piccolo));
+    float height = layout->folders_height + layout->files_height + ImGui::GetStyle().ItemSpacing.y +
+                   ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing();
+    retro_ui_begin_list("connect_box", layout->width, height);
+    ImGui::PushTextWrapPos(0.0f);
+    if (link == nullptr || link->state == NetShareLinkState::off)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_network_off));
+    }
+    else if (link->state == NetShareLinkState::ready)
+    {
+        // Connected, but not at OWNER: the other piccolo decides that.
+        ImGui::TextUnformatted(link->host_name.c_str());
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_needs_owner));
+        if (retro_ui_button(piccolo_text(strings, Str::share_disconnect)))
+        {
+            window->disconnect = true;
+        }
+    }
+    else
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_found));
+        if (window->found_selected >= static_cast<int32_t>(link->found.size()))
+        {
+            window->found_selected = -1;
+        }
+        for (size_t i = 0; i < link->found.size(); i++)
+        {
+            ImGui::PushID(static_cast<int>(i));
+            char address[64] = {};
+            net_address_to_text(link->found[i].address, address, sizeof(address));
+            char label[160] = {};
+            std::snprintf(label, sizeof(label), "%s  %s", link->found[i].name.c_str(), address);
+            if (ImGui::Selectable(label, window->found_selected == static_cast<int32_t>(i)))
+            {
+                window->found_selected = static_cast<int32_t>(i);
+            }
+            ImGui::PopID();
+        }
+        if (link->found.empty())
+        {
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_found_none));
+        }
+        ImGui::Spacing();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(piccolo_text(strings, Str::share_code));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0000000").x + ImGui::GetStyle().FramePadding.x * 2.0f);
+        retro_ui_push_field_text();
+        ImGui::InputText("##code", window->code, sizeof(window->code), ImGuiInputTextFlags_CharsDecimal);
+        retro_ui_pop_field_text();
+        retro_ui_item_tooltip(piccolo_text(strings, Str::share_code_help));
+        bool connecting = link->state == NetShareLinkState::connecting;
+        ImGui::BeginDisabled(window->found_selected < 0 || connecting);
+        if (retro_ui_button(piccolo_text(strings, Str::share_connect)))
+        {
+            window->connect = true;
+        }
+        ImGui::EndDisabled();
+        if (connecting)
+        {
+            ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_connecting));
+        }
+        else if (link->refusal != NetClientRefusal::none)
+        {
+            ImGui::TextDisabled("%s", piccolo_text(strings, refusal_text(link->refusal)));
+        }
+    }
+    ImGui::PopTextWrapPos();
+    retro_ui_end_list();
+    ImGui::PopID();
+    ImGui::EndGroup();
+}
+
 static const NetShareEntry* selected_file(const SharePane* pane)
 {
     if (pane->selected < 0 || static_cast<size_t>(pane->selected) >= pane->entries.size())
@@ -310,11 +409,24 @@ static void draw_arrow(ShareWindow* window, bool to_remote, bool connected, floa
 }
 
 // The bottom line: the copy running, or what the arrows do.
-static void draw_line(ShareWindow* window, const ShareTransferLine* line, const Localization* strings, float block)
+static void draw_line(ShareWindow* window, const ShareTransferLine* line, bool connected, const Localization* strings,
+                      float block)
 {
     if (line == nullptr || !line->active)
     {
-        ImGui::TextDisabled("%s", piccolo_text(strings, Str::share_hint));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", window->message.empty() ? piccolo_text(strings, Str::share_hint) : window->message.c_str());
+        if (connected)
+        {
+            const char* label = piccolo_text(strings, Str::share_disconnect);
+            float width = ImGui::CalcTextSize(label).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            ImGui::SameLine();
+            ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - width);
+            if (retro_ui_button(label))
+            {
+                window->disconnect = true;
+            }
+        }
         return;
     }
     const char* verb = piccolo_text(strings, line->sending ? Str::share_sending : Str::share_receiving);
@@ -373,10 +485,12 @@ void share_window_draw(ShareWindow* window, const ShareWindowContext* context, I
         return;
     }
     const Localization* strings = context->strings;
-    bool connected = context->remote_name[0] != '\0';
+    const NetShareLinkStatus* link = context->link;
+    bool connected = link != nullptr && link->state == NetShareLinkState::ready && link->access == NetAccessLevel::owner;
     if (window->local.stale && context->local_folders != nullptr)
     {
         window->local.stale = false;
+        net_share_list(context->local_folders, "", &window->local_roots);
         window->local.status = net_share_list(context->local_folders, window->local.path.c_str(), &window->local.entries);
         window->local.selected = -1;
         if (window->local.status != NetShareStatus::ok && !window->local.path.empty())
@@ -417,12 +531,7 @@ void share_window_draw(ShareWindow* window, const ShareWindowContext* context, I
         layout.folders_height = static_cast<float>(static_cast<int32_t>(lists * 0.38f));
         layout.files_height = static_cast<float>(static_cast<int32_t>(lists - layout.folders_height));
 
-        std::vector<NetShareEntry> local_roots;   // this piccolo's shared folders, for its combo
-        if (context->local_folders != nullptr)
-        {
-            net_share_list(context->local_folders, "", &local_roots);
-        }
-        draw_pane(&window->local, &local_roots, piccolo_text(strings, Str::share_this_piccolo), true, &layout, strings);
+        draw_pane(&window->local, &window->local_roots, piccolo_text(strings, Str::share_this_piccolo), true, &layout, strings);
 
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -439,10 +548,16 @@ void share_window_draw(ShareWindow* window, const ShareWindowContext* context, I
         ImGui::EndGroup();
         ImGui::SameLine();
 
-        draw_pane(&window->remote, &window->remote_roots, connected ? context->remote_name : piccolo_text(strings, Str::share_other_piccolo),
-                  connected, &layout, strings);
+        if (connected)
+        {
+            draw_pane(&window->remote, &window->remote_roots, link->host_name.c_str(), true, &layout, strings);
+        }
+        else
+        {
+            draw_connect(window, link, &layout, strings);
+        }
 
-        draw_line(window, context->line, strings, block);
+        draw_line(window, context->line, connected, strings, block);
         retro_ui_end_window();
     }
     ImGui::End();
