@@ -90,6 +90,8 @@ static void draw_list(CoresWindow* window, const CoresWindowContext* context, fl
     CoreUpdater* updater = context->updater;
     const Localization* strings = context->strings;
     retro_ui_begin_list("cores", 0.0f, height);
+    // A gap between columns, so a long SYSTEMS text doesn't run into VERSION.
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4.0f * block, ImGui::GetStyle().CellPadding.y));
     if (ImGui::BeginTable("cores_table", 4, ImGuiTableFlags_SizingFixedFit))
     {
         ImGui::TableSetupColumn(piccolo_text(strings, Str::cores_column_core), ImGuiTableColumnFlags_WidthFixed, 80.0f * block);
@@ -119,6 +121,7 @@ static void draw_list(CoresWindow* window, const CoresWindowContext* context, fl
         }
         ImGui::EndTable();
     }
+    ImGui::PopStyleVar();
     retro_ui_end_list();
 }
 
@@ -219,10 +222,14 @@ void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, I
         }
         else
         {
-            // The list takes what's left after the details, buttons and status (about 5 lines).
+            // The list takes what's left above the details, buttons and status,
+            // measured last frame (their height changes with notes and buttons;
+            // the first frame guesses 4 lines).
             float line = ImGui::GetFrameHeightWithSpacing();
-            float list_height = ImGui::GetContentRegionAvail().y - line * 5.0f;
+            float bottom = window->bottom_height > 0.0f ? window->bottom_height : line * 4.0f;
+            float list_height = ImGui::GetContentRegionAvail().y - bottom;
             draw_list(window, context, block, list_height > line * 3.0f ? list_height : line * 3.0f);
+            float bottom_start = ImGui::GetCursorPosY();
             draw_selected(window, context);
 
             bool busy = updater->state != CoreUpdaterState::idle;
@@ -267,6 +274,7 @@ void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, I
             {
                 ImGui::TextDisabled("%s", updater->message.c_str());
             }
+            window->bottom_height = ImGui::GetCursorPosY() - bottom_start;
         }
         retro_ui_end_window();
     }
