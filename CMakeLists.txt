@@ -342,6 +342,20 @@ multitap_write_version_header("${PICCOLO_GENERATED}" piccolo PICCOLO_VERSION "${
 message(STATUS "piccolo ${PICCOLO_VERSION}")
 
 multitap_set_project_flags(piccolo)
+if(EMSCRIPTEN)
+    # The browser build (web/build.sh, docs/wasm.md): piccolo.js + piccolo.wasm.
+    # WebGL 2 only (the GLES 3 path asks SDL for an ES 3.0 context). With
+    # pthreads: every object is built with -pthread (web/build.sh), the link
+    # needs it too. Fixed memory, no growth: with threads, growing memory makes
+    # every JS access to it slow (Emscripten warns), and iOS browsers refuse a
+    # threaded module without a maximum anyway (SDL's README-emscripten.md).
+    # 256 MiB is plenty for SameBoy; bigger cores may need more (per core later).
+    target_link_options(piccolo PRIVATE
+        -pthread
+        -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
+        -sINITIAL_MEMORY=256mb)
+    return()   # nothing else (tools, tests) is built for the browser
+endif()
 if(ANDROID)
     return()   # the APK needs only libmain.so (and Test libretro); no tools or tests
 endif()
