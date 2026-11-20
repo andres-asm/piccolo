@@ -460,3 +460,10 @@ if(MULTITAP_BUILD_TESTS)
     set_tests_properties(piccolo_recent_games PROPERTIES
         FAIL_REGULAR_EXPRESSION "ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 endif()
+
+
+# Development tool: what keeping a savestate every frame costs on a core and
+# game (rewind): serialize, the delta (state_delta), loading a state, history per MiB.
+add_executable(rewind_measure tools/rewind_measure.cpp tools/measure_common.cpp)
+target_link_libraries(rewind_measure PRIVATE host_libretro frontend_common)
+multitap_set_project_flags(rewind_measure)
