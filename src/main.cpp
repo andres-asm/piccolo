@@ -2921,7 +2921,7 @@ int main(int argc, char** argv)
 
         if (app_shell_begin_frame(&app->shell))
         {
-            app->ui_scale = retro_ui_scale_for_width(ImGui::GetIO().DisplaySize.x);
+            app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
             draw_game(app);   // background, behind everything
             bool menu_shown = app->menu_visible || !game_running(app);

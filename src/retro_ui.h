@@ -73,10 +73,9 @@ const RetroUiPalette* retro_ui_theme_palette(RetroUiTheme theme);
 // The palette everything is drawn with from now on (copied).
 void retro_ui_set_palette(const RetroUiPalette* palette);
 
-// The scale for a window: about 640 retro pixels across, at least 1, times
-// the display's scale (whole part, at least 1): 2 on a 320 dpi Android screen
-// (the SHIELD), 1 on most desktops.
-int32_t retro_ui_scale_for_width(float window_width);
+// The scale for a window: the biggest whole block that leaves at least
+// 640 x 360 retro pixels, at least 1 (3 on a 1920 x 1080 window).
+int32_t retro_ui_scale_for_window(float window_width, float window_height);
 
 // The menu bar at the top of the window. Call between ImGui::NewFrame() and
 // rendering. Returns the item picked this frame (MenuAction::none if none).

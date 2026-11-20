@@ -156,28 +156,24 @@ static void push_invisible_text()
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
 }
 
-int32_t retro_ui_scale_for_width(float window_width)
+int32_t retro_ui_scale_for_window(float window_width, float window_height)
 {
-    int32_t scale = static_cast<int32_t>(window_width / 640.0f);
-    if (scale < 1)
-    {
-        scale = 1;
-    }
-    // debug_ui puts the display's scale (SDL_GetWindowDisplayScale) in
-    // style.FontScaleDpi. The retro UI takes it here, in the block, and keeps
-    // it out of the font (push_pixel_font): then the font and every other
-    // metric (padding, bevels, shadows) stay in the same whole blocks.
-    int32_t display_scale = static_cast<int32_t>(ImGui::GetStyle().FontScaleDpi);
-    if (display_scale < 1)
-    {
-        display_scale = 1;
-    }
-    return scale * display_scale;
+    // The biggest whole block that still leaves 640 x 360 retro pixels: the
+    // UI is then the same share of any window (and the windows fit: MAP
+    // CONTROLLER is 252 + 24 tall). The display's scale (density) isn't
+    // added on top: a bigger block wouldn't fit, and the window's size is
+    // already in the display's units (points on macOS / Wayland, pixels on
+    // Android and Windows), so the UI has the same share either way. The
+    // SHIELD Portable (1920 x 1080 at 320 dpi) gets 3.
+    int32_t across = static_cast<int32_t>(window_width / 640.0f);
+    int32_t down = static_cast<int32_t>(window_height / 360.0f);
+    int32_t scale = across < down ? across : down;
+    return scale < 1 ? 1 : scale;
 }
 
 // The pixel font at exactly 8 x block pixels per line. ImGui multiplies every
 // font size by style.FontScaleMain x style.FontScaleDpi; the display's scale
-// is already in the block (retro_ui_scale_for_width), so it's divided out.
+// isn't wanted on top of the block (retro_ui_scale_for_window), so it's divided out.
 static void push_pixel_font(ImFont* pixel_font, float block)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
