@@ -3676,12 +3676,18 @@ int main(int argc, char** argv)
             cores_context.updater = &app->core_updater;
             cores_context.running_file = running_file.c_str();
             app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+            app->cores_window.show_legacy = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_LEGACY);
+            app->cores_window.show_experimental = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_EXPERIMENTAL);
             cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
-            if (app->cores_window.show_non_free_changed)
+            if (app->cores_window.show_changed)
             {
-                app->cores_window.show_non_free_changed = false;
+                app->cores_window.show_changed = false;
                 settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
                                   app->cores_window.show_non_free);
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_LEGACY,
+                                  app->cores_window.show_legacy);
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_EXPERIMENTAL,
+                                  app->cores_window.show_experimental);
                 save_settings(app);
             }
             InputWindowContext input_context = {};

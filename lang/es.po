@@ -2998,6 +2998,42 @@ msgctxt "cores_non_free_confirm_yes"
 msgid "SHOW THEM"
 msgstr "MOSTRARLOS"
 
+msgctxt "cores_show"
+msgid "SHOW:"
+msgstr "MOSTRAR:"
+
+msgctxt "cores_show_legacy"
+msgid "OLDER VERSIONS"
+msgstr "VERSIONES VIEJAS"
+
+msgctxt "cores_show_legacy_setting"
+msgid "SHOW OLDER CORE VERSIONS"
+msgstr "MOSTRAR VERSIONES VIEJAS DE CORES"
+
+msgctxt "cores_show_legacy_help"
+msgid "Also lists older versions of cores (Snes9x 2005...), kept for weak devices or old game sets. Off: only the current ones, plus older ones already installed."
+msgstr "También lista versiones viejas de cores (Snes9x 2005...), para equipos débiles o sets de juegos viejos. Apagado: solo las actuales, más las viejas ya instaladas."
+
+msgctxt "cores_show_experimental"
+msgid "EXPERIMENTAL"
+msgstr "EXPERIMENTALES"
+
+msgctxt "cores_show_experimental_setting"
+msgid "SHOW EXPERIMENTAL CORES"
+msgstr "MOSTRAR CORES EXPERIMENTALES"
+
+msgctxt "cores_show_experimental_help"
+msgid "Also lists cores that are unsupported upstream or don't fully work in piccolo yet. Off: they're hidden, unless already installed."
+msgstr "También lista cores sin soporte de sus autores o que todavía no funcionan del todo en piccolo. Apagado: ocultos, salvo los ya instalados."
+
+msgctxt "cores_legacy_note"
+msgid "AN OLDER VERSION OF A CORE: FOR WEAK DEVICES OR OLD GAME SETS."
+msgstr "VERSIÓN VIEJA DE UN CORE: PARA EQUIPOS DÉBILES O SETS DE JUEGOS VIEJOS."
+
+msgctxt "cores_experimental_note"
+msgid "EXPERIMENTAL: UNSUPPORTED, OR NOT FULLY WORKING IN PICCOLO YET."
+msgstr "EXPERIMENTAL: SIN SOPORTE, O TODAVÍA NO FUNCIONA DEL TODO EN PICCOLO."
+
 msgctxt "setting_run_ahead"
 msgid "RUN-AHEAD"
 msgstr "RUN-AHEAD"

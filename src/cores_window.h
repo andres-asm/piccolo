@@ -20,6 +20,11 @@
 // explaining what non-free means. Non-free cores already installed are
 // always listed (so they can be removed). Store builds never offer them
 // (core_updater's free_only).
+//
+// Core types (Andrés, 2026-11-20): the index's `type` (multitap-org/cores
+// chooses it). OLDER VERSIONS (legacy: Snes9x 2005, ...) and EXPERIMENTAL
+// are off by default and need no confirmation. Installed cores are always
+// listed, whatever the switches say. The three switches are one SHOW row.
 
 #include <cstdint>
 
@@ -34,8 +39,11 @@ struct CoresWindow
     int32_t selected = -1;      // index into the updater's index entries
     bool    update_all = false; // UPDATE ALL: install the next outdated core whenever idle
     float   bottom_height = 0.0f;   // what's under the list, measured last frame (the list takes the rest)
-    bool    show_non_free = false;  // the setting (main.cpp loads it before drawing)
-    bool    show_non_free_changed = false;   // set when the user changed it; main.cpp saves and clears
+    // The SHOW switches: settings, main.cpp loads them before drawing.
+    bool    show_non_free = false;
+    bool    show_legacy = false;
+    bool    show_experimental = false;
+    bool    show_changed = false;            // set when the user changed one; main.cpp saves and clears
     bool    confirm_non_free = false;        // the confirmation is up
 };
 
