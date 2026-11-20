@@ -14,6 +14,18 @@ void main_loop_run(MainLoopFrame frame, void* data)
     }
 }
 
+void main_loop_on_leave(MainLoopSave save, void* data)
+{
+    (void)save;
+    (void)data;
+}
+
+void main_loop_on_open(MainLoopOpen open, void* data)
+{
+    (void)open;
+    (void)data;
+}
+
 bool main_loop_window_follows_page()
 {
     return false;

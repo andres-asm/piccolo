@@ -134,6 +134,8 @@ layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
 web/                      the browser build (Emscripten, WebGL 2, pthreads; branch wasm): build-core.sh (SameBoy
                           as a static archive), build.sh; src/bundled_files_web.cpp registers the linked core
+  main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
+                          leave, piccolo_web_open); storage.* the browser's piccolo folder on OPFS (WasmFS)
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
                           codec on real games), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only

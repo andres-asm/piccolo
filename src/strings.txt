@@ -198,6 +198,7 @@ quick_menu_reset = RESET
 quick_menu_close_game = CLOSE GAME
 quick_menu_keys = ARROWS OR 1-9: SLOT. S: SAVE. L: LOAD. F1 OR ESC: BACK TO THE GAME.
 status_game_closed = GAME CLOSED
+status_no_core_for_file = NO CORE FOR THIS FILE
 
 # IMAGE SETTINGS window
 image_title = IMAGE SETTINGS

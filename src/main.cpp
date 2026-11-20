@@ -25,6 +25,7 @@
 #include "app_shell.h"
 #include "bundled_files.h"
 #include "main_loop.h"
+#include "storage.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
@@ -3628,12 +3629,69 @@ static bool app_frame_callback(void* data)
     return app_frame(static_cast<App*>(data));
 }
 
+// A file the page opened (main_loop_on_open, the browser): kept in
+// <piccolo>/games (so RECENT finds it again after a reload), then started
+// with the first core that takes its extension, like LOAD GAME would.
+static void app_open_file(void* data, const char* path)
+{
+    App* app = static_cast<App*>(data);
+    std::string name = path;
+    size_t slash = name.find_last_of('/');
+    if (slash != std::string::npos)
+    {
+        name = name.substr(slash + 1);
+    }
+    std::string kept = app->paths.root.empty() ? std::string(path) : app->paths.root + "/games/" + name;
+    if (kept != path)
+    {
+        std::string folder = app->paths.root + "/games";
+        if (!host_fs_make_directories(folder.c_str()) || !host_fs_copy(path, kept.c_str()))
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Can't keep %s in %s: playing it from where it is", path,
+                         folder.c_str());
+            kept = path;
+        }
+    }
+    const CoreCatalogEntry* core = nullptr;
+    for (int32_t i = 0; i < app->catalog.count && core == nullptr; i++)
+    {
+        if (libretro_core_info_accepts(&app->catalog.entries[i].info, kept.c_str()))
+        {
+            core = &app->catalog.entries[i];
+        }
+    }
+    if (core == nullptr)
+    {
+        set_status(app, piccolo_text(&app->strings, Str::status_no_core_for_file));
+        return;
+    }
+    app->pending_start = FilePickerChoice{};
+    core_catalog_path(&app->catalog, core, app->pending_start.core_path, sizeof(app->pending_start.core_path));
+    std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s", kept.c_str());
+    app->has_pending_start = true;   // started at the top of the next frame, like LOAD GAME
+}
+
+// The browser is leaving (main_loop_on_leave): what piccolo writes at exit,
+// written now, since its exit never runs there. The game keeps running if
+// the page comes back.
+static void app_save_on_leave(void* data)
+{
+    App* app = static_cast<App*>(data);
+    if (app->session.host != nullptr)
+    {
+        libretro_host_save_memory(app->session.host);
+    }
+    save_settings(app);
+    save_core_options(app);
+}
+
 int main(int argc, char** argv)
 {
     (void)argc;
     (void)argv;
 
     SDL_Log("piccolo %s, host-libretro %s", PICCOLO_VERSION, HOST_LIBRETRO_VERSION);
+    storage_init(bundled_files_folder_name());   // the browser: piccolo's folder on OPFS
 
     // The session, catalog and file picker are large (paths, file lists): off the stack.
     App* app = new App{};
@@ -3800,6 +3858,8 @@ int main(int argc, char** argv)
     refresh_audio_devices(app);
 
     app->running = true;
+    main_loop_on_leave(app_save_on_leave, app);
+    main_loop_on_open(app_open_file, app);
     main_loop_run(app_frame_callback, app);
 
     piccolo_window_capture(&app->window, app->shell.window);

@@ -1210,6 +1210,10 @@ msgctxt "status_game_closed"
 msgid "GAME CLOSED"
 msgstr "JUEGO CERRADO"
 
+msgctxt "status_no_core_for_file"
+msgid "NO CORE FOR THIS FILE"
+msgstr "NINGÚN CORE ABRE ESTE ARCHIVO"
+
 msgctxt "core_options_section"
 msgid "SECTION"
 msgstr "SECCIÓN"
