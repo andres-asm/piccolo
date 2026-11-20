@@ -330,6 +330,18 @@ msgctxt "setting_pause_on_focus_loss_help"
 msgid "Pause while another window is active."
 msgstr "Pausa mientras otra ventana está activa."
 
+msgctxt "setting_pause_on_disconnect"
+msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
+msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
+
+msgctxt "setting_pause_on_disconnect_help"
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START resumes."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START reanuda."
+
+msgctxt "status_paused_disconnected"
+msgid "PAUSED: CONTROLLER DISCONNECTED. START TO GO ON"
+msgstr "EN PAUSA: CONTROL DESCONECTADO. START PARA SEGUIR"
+
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
 msgstr "PERMITIR PROTECTOR DE PANTALLA EN PAUSA"
@@ -2451,6 +2463,134 @@ msgctxt "map_any_button"
 msgid "Or press any button on the controller."
 msgstr "O presiona cualquier botón del control."
 
+msgctxt "menu_cores"
+msgid "CORES..."
+msgstr "CORES..."
+
+msgctxt "cores_title"
+msgid "CORES"
+msgstr "CORES"
+
+msgctxt "cores_refresh"
+msgid "REFRESH"
+msgstr "ACTUALIZAR LISTA"
+
+msgctxt "cores_update_all"
+msgid "UPDATE ALL"
+msgstr "ACTUALIZAR TODOS"
+
+msgctxt "cores_install"
+msgid "INSTALL"
+msgstr "INSTALAR"
+
+msgctxt "cores_update"
+msgid "UPDATE"
+msgstr "ACTUALIZAR"
+
+msgctxt "cores_replace"
+msgid "REPLACE"
+msgstr "REEMPLAZAR"
+
+msgctxt "cores_remove"
+msgid "REMOVE"
+msgstr "QUITAR"
+
+msgctxt "cores_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "cores_column_core"
+msgid "CORE"
+msgstr "CORE"
+
+msgctxt "cores_column_systems"
+msgid "SYSTEMS"
+msgstr "SISTEMAS"
+
+msgctxt "cores_column_version"
+msgid "VERSION"
+msgstr "VERSIÓN"
+
+msgctxt "cores_column_status"
+msgid "STATUS"
+msgstr "ESTADO"
+
+msgctxt "cores_status_installed"
+msgid "INSTALLED"
+msgstr "INSTALADO"
+
+msgctxt "cores_status_update"
+msgid "UPDATE"
+msgstr "ACTUALIZAR"
+
+msgctxt "cores_status_not_installed"
+msgid "-"
+msgstr "-"
+
+msgctxt "cores_status_by_hand"
+msgid "YOURS"
+msgstr "TUYO"
+
+msgctxt "cores_free"
+msgid "FREE"
+msgstr "LIBRE"
+
+msgctxt "cores_non_free"
+msgid "NON-FREE"
+msgstr "NO LIBRE"
+
+msgctxt "cores_license"
+msgid "LICENSE"
+msgstr "LICENCIA"
+
+msgctxt "cores_size"
+msgid "DOWNLOAD"
+msgstr "DESCARGA"
+
+msgctxt "cores_installed_version"
+msgid "INSTALLED"
+msgstr "INSTALADO"
+
+msgctxt "cores_none_selected"
+msgid "PICK A CORE IN THE LIST."
+msgstr "ELIGE UN CORE DE LA LISTA."
+
+msgctxt "cores_empty"
+msgid "NO LIST YET: REFRESH TO GET IT."
+msgstr "TODAVÍA NO HAY LISTA: ACTUALIZAR LISTA PARA BAJARLA."
+
+msgctxt "cores_unavailable"
+msgid "CORE DOWNLOADS AREN'T PART OF THIS BUILD."
+msgstr "LAS DESCARGAS DE CORES NO SON PARTE DE ESTA VERSIÓN."
+
+msgctxt "cores_non_free_note"
+msgid "* NON-FREE: FREE TO USE, BUT ITS LICENSE ISN'T FREE SOFTWARE (FOR EXAMPLE, NO COMMERCIAL USE)."
+msgstr "* NO LIBRE: SE PUEDE USAR GRATIS, PERO SU LICENCIA NO ES DE SOFTWARE LIBRE (POR EJEMPLO, NO PERMITE USO COMERCIAL)."
+
+msgctxt "cores_by_hand_note"
+msgid "THIS FILE WAS PUT THERE BY HAND. REPLACE INSTALLS THE DOWNLOAD OVER IT."
+msgstr "ESTE ARCHIVO SE PUSO A MANO. REEMPLAZAR INSTALA LA DESCARGA ENCIMA."
+
+msgctxt "cores_downloading"
+msgid "DOWNLOADING"
+msgstr "DESCARGANDO"
+
+msgctxt "setting_core_server"
+msgid "CORE SERVER"
+msgstr "SERVIDOR DE CORES"
+
+msgctxt "setting_core_server_help"
+msgid "Where TOOLS > CORES downloads cores from. Must be an https:// address."
+msgstr "De dónde descarga cores HERRAMIENTAS > CORES. Debe ser una dirección https://."
+
+msgctxt "setting_core_server_insecure"
+msgid "ALLOW INSECURE CORE SERVER"
+msgstr "PERMITIR SERVIDOR DE CORES INSEGURO"
+
+msgctxt "setting_core_server_insecure_help"
+msgid "Development only: CORE SERVER may be http:// or file://. Cores are still checked against the signed list."
+msgstr "Solo para desarrollo: SERVIDOR DE CORES puede ser http:// o file://. Los cores se siguen comprobando contra la lista firmada."
+
 msgctxt "menu_network"
 msgid "NETWORK..."
 msgstr "RED..."
@@ -2645,3 +2785,23 @@ msgstr "BAJADA"
 msgctxt "net_speed_up"
 msgid "UP"
 msgstr "SUBIDA"
+
+msgctxt "cores_show_non_free"
+msgid "SHOW NON-FREE CORES"
+msgstr "MOSTRAR CORES NO LIBRES"
+
+msgctxt "cores_show_non_free_help"
+msgid "Also lists cores whose license isn't free software (marked *). Off: only free-licensed cores, plus non-free ones already installed."
+msgstr "También lista los cores cuya licencia no es de software libre (marcados con *). Apagado: solo cores con licencia libre, más los no libres ya instalados."
+
+msgctxt "cores_non_free_confirm_title"
+msgid "NON-FREE CORES"
+msgstr "CORES NO LIBRES"
+
+msgctxt "cores_non_free_confirm_text"
+msgid "NON-FREE CORES CAN BE USED FOR FREE, BUT THEIR LICENSES AREN'T FREE SOFTWARE: MOST FORBID COMMERCIAL USE, AND SOME DON'T ALLOW CHANGING OR SHARING CHANGED VERSIONS. SHOW THEM IN THE LIST?"
+msgstr "LOS CORES NO LIBRES SE PUEDEN USAR GRATIS, PERO SUS LICENCIAS NO SON DE SOFTWARE LIBRE: LA MAYORÍA PROHÍBE EL USO COMERCIAL Y ALGUNAS NO PERMITEN MODIFICARLOS NI COMPARTIR VERSIONES MODIFICADAS. ¿MOSTRARLOS EN LA LISTA?"
+
+msgctxt "cores_non_free_confirm_yes"
+msgid "SHOW THEM"
+msgstr "MOSTRARLOS"

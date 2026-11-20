@@ -22,6 +22,9 @@
 constexpr const char* PICCOLO_LANGUAGE = "language";
 constexpr const char* PICCOLO_PAUSE_IN_MENU = "pause_in_menu";
 constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
+// Pause when the last gamepad playing goes away (not when the keyboard was
+// what played); START (joining a port, or on one) resumes.
+constexpr const char* PICCOLO_PAUSE_ON_DISCONNECT = "pause_on_disconnect";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
@@ -41,6 +44,11 @@ constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";
 constexpr const char* PICCOLO_PATH_STATES = "path_states";
+// TOOLS > CORES: the core downloader's server (no row in SETTINGS yet: set in
+// piccolo.cfg), and the development switch that lets it be http:// or file://.
+constexpr const char* PICCOLO_CORE_SERVER = "core_server";
+constexpr const char* PICCOLO_CORE_SERVER_INSECURE = "core_server_insecure";
+constexpr const char* PICCOLO_CORES_SHOW_NON_FREE = "cores_show_non_free";   // TOOLS > CORES's checkbox
 // Game folders (SETTINGS > GENERAL, "+" adds one): LOAD GAME offers them as
 // places to start, and they're the only folders a network client may browse
 // and load games from. Global only; kept in order, no gaps (an emptied slot

@@ -35,8 +35,9 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
-  (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/)
+  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
+  signatures); libcurl from the system (Linux) for the core downloader
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
@@ -125,6 +126,7 @@ src/
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
+  cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android stub (SDL from deps/)
 tools/                    pixel_font_preview, strings_check, recent_games_test, lsan-suppressions.txt
@@ -136,7 +138,9 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
-                              content_cache (extracted files, LRU); frontend_net (optional, with deps/enet):
+                              content_cache (extracted files, LRU); frontend_download (signature, net_http,
+                              file_hash: the core downloader; built where libcurl is found);
+                              frontend_net (optional, with deps/enet):
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
                               net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
@@ -150,7 +154,8 @@ deps/libretro/host-libretro/  host_libretro: libretro_core / host / environment 
                               tools/core_info.cpp (libretro_core_info); tests/ (test core, unit tests, Test libretro runs)
 deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, core_options_store / cache,
                               keyboard_input, fixed_input, content_archive (which cores take archives
-                              whole, extraction before loading); tests/
+                              whole, extraction before loading), core_index / core_updater (the core
+                              downloader; core_updater_none.cpp with MULTITAP_CORE_UPDATER=OFF); tests/
 ```
 
 ## Setup (first time on a machine)

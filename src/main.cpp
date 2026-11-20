@@ -39,6 +39,8 @@
 #include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
+#include "core_updater.h"
+#include "cores_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -120,6 +122,9 @@ struct App
     NetRemote  net_remote = {};          // settings and actions from devices (net_remote.h)
     bool       net_remote_ready = false;
     bool       net_paused = false;       // PAUSE from a device
+    // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
+    bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
+    bool       disconnect_paused = false;     // START resumes
     uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
@@ -230,6 +235,11 @@ struct App
     CoreOptionsUiState core_options_state;
     bool               core_options_manager = false;   // the window is open
     bool               core_options_manager_was_open = false;
+
+    // TOOLS > CORES: the core downloader (core_updater.h) and its window. Set
+    // up when the window opens (the server and cores folder may have changed).
+    CoreUpdater        core_updater;
+    CoresWindow        cores_window;
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -434,7 +444,7 @@ static void update_pause(App* app)
                      app->input_window.open || map_window_open_now(&app->map_window);
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
     bool pause_for_focus = !app->window_focused && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_FOCUS_LOSS);
-    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused);
+    bool pause = game_running(app) && (pause_for_menu || pause_for_focus || app->net_paused || app->disconnect_paused);
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
@@ -692,6 +702,40 @@ static CoreOptionsUiContext core_options_context(App* app)
     return context;
 }
 
+// The running core's file name ("snes9x_libretro.so"), "" when no game runs:
+// the core downloader never replaces or removes it.
+static std::string running_core_file(const App* app)
+{
+    if (!game_running(app))
+    {
+        return std::string();
+    }
+    const char* slash = std::strrchr(app->last_core, '/');
+    return slash != nullptr ? std::string(slash + 1) : std::string(app->last_core);
+}
+
+// TOOLS > CORES: the downloader is set up again on every open (unless it's
+// busy), so a changed CORE SERVER or cores folder applies.
+static void open_cores_window(App* app)
+{
+    if (app->core_updater.state == CoreUpdaterState::idle && !app->paths.root.empty())
+    {
+        const char* keys[CORE_UPDATER_MAX_KEYS] = {};
+        int32_t key_count = core_updater_key_count();
+        key_count = key_count < CORE_UPDATER_MAX_KEYS ? key_count : CORE_UPDATER_MAX_KEYS;
+        for (int32_t i = 0; i < key_count; i++)
+        {
+            keys[i] = core_updater_key_hex(i);
+        }
+        std::string work = app->paths.cache + "/downloads";
+        core_updater_init(&app->core_updater, "piccolo/" PICCOLO_VERSION,
+                          settings_get_text(&app->settings, PICCOLO_CORE_SERVER),
+                          settings_get_bool(&app->settings, PICCOLO_CORE_SERVER_INSECURE), keys, key_count,
+                          core_index_build_target(), app->cores_directory.c_str(), work.c_str());
+    }
+    cores_window_open(&app->cores_window, &app->core_updater);
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -750,6 +794,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::options_manager:
             core_options_manager_open(&app->core_options_manager, &app->core_options_state);
+            break;
+        case MenuAction::cores:
+            open_cores_window(app);
             break;
         case MenuAction::network:
             settings_window_open(&app->settings_window, SettingsTab::network);
@@ -951,7 +998,8 @@ static void refresh_audio_devices(App* app)
 static bool any_window_open(const App* app)
 {
     return app->picker.open || app->settings_window.open || app->settings_window.image_open || app->quick_menu.open ||
-           app->core_options_manager || app->safe_start_open || app->show_debug_window || app->input_window.open ||
+           app->core_options_manager || app->cores_window.open || app->safe_start_open || app->show_debug_window ||
+           app->input_window.open ||
            map_window_open_now(&app->map_window);
 }
 
@@ -983,6 +1031,10 @@ static void close_topmost_or_toggle_menu(App* app)
         else if (app->core_options_manager)
         {
             app->core_options_manager = false;
+        }
+        else if (app->cores_window.open)
+        {
+            app->cores_window.open = false;
         }
         else if (app->input_window.open)
         {
@@ -1338,6 +1390,65 @@ static void update_cursors(App* app, const InputFrame* frame, bool ui_up)
 
 // Once per loop, after the events: what the controllers say (ports,
 // hotkeys), handed to the core session before it runs frames.
+
+// Is a connected gamepad (local or remote) on any port?
+static bool gamepad_on_a_port(const App* app)
+{
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputDevice* device = input_devices_find_const(&app->input.devices, app->input.controllers[c].device_id);
+        if (device != nullptr && device->connected && device->kind == InputDeviceKind::gamepad &&
+            input_controller_port(&app->input, static_cast<uint32_t>(c)) != INPUT_NO_PORT)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// PAUSE WHEN CONTROLLERS DISCONNECT: notes whether a gamepad or the keyboard
+// played last (a RetroPad input held in the game), and resumes on START.
+static void follow_what_plays(App* app, const InputFrame* frame)
+{
+    uint32_t pad_actions = static_cast<uint32_t>(InputAction::pad_turbo);   // the RetroPad's buttons and sticks
+    for (size_t c = 0; c < app->input.controllers.size(); c++)
+    {
+        const InputController* controller = &app->input.controllers[c];
+        if (controller->layer != InputLayer::game)
+        {
+            continue;
+        }
+        bool playing = false;
+        for (uint32_t a = 0; a < pad_actions && !playing; a++)
+        {
+            playing = controller->held_last[a];
+        }
+        const InputDevice* device = input_devices_find_const(&app->input.devices, controller->device_id);
+        if (playing && device != nullptr)
+        {
+            app->played_with_gamepad = device->kind == InputDeviceKind::gamepad;
+        }
+    }
+    if (!app->disconnect_paused)
+    {
+        return;
+    }
+    bool start = frame->joined_port != INPUT_NO_PORT;
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT && !start; p++)
+    {
+        start = (frame->pad_buttons[p] & (1u << 3)) != 0;   // RETRO_DEVICE_ID_JOYPAD_START
+    }
+    if (start || !game_running(app))
+    {
+        app->disconnect_paused = false;
+        if (start)
+        {
+            set_status(app, piccolo_text(&app->strings, Str::status_resumed));
+            SDL_Log("Resumed: START");
+        }
+    }
+}
+
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
@@ -1373,11 +1484,17 @@ static void app_update_input(App* app)
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
         set_status(app, message);
         SDL_Log("%s", message);
-        if (game_running(app) && !app->quick_menu.open)
+        // No CONTROLS here (Andrés): joining again is just START. The game
+        // pauses if that was the last gamepad playing (the setting).
+        if (game_running(app) && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_DISCONNECT) &&
+            app->played_with_gamepad && !gamepad_on_a_port(app))
         {
-            quick_menu_open_controls(&app->quick_menu, app->session.state_slot);   // rearrange the ports
+            app->disconnect_paused = true;
+            set_status(app, piccolo_text(&app->strings, Str::status_paused_disconnected));
+            SDL_Log("Paused: the last gamepad playing went away");
         }
     }
+    follow_what_plays(app, &frame);
     app_handle_hotkeys(app, &frame);
     drive_ui_with_gamepads(app, &frame, ui_up);
     if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])
@@ -2903,6 +3020,28 @@ int main(int argc, char** argv)
                 save_core_options(app);   // what was deleted
             }
             app->core_options_manager_was_open = app->core_options_manager;
+            // The core downloader: pick up what finished; the catalog sees
+            // installed or removed cores right away.
+            core_updater_poll(&app->core_updater);
+            if (app->core_updater.cores_changed)
+            {
+                app->core_updater.cores_changed = false;
+                core_catalog_scan(&app->catalog, game_running(app) ? app->session.host : nullptr);
+            }
+            std::string running_file = running_core_file(app);
+            CoresWindowContext cores_context = {};
+            cores_context.strings = &app->strings;
+            cores_context.updater = &app->core_updater;
+            cores_context.running_file = running_file.c_str();
+            app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+            cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
+            if (app->cores_window.show_non_free_changed)
+            {
+                app->cores_window.show_non_free_changed = false;
+                settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
+                                  app->cores_window.show_non_free);
+                save_settings(app);
+            }
             InputWindowContext input_context = {};
             input_context.input = &app->input;
             input_context.sdl = &app->input_sdl;
@@ -2996,6 +3135,7 @@ int main(int argc, char** argv)
     save_settings(app);
     save_learned_latency(app);
     save_core_options(app);
+    core_updater_shutdown(&app->core_updater);   // cancels a download in progress
     core_session_destroy(&app->session, &app->shell);   // writes save RAM
     remove_running_marker(app);   // quit properly (a marker found at launch stays if no game ran)
     game_mode_set(&app->game_mode, false);
