@@ -19,12 +19,13 @@
 # apksigner) come with the runner.
 name: Android
 
+# Tags: release.yml calls this workflow for v* tags (workflow_call).
 on:
   push:
     branches: [main]
-    tags: ['*']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 env:
   NDK_VERSION: r30

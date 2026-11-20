@@ -10,12 +10,13 @@
 #   docker run --rm -p 8080:80 ghcr.io/multitap-org/piccolo-web   -> http://localhost:8080/
 name: Web
 
+# Tags: release.yml calls this workflow for v* tags (workflow_call).
 on:
   push:
     branches: [main]
-    tags: ['*']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 env:
   EMSDK_VERSION: 6.0.13
