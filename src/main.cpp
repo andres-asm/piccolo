@@ -39,6 +39,7 @@
 #include "recent_games.h"
 #include "safe_start_window.h"
 #include "settings_window.h"
+#include "archive.h"
 #include "host_fs.h"
 #include "settings_file.h"
 #include "core_catalog.h"
@@ -3369,10 +3370,13 @@ static bool app_frame(App* app)
     }
     // A streaming device's frame delay needs present waits (piccolo's
     // frame delay works only that way): turned on here, in memory only.
+    // Never in the browser: on GL it's a glFinish after every swap, a stall
+    // per frame there, and the browser paces presents itself (main_loop.h).
     app_shell_set_wait_for_present(&app->shell,
-                                   settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
-                                       (stream_delay_overrides(app) &&
-                                        app->stream_tuning.delay != NetStreamDelay::off));
+                                   main_loop_can_wait() &&
+                                       (settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
+                                        (stream_delay_overrides(app) &&
+                                         app->stream_tuning.delay != NetStreamDelay::off)));
     piccolo_settings_audio(&app->settings, &app->session.audio_config);
     apply_learned_latency(app);
     // Held for the whole game, paused or not: a request is a D-Bus call
@@ -3629,6 +3633,19 @@ static bool app_frame_callback(void* data)
     return app_frame(static_cast<App*>(data));
 }
 
+// The first core in the catalog that takes `path` (by its extension), or nullptr.
+static const CoreCatalogEntry* core_for_file(const App* app, const char* path)
+{
+    for (int32_t i = 0; i < app->catalog.count; i++)
+    {
+        if (libretro_core_info_accepts(&app->catalog.entries[i].info, path))
+        {
+            return &app->catalog.entries[i];
+        }
+    }
+    return nullptr;
+}
+
 // A file the page opened (main_loop_on_open, the browser): kept in
 // <piccolo>/games (so RECENT finds it again after a reload), then started
 // with the first core that takes its extension, like LOAD GAME would.
@@ -3652,12 +3669,21 @@ static void app_open_file(void* data, const char* path)
             kept = path;
         }
     }
-    const CoreCatalogEntry* core = nullptr;
-    for (int32_t i = 0; i < app->catalog.count && core == nullptr; i++)
+    // The file itself, or (a zip / 7z) the first file inside that a core takes:
+    // "<archive>#<inside>", the path LOAD GAME gives for a file in an archive.
+    std::string content = kept;
+    const CoreCatalogEntry* core = core_for_file(app, kept.c_str());
+    if (core == nullptr && archive_format(kept.c_str()) != ArchiveFormat::none)
     {
-        if (libretro_core_info_accepts(&app->catalog.entries[i].info, kept.c_str()))
+        std::vector<ArchiveEntry> entries;
+        archive_list(kept.c_str(), &entries);   // failure: logged
+        for (size_t i = 0; i < entries.size() && core == nullptr; i++)
         {
-            core = &app->catalog.entries[i];
+            if (!entries[i].is_directory)
+            {
+                core = core_for_file(app, entries[i].name.c_str());
+                content = kept + "#" + entries[i].name;
+            }
         }
     }
     if (core == nullptr)
@@ -3667,14 +3693,15 @@ static void app_open_file(void* data, const char* path)
     }
     app->pending_start = FilePickerChoice{};
     core_catalog_path(&app->catalog, core, app->pending_start.core_path, sizeof(app->pending_start.core_path));
-    std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s", kept.c_str());
+    std::snprintf(app->pending_start.content_path, sizeof(app->pending_start.content_path), "%s", content.c_str());
     app->has_pending_start = true;   // started at the top of the next frame, like LOAD GAME
 }
 
 // The browser is leaving (main_loop_on_leave): what piccolo writes at exit,
-// written now, since its exit never runs there. The game keeps running if
-// the page comes back.
-static void app_save_on_leave(void* data)
+// written now, since its exit never runs there. Hidden: the game keeps
+// running if the page comes back. Unloading: a proper end, so the running
+// marker goes too (or the next visit would think the core crashed).
+static void app_save_on_leave(void* data, bool unloading)
 {
     App* app = static_cast<App*>(data);
     if (app->session.host != nullptr)
@@ -3683,6 +3710,10 @@ static void app_save_on_leave(void* data)
     }
     save_settings(app);
     save_core_options(app);
+    if (unloading)
+    {
+        remove_running_marker(app);
+    }
 }
 
 int main(int argc, char** argv)

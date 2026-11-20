@@ -14,7 +14,7 @@
 struct SDL_Window;
 
 typedef bool (*MainLoopFrame)(void* data);
-typedef void (*MainLoopSave)(void* data);
+typedef void (*MainLoopSave)(void* data, bool unloading);
 typedef void (*MainLoopOpen)(void* data, const char* path);
 
 // Right after the window exists. Web: the canvas fills the page and follows
@@ -28,7 +28,8 @@ void main_loop_run(MainLoopFrame frame, void* data);
 // The browser never runs piccolo's shutdown (closing the tab just stops it):
 // save(data) is called, right then, whenever the page is hidden (tab
 // switched, minimized, closed on a phone) or unloaded (reload, close), to
-// write what would otherwise be written at exit (SRAM, settings). Desktop:
+// write what would otherwise be written at exit (SRAM, settings);
+// `unloading` is true only for the unload, the one sure end. Desktop:
 // nothing (piccolo saves at exit).
 void main_loop_on_leave(MainLoopSave save, void* data);
 
