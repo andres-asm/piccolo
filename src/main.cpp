@@ -118,6 +118,9 @@ struct App
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
     std::string net_beacon_applied;      // the beacon server handed to the service ("" = INTERNET off)
+    std::string net_share_applied;     // the shared folders the service has (piccolo-share), as one text
+    uint32_t    net_share_revision = 0;   // the settings' revision they were looked at for
+    bool        net_share_set = false;    // the service has them
     bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
     // stream_tuning (net_stream.h): what streaming devices asked for, kept only
     // here (never in the settings or the files: a crash leaves nothing changed).
@@ -791,13 +794,23 @@ static void open_cores_window(App* app)
     cores_window_open(&app->cores_window, &app->core_updater);
 }
 
+// What this piccolo shares with OWNER devices (and lists on SHARE's own
+// side): the game folders, SAVES and STATES as the settings say now.
+static void share_folder_paths(const App* app, std::vector<std::string>* game_folders, std::string* saves,
+                               std::string* states)
+{
+    piccolo_settings_game_folders(&app->settings, game_folders);
+    *saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
+    *states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+}
+
 // TOOLS > SHARE: this piccolo's shared folders as they are now.
 static void open_share_window(App* app)
 {
     std::vector<std::string> game_folders;
-    piccolo_settings_game_folders(&app->settings, &game_folders);
-    std::string saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
-    std::string states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+    std::string saves;
+    std::string states;
+    share_folder_paths(app, &game_folders, &saves, &states);
     net_share_set_folders(&app->share_folders, &game_folders, saves.c_str(), states.c_str());
     share_window_open(&app->share_window);
 }
@@ -3152,6 +3165,7 @@ static void net_start(App* app)
     app->net_listen_failed = false;
     app->net_running = true;
     app->net_beacon_applied.clear();   // a new service: net_update hands it the beacon again
+    app->net_share_set = false;        // and its shared folders
 }
 
 static void net_stop(App* app)
@@ -3215,9 +3229,32 @@ static void net_update(App* app)
         app->net_beacon_applied = beacon;
         net_service_set_beacon(&app->net_service, beacon.c_str());
     }
+    // The shared folders OWNER devices reach (piccolo-share): looked at
+    // again only when a setting changed, handed over only when they did.
+    bool share_check = !app->net_share_set || app->settings.revision != app->net_share_revision;
+    std::vector<std::string> share_games;
+    std::string share_saves;
+    std::string share_states;
+    std::string share_key;
+    if (share_check)
+    {
+        app->net_share_revision = app->settings.revision;
+        share_folder_paths(app, &share_games, &share_saves, &share_states);
+        share_key = share_saves + "\n" + share_states;
+        for (size_t i = 0; i < share_games.size(); i++)
+        {
+            share_key += "\n" + share_games[i];
+        }
+    }
     // The network thread polls; this loop handles what it queued, holding
     // the lock for all of it (the NetAccess, its peers and lists).
     net_service_lock(&app->net_service);
+    if (share_check && (!app->net_share_set || share_key != app->net_share_applied))
+    {
+        app->net_share_applied = share_key;
+        app->net_share_set = true;
+        net_service_set_share_folders(&app->net_service, &share_games, share_saves.c_str(), share_states.c_str());
+    }
     net_update_locked(app);
     net_service_unlock(&app->net_service);
 }
