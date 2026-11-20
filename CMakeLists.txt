@@ -33,6 +33,11 @@ option(MULTITAP_SYSTEM_SDL3        "Use the system SDL3 instead of deps/SDL" OFF
 option(MULTITAP_WARNINGS_AS_ERRORS "Treat warnings in our own code as errors"    OFF)
 option(MULTITAP_SANITIZE           "Build our own code with ASan + UBSan"         OFF)
 option(MULTITAP_BUILD_TESTS        "Build tests and register CTest tests"         ON)
+# OpenGL ES path (docs/gl.md): the window falls back to GLES when Vulkan isn't usable
+# (MULTITAP_GPU=gl forces it). ImGui's GL backend is built either in its desktop mode
+# (GLES 3 / desktop GL, functions loaded at run time) or, with this ON, for GLES 2:
+# the Android 5 APK (Tegra 4), or a Linux build that tests like it.
+option(MULTITAP_GL_ES2             "ImGui's GL backend for GLES 2 (and GLES 2.0 contexts)" OFF)
 
 # Where builds are copied so they're easy to find and run: piccolo's own
 # folder, the same one it uses for its data (frontends-common's app_paths.h).
@@ -108,7 +113,7 @@ else()
     add_subdirectory(deps/SDL EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
-# Dear ImGui core + SDL3 platform backend + Vulkan renderer backend.
+# Dear ImGui core + SDL3 platform backend + Vulkan and OpenGL renderer backends.
 # Sources come straight from the submodule; nothing is copied or patched.
 set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui")
 add_library(imgui STATIC
@@ -119,9 +124,22 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
     ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui SYSTEM PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
 target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan)
+if(MULTITAP_GL_ES2)
+    # GLES 2 mode calls libGLESv2 directly (its own header, no loader).
+    find_library(MULTITAP_GLESV2_LIBRARY NAMES GLESv2 REQUIRED)
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES2)
+    target_link_libraries(imgui PUBLIC ${MULTITAP_GLESV2_LIBRARY})
+elseif(ANDROID)
+    # On Android ImGui's backend picks GLES 3 itself and calls libGLESv3 directly.
+    target_link_libraries(imgui PUBLIC GLESv3)
+else()
+    # Desktop mode loads GL at run time (dlopen).
+    target_link_libraries(imgui PUBLIC ${CMAKE_DL_LIBS})
+endif()
 
 # libretro API header. Only include/libretro*.h is used; none of
 # libretro-common's .c files are compiled (see CLAUDE.md).

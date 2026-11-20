@@ -138,7 +138,8 @@ deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, at
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
                               video_texture / video_output (what frontends draw the picture with: Vulkan's
-                              picture + shader_chain underneath, GL next: docs/gl.md, branch gl),
+                              picture + shader_chain, or the GLES path's gl_texture + gl_picture),
+                              gl_context (GLES fallback when Vulkan isn't usable: docs/gl.md, branch gl),
                               vk_* (context, swapchain, texture, barrier), renderer, debug_ui, audio_output (+DRC),
                               frame_timing, frame_delay, rate_control, frame_delta (lossless
                               frame codec for remote play), settings_file / settings (layers global ->
@@ -196,6 +197,7 @@ cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DMULTITAP_WARNINGS_A
 cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../tools/lsan-suppressions.txt ctest)
 ./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
                                    # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
+MULTITAP_GPU=gl ./build/piccolo     # the OpenGL ES path (GLES 3); -DMULTITAP_GL_ES2=ON builds test like the Tegra 4
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
