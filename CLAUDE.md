@@ -129,6 +129,7 @@ src/
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
+  text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh, res/ (icons, banner), res-debug/ (debug variant)
@@ -197,7 +198,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-67 tests with test-libretro (48 without). Before calling a larger change done:
+77 tests with test-libretro. Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -219,6 +220,10 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
   the `video_shader_preset` setting or piccolo's scale preset for FILTER.
   Curated presets from deps/piccolo-shaders; SETTINGS > SHADER: CHOOSE. Without
   librashader the plain picture path draws. Details: docs/handoff-shaders.md.
+- libretro extensions (Multitap's private environment calls, host-libretro
+  `src/libretro_extensions.h`): run-ahead (0x4D01/02) and text input (0x4D03:
+  KEYS opens a phone's on-screen keyboard only when the core asks, TEXT shows
+  piccolo's text box). Planned: multitap adapters, media slots (docs/design-notes.md).
 - TOOLS > CORES: the core downloader (core_updater in frontend-libretro, signed
   index); SHOW NON-FREE CORES off by default, confirmed when turned on.
 - Input (done for this version): N:N ports (hotkeys and UI from port 1 + the
