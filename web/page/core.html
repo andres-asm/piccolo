@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- piccolo in the browser: one page per core (web/package.sh copies this as
+     <core>/index.html next to piccolo.js / .wasm / .data). Everything here
+     is relative, so the folder works anywhere on any static server. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>piccolo</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icon-32.png">
+<style>
+  :root { --back: #101820; --bar: #2f4f7f; --text: #e8eef4; --dim: #9fb0c4; }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font: 13px/1.4 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--text); }
+  canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+             background: var(--back); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 16px; }
+  #overlay.gone { display: none; }
+  #overlay .box { max-width: 36em; }
+  #overlay progress { width: 16em; height: 6px; margin-top: 12px; accent-color: var(--bar); }
+  #open { position: fixed; right: 8px; bottom: 6px; z-index: 2; background: var(--bar); color: var(--text);
+          border: 0; padding: 3px 10px; font: inherit; font-size: 11px; text-transform: uppercase;
+          letter-spacing: 1px; cursor: pointer; opacity: 0.85; }
+  #open:hover { opacity: 1; }
+  #open[hidden] { display: none; }
+  body.dragging::after { content: "DROP A GAME"; position: fixed; inset: 12px; border: 2px dashed var(--dim);
+                         display: flex; align-items: center; justify-content: center; color: var(--text);
+                         background: rgba(16, 24, 32, 0.7); letter-spacing: 2px; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="overlay"><div class="box"><div id="message">LOADING PICCOLO</div><progress id="progress" max="1" value="0"></progress></div></div>
+<button id="open" hidden title="Open a game file (or drop it on the page)">Open game</button>
+<input id="file" type="file" hidden>
+<script src="../piccolo-page.js"></script>
+<script>piccolo_page_start();</script>
+</body>
+</html>

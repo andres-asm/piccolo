@@ -16,3 +16,8 @@ leak:X11_AddXRandRDisplay
 # llvmpipe) LeakSanitizer reports 2 x 56 bytes from a driver thread. The driver
 # is unloaded by vkDestroyInstance, so its frames show as "<unknown module>" and
 # can't be matched here. Piccolo (no core, no host) shows the same 112 bytes.
+
+# OpenGL ES (the GL path, docs/gl.md): Mesa's libEGL allocates 392 bytes while
+# SDL loads it (eglGetDisplay inside SDL_EGL_LoadLibrary) and never frees them,
+# even after eglTerminate. Seen on Wayland with panfrost.
+leak:SDL_EGL_LoadLibrary

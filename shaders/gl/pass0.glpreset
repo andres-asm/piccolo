@@ -1,0 +1,5 @@
+# piccolo's pass 0 on OpenGL ES (pass0.glsl): at the core's resolution, nearest.
+passes = 1
+pass0 = pass0.glsl
+pass0_filter = nearest
+pass0_scale = source

@@ -1,0 +1,5 @@
+# piccolo: the final scale, sharp bilinear (no preset chosen).
+passes = 1
+pass0 = scale-sharp-bilinear.glsl
+pass0_filter = linear
+pass0_scale = viewport

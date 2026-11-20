@@ -1,0 +1,5 @@
+# LCD3X: lcd3x (Gigaherz, public domain), ported.
+passes = 1
+pass0 = lcd3x.glsl
+pass0_filter = nearest
+pass0_scale = viewport

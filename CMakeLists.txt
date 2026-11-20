@@ -33,6 +33,12 @@ option(MULTITAP_SYSTEM_SDL3        "Use the system SDL3 instead of deps/SDL" OFF
 option(MULTITAP_WARNINGS_AS_ERRORS "Treat warnings in our own code as errors"    OFF)
 option(MULTITAP_SANITIZE           "Build our own code with ASan + UBSan"         OFF)
 option(MULTITAP_BUILD_TESTS        "Build tests and register CTest tests"         ON)
+# OpenGL ES path (docs/gl.md): the window falls back to GLES when Vulkan isn't usable
+# (MULTITAP_GPU=gl forces it). ImGui's GL backend is built either in its desktop mode
+# (GLES 3 / desktop GL, functions loaded at run time) or, with this ON, for GLES 2:
+# the Android 5 APK (Tegra 4), or a Linux build that tests like it.
+option(MULTITAP_GPU_VULKAN         "Vulkan in the build (OFF: OpenGL ES only, the Android 5 APK)" ON)
+option(MULTITAP_GL_ES2             "ImGui's GL backend for GLES 2 (and GLES 2.0 contexts)" OFF)
 
 # Where builds are copied so they're easy to find and run: piccolo's own
 # folder, the same one it uses for its data (frontends-common's app_paths.h).
@@ -93,7 +99,9 @@ endforeach()
 # ---------------------------------------------------------------------------
 # Third-party dependencies (built with their own defaults, not our warnings)
 # ---------------------------------------------------------------------------
-find_package(Vulkan REQUIRED)
+if(MULTITAP_GPU_VULKAN)
+    find_package(Vulkan REQUIRED)
+endif()
 
 if(MULTITAP_SYSTEM_SDL3)
     find_package(SDL3 CONFIG REQUIRED)
@@ -108,7 +116,7 @@ else()
     add_subdirectory(deps/SDL EXCLUDE_FROM_ALL SYSTEM)
 endif()
 
-# Dear ImGui core + SDL3 platform backend + Vulkan renderer backend.
+# Dear ImGui core + SDL3 platform backend + Vulkan and OpenGL renderer backends.
 # Sources come straight from the submodule; nothing is copied or patched.
 set(IMGUI_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/imgui")
 add_library(imgui STATIC
@@ -118,10 +126,31 @@ add_library(imgui STATIC
     ${IMGUI_DIR}/imgui_tables.cpp
     ${IMGUI_DIR}/imgui_widgets.cpp
     ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 target_include_directories(imgui SYSTEM PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
-target_link_libraries(imgui PUBLIC SDL3::SDL3 Vulkan::Vulkan)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+if(MULTITAP_GPU_VULKAN)
+    target_sources(imgui PRIVATE ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+    target_link_libraries(imgui PUBLIC Vulkan::Vulkan)
+endif()
+if(MULTITAP_GL_ES2)
+    # GLES 2 mode calls libGLESv2 directly (its own header, no loader).
+    find_library(MULTITAP_GLESV2_LIBRARY NAMES GLESv2 REQUIRED)
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES2)
+    target_link_libraries(imgui PUBLIC ${MULTITAP_GLESV2_LIBRARY})
+elseif(EMSCRIPTEN)
+    # The browser: WebGL 2. ImGui's backend would pick ES 2 ("#version 100")
+    # by itself under Emscripten; gl_context makes an ES 3.0 context and
+    # gives ImGui "#version 300 es", so both are told ES 3.
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_OPENGL_ES3)
+elseif(ANDROID)
+    # On Android ImGui's backend picks GLES 3 itself and calls libGLESv3 directly.
+    target_link_libraries(imgui PUBLIC GLESv3)
+else()
+    # Desktop mode loads GL at run time (dlopen).
+    target_link_libraries(imgui PUBLIC ${CMAKE_DL_LIBS})
+endif()
 
 # libretro API header. Only include/libretro*.h is used; none of
 # libretro-common's .c files are compiled (see CLAUDE.md).
@@ -201,7 +230,7 @@ if(ANDROID)
     # Android (hosts-common's cmake/android-toolchain.cmake, android/build-apk.sh):
     # the same piccolo as libmain.so, which SDL's Java activity loads and whose
     # SDL_main (main.cpp's main, renamed by SDL_main.h) it calls.
-    add_library(piccolo SHARED ${PICCOLO_SOURCES} src/bundled_files_android.cpp)
+    add_library(piccolo SHARED ${PICCOLO_SOURCES} src/bundled_files_android.cpp src/main_loop.cpp src/storage.cpp)
     set_target_properties(piccolo PROPERTIES
         OUTPUT_NAME "main"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")   # where build-apk.sh picks it up
@@ -211,8 +240,21 @@ if(ANDROID)
         add_dependencies(piccolo test_libretro)
         set_target_properties(test_libretro PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
     endif()
+elseif(EMSCRIPTEN)
+    # The browser build (web/build.sh): one wasm per core, the core's static
+    # archive linked in (web/build-core.sh), registered under its file name.
+    set(PICCOLO_LINKED_CORE "" CACHE FILEPATH "The core's static archive linked into the browser build")
+    set(PICCOLO_LINKED_CORE_FILE "" CACHE STRING "The file name the linked core answers to (e.g. sameboy_libretro.so)")
+    if(NOT EXISTS "${PICCOLO_LINKED_CORE}" OR PICCOLO_LINKED_CORE_FILE STREQUAL "")
+        message(FATAL_ERROR "The browser build needs PICCOLO_LINKED_CORE (an archive) and PICCOLO_LINKED_CORE_FILE (see web/build.sh)")
+    endif()
+    add_executable(piccolo ${PICCOLO_SOURCES} src/bundled_files_web.cpp src/main_loop_web.cpp src/storage_web.cpp)
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/generated/piccolo_linked_core.h"
+         "// Generated by CMake (PICCOLO_LINKED_CORE_FILE). Do not edit.\n#pragma once\n"
+         "constexpr const char* PICCOLO_LINKED_CORE_FILE = \"${PICCOLO_LINKED_CORE_FILE}\";\n")
+    target_link_libraries(piccolo PRIVATE host_libretro_linked "${PICCOLO_LINKED_CORE}")
 else()
-    add_executable(piccolo ${PICCOLO_SOURCES} src/bundled_files.cpp)
+    add_executable(piccolo ${PICCOLO_SOURCES} src/bundled_files.cpp src/main_loop.cpp src/storage.cpp)
 endif()
 
 # UI text: src/strings.txt is the one English source. The build turns it into
@@ -323,6 +365,37 @@ multitap_write_version_header("${PICCOLO_GENERATED}" piccolo PICCOLO_VERSION "${
 message(STATUS "piccolo ${PICCOLO_VERSION}")
 
 multitap_set_project_flags(piccolo)
+if(EMSCRIPTEN)
+    # The browser build (web/build.sh, docs/wasm.md): piccolo.js + piccolo.wasm.
+    # WebGL 2 only (the GLES 3 path asks SDL for an ES 3.0 context). With
+    # pthreads: every object is built with -pthread (web/build.sh), the link
+    # needs it too. Fixed memory, no growth: with threads, growing memory makes
+    # every JS access to it slow (Emscripten warns), and iOS browsers refuse a
+    # threaded module without a maximum anyway (SDL's README-emscripten.md).
+    # 256 MiB is plenty for SameBoy; bigger cores may need more (per core later).
+    target_link_options(piccolo PRIVATE
+        -pthread
+        -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2
+        -sINITIAL_MEMORY=256mb
+        # Emscripten's default stack is 64 KiB; piccolo and cores expect a
+        # desktop-sized one (host-libretro keeps a few KB of paths on it).
+        -sSTACK_SIZE=1mb -sDEFAULT_PTHREAD_STACK_SIZE=1mb
+        # The page writes the files people open into the virtual filesystem.
+        -sEXPORTED_RUNTIME_METHODS=FS,ccall
+        # WasmFS: piccolo's folder on OPFS (storage_web.cpp). Its OPFS worker and
+        # the thread that mounts it come from a pool started with the page, so
+        # the main thread can wait for them without going back to the browser.
+        -sWASMFS -sPTHREAD_POOL_SIZE=4
+        # The files piccolo ships next to its program (bundled_files_web.cpp:
+        # the root of the virtual filesystem), packed into piccolo.data.
+        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/shaders/gl@/shaders/gl"
+        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/lang@/lang"
+        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/layouts@/layouts"
+        "--preload-file=${CMAKE_CURRENT_SOURCE_DIR}/themes@/themes"
+        # Debug builds: Emscripten's run-time checks and function names in stacks.
+        $<$<CONFIG:Debug>:-sASSERTIONS=2>)
+    return()   # nothing else (tools, tests) is built for the browser
+endif()
 if(ANDROID)
     return()   # the APK needs only libmain.so (and Test libretro); no tools or tests
 endif()
@@ -367,6 +440,16 @@ if(MULTITAP_BUILD_TESTS)
     add_test(NAME piccolo_shader_check COMMAND piccolo_shader_check_test)
     set_tests_properties(piccolo_shader_check PROPERTIES
         FAIL_REGULAR_EXPRESSION "ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
+
+    # The OpenGL ES presets (shaders/gl/) compile and run (needs a display; skipped without).
+    add_executable(piccolo_gl_presets_check tools/gl_presets_check.cpp)
+    target_link_libraries(piccolo_gl_presets_check PRIVATE frontend_common)
+    multitap_set_project_flags(piccolo_gl_presets_check)
+    add_test(NAME piccolo_gl_presets COMMAND piccolo_gl_presets_check "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gl")
+    set_tests_properties(piccolo_gl_presets PROPERTIES
+                         SKIP_RETURN_CODE 77
+                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load and run"
+                         FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
     add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)
     target_include_directories(piccolo_recent_games_test PRIVATE src)

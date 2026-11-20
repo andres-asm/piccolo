@@ -1,5 +1,9 @@
-# Builds piccolo's Android APK (arm64-v8a) with android/build-apk.sh, the
-# same script as on the development machine, and uploads it as an artifact.
+# Builds piccolo's Android APKs with android/build-apk.sh, the same script as
+# on the development machine, and uploads them as artifacts:
+#   piccolo.apk          arm64-v8a, Android 9+, Vulkan (OpenGL ES 3 fallback)
+#   piccolo-legacy.apk   armeabi-v7a, Android 5+, OpenGL ES 2 only: the SHIELD
+#                        Portable (Tegra 4) and other 32-bit devices without
+#                        Vulkan (build-apk.sh --legacy, docs/gl.md)
 # Install it with:
 #   adb install --no-incremental -r piccolo.apk
 # Signed with the release key from the repository secrets
@@ -29,8 +33,20 @@ env:
 
 jobs:
   android:
-    name: Android (arm64-v8a)
+    name: Android (${{ matrix.name }})
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: arm64-v8a
+            flags: ''
+            apk: piccolo.apk
+            artifact: piccolo-android-arm64
+          - name: armeabi-v7a, legacy
+            flags: --legacy
+            apk: piccolo-legacy.apk
+            artifact: piccolo-android-armv7-legacy
     steps:
       - uses: actions/checkout@v4
         with:
@@ -111,9 +127,9 @@ jobs:
           export D8_JAR="$tools/lib/d8.jar"
           export JAVA_HOME="$JAVA_HOME_17_X64"
           export BUILD_TYPE=Release
-          android/build-apk.sh
+          android/build-apk.sh ${{ matrix.flags }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: piccolo-android-arm64
-          path: android/build/piccolo.apk
+          name: ${{ matrix.artifact }}
+          path: android/build/${{ matrix.apk }}

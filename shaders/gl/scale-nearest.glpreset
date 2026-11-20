@@ -1,0 +1,5 @@
+# piccolo: the final scale, nearest (no preset chosen).
+passes = 1
+pass0 = scale.glsl
+pass0_filter = nearest
+pass0_scale = viewport
