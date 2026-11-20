@@ -48,6 +48,7 @@ constexpr const char* PICCOLO_PATH_STATES = "path_states";
 // piccolo.cfg), and the development switch that lets it be http:// or file://.
 constexpr const char* PICCOLO_CORE_SERVER = "core_server";
 constexpr const char* PICCOLO_CORE_SERVER_INSECURE = "core_server_insecure";
+constexpr const char* PICCOLO_CORES_SHOW_NON_FREE = "cores_show_non_free";   // TOOLS > CORES's checkbox
 // Game folders (SETTINGS > GENERAL, "+" adds one): LOAD GAME offers them as
 // places to start, and they're the only folders a network client may browse
 // and load games from. Global only; kept in order, no gaps (an emptied slot

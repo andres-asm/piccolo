@@ -2785,3 +2785,23 @@ msgstr "BAJADA"
 msgctxt "net_speed_up"
 msgid "UP"
 msgstr "SUBIDA"
+
+msgctxt "cores_show_non_free"
+msgid "SHOW NON-FREE CORES"
+msgstr "MOSTRAR CORES NO LIBRES"
+
+msgctxt "cores_show_non_free_help"
+msgid "Also lists cores whose license isn't free software (marked *). Off: only free-licensed cores, plus non-free ones already installed."
+msgstr "También lista los cores cuya licencia no es de software libre (marcados con *). Apagado: solo cores con licencia libre, más los no libres ya instalados."
+
+msgctxt "cores_non_free_confirm_title"
+msgid "NON-FREE CORES"
+msgstr "CORES NO LIBRES"
+
+msgctxt "cores_non_free_confirm_text"
+msgid "NON-FREE CORES CAN BE USED FOR FREE, BUT THEIR LICENSES AREN'T FREE SOFTWARE: MOST FORBID COMMERCIAL USE, AND SOME DON'T ALLOW CHANGING OR SHARING CHANGED VERSIONS. SHOW THEM IN THE LIST?"
+msgstr "LOS CORES NO LIBRES SE PUEDEN USAR GRATIS, PERO SUS LICENCIAS NO SON DE SOFTWARE LIBRE: LA MAYORÍA PROHÍBE EL USO COMERCIAL Y ALGUNAS NO PERMITEN MODIFICARLOS NI COMPARTIR VERSIONES MODIFICADAS. ¿MOSTRARLOS EN LA LISTA?"
+
+msgctxt "cores_non_free_confirm_yes"
+msgid "SHOW THEM"
+msgstr "MOSTRARLOS"

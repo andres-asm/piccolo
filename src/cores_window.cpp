@@ -57,6 +57,18 @@ static void size_text(int64_t bytes, char* out, size_t out_size)
     }
 }
 
+// Listed: free cores; non-free ones when SHOW NON-FREE CORES is on, or when
+// they're installed (so they can still be removed or updated).
+static bool listed(const CoresWindow* window, const CoreUpdater* updater, int32_t entry)
+{
+    const CoreIndexEntry* chosen = &updater->index.entries[static_cast<size_t>(entry)];
+    if (chosen->free || window->show_non_free)
+    {
+        return true;
+    }
+    return core_updater_status(updater, entry) != CoreStatus::not_installed;
+}
+
 // UPDATE ALL: whenever the downloader is idle, the next core with an update
 // (stops at the first error, or when none is left).
 static void continue_update_all(CoresWindow* window, const CoresWindowContext* context)
@@ -74,7 +86,7 @@ static void continue_update_all(CoresWindow* window, const CoresWindowContext* c
     for (size_t i = 0; i < updater->index.entries.size(); i++)
     {
         int32_t entry = static_cast<int32_t>(i);
-        if (core_updater_status(updater, entry) == CoreStatus::update &&
+        if (listed(window, updater, entry) && core_updater_status(updater, entry) == CoreStatus::update &&
             updater->index.entries[i].file != context->running_file &&
             (!updater->free_only || updater->index.entries[i].free))
         {
@@ -103,6 +115,10 @@ static void draw_list(CoresWindow* window, const CoresWindowContext* context, fl
         {
             const CoreIndexEntry* entry = &updater->index.entries[i];
             int32_t index = static_cast<int32_t>(i);
+            if (!listed(window, updater, index))
+            {
+                continue;
+            }
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             char label[300];
@@ -130,7 +146,12 @@ static void draw_selected(CoresWindow* window, const CoresWindowContext* context
     CoreUpdater* updater = context->updater;
     const Localization* strings = context->strings;
     bool busy = updater->state != CoreUpdaterState::idle;
-    if (window->selected < 0 || window->selected >= static_cast<int32_t>(updater->index.entries.size()))
+    if (window->selected >= static_cast<int32_t>(updater->index.entries.size()) ||
+        (window->selected >= 0 && !listed(window, updater, window->selected)))
+    {
+        window->selected = -1;   // hidden by SHOW NON-FREE CORES, or a shorter list
+    }
+    if (window->selected < 0)
     {
         ImGui::TextDisabled("%s", piccolo_text(strings, updater->index.entries.empty() ? Str::cores_empty
                                                                                          : Str::cores_none_selected));
@@ -183,6 +204,61 @@ static void draw_selected(CoresWindow* window, const CoresWindowContext* context
         core_updater_remove(updater, window->selected, context->running_file);
     }
     ImGui::EndDisabled();
+}
+
+// SHOW NON-FREE CORES, and the confirmation turning it on asks for.
+static void draw_non_free_switch(CoresWindow* window, const Localization* strings)
+{
+    bool shown = window->show_non_free;
+    if (retro_ui_checkbox(piccolo_text(strings, Str::cores_show_non_free), &shown))
+    {
+        if (shown)
+        {
+            window->confirm_non_free = true;   // on only after YES
+        }
+        else
+        {
+            window->show_non_free = false;
+            window->show_non_free_changed = true;
+        }
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, Str::cores_show_non_free_help));
+
+    char title[128] = {};
+    std::snprintf(title, sizeof(title), "%s###non_free_confirm", piccolo_text(strings, Str::cores_non_free_confirm_title));
+    if (window->confirm_non_free && !ImGui::IsPopupOpen(title))
+    {
+        ImGui::OpenPopup(title);
+    }
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.4f)), 0.0f),
+                             ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+    {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(piccolo_text(strings, Str::cores_non_free_confirm_text));
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        bool close = ImGui::IsKeyPressed(ImGuiKey_Escape);   // (B on a gamepad sends Escape while a popup is up)
+        if (retro_ui_button(piccolo_text(strings, Str::cores_non_free_confirm_yes)))
+        {
+            window->show_non_free = true;
+            window->show_non_free_changed = true;
+            close = true;
+        }
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::cores_cancel)))
+        {
+            close = true;
+        }
+        if (close)
+        {
+            window->confirm_non_free = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, ImFont* pixel_font, int32_t scale)
@@ -246,6 +322,11 @@ void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, I
                 updater->message_is_error = false;   // a new run: don't stop on the last error
             }
             ImGui::EndDisabled();
+            if (!updater->free_only)
+            {
+                ImGui::SameLine();
+                draw_non_free_switch(window, strings);
+            }
             if (busy)
             {
                 ImGui::SameLine();

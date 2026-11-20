@@ -181,6 +181,8 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_core_server), .help = text_id(Str::setting_core_server_help)},
     {.key = PICCOLO_CORE_SERVER_INSECURE, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_core_server_insecure), .help = text_id(Str::setting_core_server_insecure_help)},
+    {.key = PICCOLO_CORES_SHOW_NON_FREE, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::cores_show_non_free), .help = text_id(Str::cores_show_non_free_help)},
     {.key = PICCOLO_PATH_GAMES[0], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
      .help = text_id(Str::setting_path_games_help)},
     {.key = PICCOLO_PATH_GAMES[1], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
