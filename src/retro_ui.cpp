@@ -1,5 +1,7 @@
 #include "retro_ui.h"
 
+#include <cstdio>
+
 #include "imgui.h"
 #include "imgui_internal.h"   // DC.CurrLineTextBaseOffset: where ImGui puts a widget's text on its line
 
@@ -734,6 +736,23 @@ void retro_ui_raised_item_edge()
 bool retro_ui_button(const char* label)
 {
     return retro_ui_button_sized(label, 0.0f, 0.0f);
+}
+
+int retro_ui_seconds_left(uint64_t now_ms, uint64_t started_ms, uint64_t total_ms)
+{
+    uint64_t elapsed = now_ms - started_ms;
+    return static_cast<int>((total_ms - (elapsed < total_ms ? elapsed : total_ms) + 999) / 1000);
+}
+
+bool retro_ui_countdown_button(const char* format, int seconds, const char* id)
+{
+    char label[128] = {};
+    int written = std::snprintf(label, sizeof(label), format, seconds);
+    if (written > 0 && static_cast<size_t>(written) < sizeof(label))
+    {
+        std::snprintf(label + written, sizeof(label) - static_cast<size_t>(written), "###%s", id);
+    }
+    return retro_ui_button(label);
 }
 
 bool retro_ui_checkbox(const char* label, bool* value)

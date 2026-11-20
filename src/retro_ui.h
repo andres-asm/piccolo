@@ -125,6 +125,15 @@ void retro_ui_raised_item_edge();
 bool retro_ui_button(const char* label);
 bool retro_ui_button_sized(const char* label, float width, float height);
 
+// A countdown (e.g. "REVERT (12)" until it acts by itself): the seconds left
+// of `total_ms` started at `started_ms`, rounded up.
+int retro_ui_seconds_left(uint64_t now_ms, uint64_t started_ms, uint64_t total_ms);
+
+// A button whose label counts down: `format` has one %d for the seconds. Its
+// id stays the same while the number changes, so a click on it isn't lost
+// when the second ticks.
+bool retro_ui_countdown_button(const char* format, int seconds, const char* id);
+
 // A choice among a few values as a row of buttons (not a combo): the chosen
 // one stays pressed in (sunken, the highlight color, its label down a pixel),
 // the others raised. True when another one was clicked (*current changed).

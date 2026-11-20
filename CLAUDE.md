@@ -122,13 +122,14 @@ src/
                           CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
-                          combos, macros, mouse / lightgun)
+                          combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
   core_options_ui.* safe_start_window.*
+  shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
   text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)

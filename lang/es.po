@@ -338,6 +338,26 @@ msgctxt "shader_picker_use"
 msgid "USE"
 msgstr "USAR"
 
+msgctxt "shader_slow_title"
+msgid "SHADER TOO SLOW"
+msgstr "SHADER DEMASIADO LENTO"
+
+msgctxt "shader_slow_text"
+msgid "RUNS AT %.0f FPS. THE GAME NEEDS %.0f."
+msgstr "CORRE A %.0f FPS. EL JUEGO NECESITA %.0f."
+
+msgctxt "shader_slow_question"
+msgid "KEEP IT?"
+msgstr "¿MANTENERLO?"
+
+msgctxt "shader_slow_keep"
+msgid "KEEP"
+msgstr "MANTENER"
+
+msgctxt "shader_slow_revert_n"
+msgid "REVERT (%d)"
+msgstr "REVERTIR (%d)"
+
 msgctxt "setting_language"
 msgid "LANGUAGE"
 msgstr "IDIOMA"
@@ -2101,6 +2121,10 @@ msgstr "%s DESCONECTADO (PUERTO %d)"
 msgctxt "quick_menu_tab_controls"
 msgid "CONTROLS"
 msgstr "CONTROLES"
+
+msgctxt "quick_menu_tab_shader"
+msgid "SHADER"
+msgstr "SHADER"
 
 msgctxt "quick_menu_no_ports"
 msgid "NOBODY HAS JOINED: PRESS START ON A CONTROLLER"
