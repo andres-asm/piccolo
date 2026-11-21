@@ -33,8 +33,11 @@
   #main { flex: 1; min-height: 0; display: flex; }
   /* The canvas fills its stage; SDL takes the window's size from the canvas's
      CSS size (multitap-page.js sends a resize event when the stage changes). */
-  #stage { position: relative; flex: 1; min-width: 0; background: #000; }
-  canvas { display: block; width: 100%; height: 100%; outline: none; }
+  #stage { position: relative; flex: 1; min-width: 0; background: #000; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; width: 100%; height: 100%; outline: none; flex: none; }
+  /* A 16:9 window in steps (the script below): the page around it. */
+  #stage.framed { background: var(--bg); }
+  #stage.framed canvas { box-shadow: 6px 6px 0 var(--shadow); }
   #overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
              background: var(--bg); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 16px; }
   #overlay.gone { display: none; }
@@ -114,6 +117,7 @@
 <script src="../multitap-page.js"></script>
 <script src="../piccolo-files.js"></script>
 <script src="../piccolo-page.js"></script>
+<script>multitap_page_frame_16x9();   // the picture as a 16:9 window (multitap-page.js)</script>
 <script>piccolo_page_start();</script>
 </body>
 </html>
