@@ -4194,7 +4194,7 @@ static bool app_frame(App* app)
         quick.shaders_available = app->shader_library.loaded;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
         draw_remap_prompt(app);
-        ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, &app->strings);
+        ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, SDL_GetTicks(), &app->strings);
         if (app->quick_menu.choose_shader_request)
         {
             app->quick_menu.choose_shader_request = false;

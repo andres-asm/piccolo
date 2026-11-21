@@ -66,5 +66,5 @@ void ports_widget_close(PortsWidget* widget);
 void ports_widget_board_update(PortsWidget* widget, InputSystem* input);
 
 // DEVICES, above everything (and what a mouse did on it).
-void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pixel_font, int32_t scale,
+void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pixel_font, int32_t scale, uint64_t now_ms,
                              const Localization* strings);

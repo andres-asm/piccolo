@@ -339,7 +339,7 @@ void ports_widget_open(PortsWidget* widget, const InputSystem* input)
     PortsView* view = &widget->view;
     widget->open = true;
     view->popped_ms = 0;
-    view->scroll = -1.0f;   // placed at once on the first draw
+    ports_view_open_board(view);   // slides up again; placed at once on the first draw
     // What's held now (the hotkey that opened it) does nothing until let go.
     widget->held.assign(input->controllers.size(), 0);
     for (size_t c = 0; c < input->controllers.size(); c++)
@@ -439,7 +439,7 @@ void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
     }
 }
 
-void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pixel_font, int32_t scale,
+void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pixel_font, int32_t scale, uint64_t now_ms,
                              const Localization* strings)
 {
     if (!widget->open)
@@ -448,7 +448,7 @@ void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pi
     }
     PortsViewText text = view_text(strings);
     PortsViewBoardInput clicks;
-    ports_view_draw_board(&widget->view, pixel_font, scale, &text, &clicks);
+    ports_view_draw_board(&widget->view, pixel_font, scale, &text, now_ms, &clicks);
     if (clicks.move && clicks.key < input->controllers.size())
     {
         move_to(input, clicks.key, clicks.port);
