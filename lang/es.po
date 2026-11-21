@@ -3541,3 +3541,7 @@ msgstr "PAUSA"
 msgctxt "quick_menu_resume"
 msgid "RESUME"
 msgstr "CONTINUAR"
+
+msgctxt "quick_menu_tab_options"
+msgid "OPTIONS"
+msgstr "OPCIONES"

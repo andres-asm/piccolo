@@ -220,7 +220,7 @@ static void draw_shader_tab(QuickMenu* menu, const QuickMenuContext* context)
 }
 
 // The SAVESTATES tab: slots, the selected one's thumbnail and date, SAVE /
-// LOAD, RESET and CLOSE GAME.
+// LOAD (PAUSE, RESET and CLOSE GAME are above the tabs).
 static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* context, float block, bool appearing)
 {
     const Localization* strings = context->strings;
@@ -291,7 +291,8 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     {
         SDL_DateTime date = {};
         SDL_TimeToDateTime(info->modified, &date, true);
-        ImGui::Text("%04d-%02d-%02d %02d:%02d", date.year, date.month, date.day, date.hour, date.minute);
+        ImGui::Text("%04d-%02d-%02d", date.year, date.month, date.day);   // two lines: the panel is narrow
+        ImGui::Text("%02d:%02d", date.hour, date.minute);
     }
     else
     {
@@ -311,19 +312,6 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
         action = QuickMenuAction::load;
     }
     ImGui::EndDisabled();
-    ImGui::Spacing();
-    if (retro_ui_button(piccolo_text(strings, context->user_paused ? Str::quick_menu_resume : Str::quick_menu_pause)))
-    {
-        action = QuickMenuAction::pause;
-    }
-    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_reset)))
-    {
-        action = QuickMenuAction::reset;
-    }
-    if (retro_ui_button(piccolo_text(strings, Str::quick_menu_close_game)))
-    {
-        action = QuickMenuAction::close_game;
-    }
     ImGui::EndGroup();
     ImGui::Spacing();
     ImGui::PushTextWrapPos(0.0f);
@@ -2181,6 +2169,9 @@ static void drop_unseen_capture(QuickMenu* menu, const QuickMenuContext* context
     menu->macro_record_seen = false;
 }
 
+// How long QUICK MENU takes to slide in from the right.
+constexpr uint64_t QUICK_MENU_SLIDE_MS = 150;
+
 QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context, ImFont* pixel_font, int32_t scale)
 {
     if (!menu->open)
@@ -2203,75 +2194,145 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
     float block = static_cast<float>(scale);
     const ImGuiIO& io = ImGui::GetIO();
     retro_ui_push_theme(pixel_font, scale);
-    // About 60 % of the window (never smaller than 360 x 240 retro pixels,
-    // never bigger than the window), the same every frame: a window that
+    // A slide-out from the right, the window's whole height (like a handheld's
+    // quick access menu, wider): half the window, at least 320 retro pixels,
+    // never more than the window. The same size every frame: a window that
     // resizes to its contents loses its scroll.
-    ImVec2 size(io.DisplaySize.x * 0.6f, io.DisplaySize.y * 0.6f);
-    size.x = size.x > 360.0f * block ? size.x : 360.0f * block;
-    size.y = size.y > 240.0f * block ? size.y : 240.0f * block;
+    ImVec2 size(io.DisplaySize.x * 0.5f, io.DisplaySize.y);
+    size.x = size.x > 320.0f * block ? size.x : 320.0f * block;
+    size.x = size.x < io.DisplaySize.x ? size.x : io.DisplaySize.x;
     size = ImVec2(static_cast<float>(static_cast<int>(size.x)), static_cast<float>(static_cast<int>(size.y)));
-    size.x = size.x < io.DisplaySize.x - 8.0f * block ? size.x : io.DisplaySize.x - 8.0f * block;
-    size.y = size.y < io.DisplaySize.y - 24.0f * block ? size.y : io.DisplaySize.y - 24.0f * block;
+    // Sliding in: an ease-out over QUICK_MENU_SLIDE_MS from the right edge.
+    float slide = 1.0f;
+    if (context->now_ms >= menu->slide_start_ms && context->now_ms - menu->slide_start_ms < QUICK_MENU_SLIDE_MS)
+    {
+        float t = static_cast<float>(context->now_ms - menu->slide_start_ms) / static_cast<float>(QUICK_MENU_SLIDE_MS);
+        slide = 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
+    }
+    float x = io.DisplaySize.x - size.x * slide;
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Appearing,
-                            ImVec2(0.5f, 0.5f));
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+    ImGui::SetNextWindowPos(ImVec2(static_cast<float>(static_cast<int>(x)), 0.0f), ImGuiCond_Always);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                             ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-    char title[200] = {};
-    std::snprintf(title, sizeof(title), "%s###quick_menu", piccolo_text(strings, Str::quick_menu_title));
-    if (ImGui::Begin(title, nullptr, flags))
+    if (ImGui::Begin("##quick_menu", nullptr, flags))
     {
         retro_ui_begin_window(scale);
-        if (retro_ui_close_button())
-        {
-            menu->open = false;
-        }
         bool appearing = ImGui::IsWindowAppearing();
         if (appearing)
         {
+            menu->slide_start_ms = context->now_ms;
             ImGui::SetWindowFocus();
         }
-        char label[200] = {};
-        if (ImGui::BeginTabBar("quick_tabs"))
+        const ImGuiStyle& style = ImGui::GetStyle();
+
+        // The tabs: a column on the right edge, by PAGE LEFT / RIGHT too.
+        // SAVESTATES first: it's what the menu is for. It opens again on the
+        // tab it was closed on.
+        constexpr int TAB_COUNT = 4;
+        const Str TAB_LABELS[TAB_COUNT] = {Str::quick_menu_tab_states, Str::quick_menu_tab_options,
+                                           Str::quick_menu_tab_controls, Str::quick_menu_tab_shader};
+        const bool tab_shown[TAB_COUNT] = {true, context->core_options_state != nullptr, context->input != nullptr,
+                                           context->settings != nullptr};
+        int target = appearing ? menu->open_on_tab : retro_ui_tab_switch(menu->tab, TAB_COUNT);
+        if (target >= 0 && target < TAB_COUNT && tab_shown[target])
         {
-            int tab_count = 4;
-            int target = appearing ? menu->open_on_tab : retro_ui_tab_switch(menu->tab, tab_count);
-            // SAVESTATES first: it's what the menu is for. It opens again on the tab it was closed on.
-            std::snprintf(label, sizeof(label), "%s###states", piccolo_text(strings, Str::quick_menu_tab_states));
-            if (ImGui::BeginTabItem(label, nullptr, target == 0 ? ImGuiTabItemFlags_SetSelected : 0))
+            menu->tab = target;
+        }
+        if (menu->tab < 0 || menu->tab >= TAB_COUNT || !tab_shown[menu->tab])
+        {
+            menu->tab = 0;
+        }
+        float tabs_width = 0.0f;
+        for (int t = 0; t < TAB_COUNT; t++)
+        {
+            float width = ImGui::CalcTextSize(piccolo_text(strings, TAB_LABELS[t])).x;
+            tabs_width = width > tabs_width ? width : tabs_width;
+        }
+        tabs_width += 2.0f * (style.FramePadding.x + 4.0f * block);
+
+        // Left of the tabs: what runs, PAUSE / RESET / CLOSE GAME (on the
+        // running core, whatever the tab), then the tab's page.
+        float content_width = ImGui::GetContentRegionAvail().x - tabs_width - style.ItemSpacing.x;
+        ImGui::BeginChild("##quick_content", ImVec2(content_width, 0.0f), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::TextUnformatted(piccolo_text(strings, Str::quick_menu_title));
+        char running[300] = {};
+        if (context->game_name[0] != '\0')
+        {
+            std::snprintf(running, sizeof(running), "%s - %s", context->game_name, context->core_name);
+        }
+        else
+        {
+            std::snprintf(running, sizeof(running), "%s", context->core_name);
+        }
+        for (size_t i = 0; running[i] != '\0'; i++)
+        {
+            running[i] = static_cast<char>(SDL_toupper(static_cast<unsigned char>(running[i])));   // the pixel font has capitals
+        }
+        ImGui::TextDisabled("%s", running);
+        ImGui::Spacing();
+        float third = static_cast<float>(static_cast<int>((content_width - 2.0f * style.ItemSpacing.x) / 3.0f));
+        if (retro_ui_button_sized(piccolo_text(strings, context->user_paused ? Str::quick_menu_resume : Str::quick_menu_pause),
+                                  third, 0.0f))
+        {
+            action = QuickMenuAction::pause;
+        }
+        ImGui::SameLine();
+        if (retro_ui_button_sized(piccolo_text(strings, Str::quick_menu_reset), third, 0.0f))
+        {
+            action = QuickMenuAction::reset;
+        }
+        ImGui::SameLine();
+        if (retro_ui_button_sized(piccolo_text(strings, Str::quick_menu_close_game), third, 0.0f))
+        {
+            action = QuickMenuAction::close_game;
+        }
+        ImGui::Separator();
+        ImGui::Spacing();
+        switch (menu->tab)
+        {
+            case 0:
             {
-                menu->tab = 0;
-                action = draw_states_tab(menu, context, block, appearing);
-                ImGui::EndTabItem();
+                QuickMenuAction states = draw_states_tab(menu, context, block, appearing);
+                action = states != QuickMenuAction::none ? states : action;
+                break;
             }
-            std::snprintf(label, sizeof(label), "%s###core_options", piccolo_text(strings, Str::tab_core_options));
-            if (context->core_options_state != nullptr &&
-                ImGui::BeginTabItem(label, nullptr, target == 1 ? ImGuiTabItemFlags_SetSelected : 0))
+            case 1:
             {
-                menu->tab = 1;
                 CoreOptionsUiContext core = context->core_options;
                 core.strings = strings;
                 core.label_width = 80.0f * block;   // SAVE TO / SECTION; the options size their own column
                 core_options_ui_draw_running(context->core_options_state, &core);
-                ImGui::EndTabItem();
+                break;
             }
-            std::snprintf(label, sizeof(label), "%s###controls", piccolo_text(strings, Str::quick_menu_tab_controls));
-            if (context->input != nullptr && ImGui::BeginTabItem(label, nullptr, target == 2 ? ImGuiTabItemFlags_SetSelected : 0))
-            {
-                menu->tab = 2;
+            case 2:
                 draw_controls_tab(menu, context, block);
-                ImGui::EndTabItem();
-            }
-            std::snprintf(label, sizeof(label), "%s###shader", piccolo_text(strings, Str::quick_menu_tab_shader));
-            if (context->settings != nullptr &&
-                ImGui::BeginTabItem(label, nullptr, target == 3 ? ImGuiTabItemFlags_SetSelected : 0))
-            {
-                menu->tab = 3;
+                break;
+            case 3:
                 draw_shader_tab(menu, context);
-                ImGui::EndTabItem();
-            }
-            ImGui::EndTabBar();
+                break;
+            default:
+                break;
         }
+        ImGui::EndChild();
+
+        ImGui::SameLine();
+        ImGui::BeginChild("##quick_tabs", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+        for (int t = 0; t < TAB_COUNT; t++)
+        {
+            if (!tab_shown[t])
+            {
+                continue;
+            }
+            char label[100] = {};
+            std::snprintf(label, sizeof(label), "%s###quick_tab_%d", piccolo_text(strings, TAB_LABELS[t]), t);
+            if (ImGui::Selectable(label, menu->tab == t, ImGuiSelectableFlags_None, ImVec2(0.0f, 16.0f * block)))
+            {
+                menu->tab = t;
+            }
+        }
+        ImGui::EndChild();
         retro_ui_end_window();
     }
     ImGui::End();
