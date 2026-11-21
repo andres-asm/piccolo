@@ -167,6 +167,9 @@ web/                      the browser build (Emscripten, WebGL 2, pthreads): bui
   page/                   piccolo's page: core.html, piccolo-page.js (OPEN GAME, drops), piccolo-files.js
                           (the FILES panel); the shared half (the start, the folder on OPFS, sw.js) is
                           frontends-common's web/, and app_loop / app_storage its C++ side
+  site/                   the websites' shared look (piccolo-site's assets/v1): package.sh fetches it into
+                          _site/v1 (this committed copy without the network) and fills the start page's bar
+                          and footer; PICCOLO_WEB_CHANNEL stable / dev (DEV pill + commit)
 tools/                    strings_check, recent_games_test, stream_measure (remote play
                           codec on real games), netplay_measure (which netplay mode a core and game
                           suit: determinism, exact states, cost), lsan-suppressions.txt

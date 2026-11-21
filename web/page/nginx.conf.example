@@ -6,7 +6,15 @@ location /piccolo/ {
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
     types {
+        text/html html;
+        text/css css;
+        text/javascript js;
+        text/plain txt;
+        image/png png;
+        image/svg+xml svg;
+        font/woff2 woff2;
         application/wasm wasm;
+        application/octet-stream data;
         application/manifest+json webmanifest;
     }
 }

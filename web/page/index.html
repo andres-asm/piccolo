@@ -1,43 +1,58 @@
 <!doctype html>
 <!-- piccolo in the browser: choose the emulator. One folder per core
-     (web/package.sh), each a piccolo built with that core linked in. -->
+     (web/package.sh), each a piccolo built with that core linked in. The
+     look is piccolo's websites' (_site/v1, copied in by web/package.sh;
+     the sites bar and footer are filled in between their markers). -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>piccolo</title>
+<title>piccolo: play</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-32.png">
+<link rel="stylesheet" href="_site/v1/site.css">
 <style>
-  :root { --back: #101820; --card: #1c2c44; --bar: #2f4f7f; --text: #e8eef4; --dim: #9fb0c4; }
-  html { background: var(--back); }
-  body { margin: 0 auto; max-width: 40em; padding: 32px 16px; color: var(--text);
-         font: 14px/1.5 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; }
-  header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
-  header img { width: 48px; height: 48px; image-rendering: pixelated; }
-  h1 { font-size: 20px; margin: 0; letter-spacing: 2px; text-transform: uppercase; }
-  p { color: var(--dim); }
-  a.core { display: block; background: var(--card); color: var(--text); text-decoration: none;
-           padding: 12px 16px; margin: 8px 0; border-left: 4px solid var(--bar); }
-  a.core:hover { background: var(--bar); }
-  a.core b { letter-spacing: 1px; text-transform: uppercase; }
-  a.core span { display: block; color: var(--dim); font-size: 12px; }
-  footer { margin-top: 32px; font-size: 12px; color: var(--dim); }
-  footer a { color: var(--dim); }
-  #drop-hint { color: var(--text); background: var(--bar); padding: 8px 12px; }
+  main.wrap { padding-top: 40px; padding-bottom: 48px; }
+  .intro { max-width: 46em; color: var(--muted); margin: 0 0 28px; }
+  .cores { display: grid; gap: 18px; margin-bottom: 32px; }
+  a.core { display: flex; align-items: center; gap: 18px; padding: 18px 22px; text-decoration: none; color: var(--text);
+           border-left: 6px solid var(--edge); }
+  a.core:hover { color: var(--text); border-left-color: var(--accent); transform: translate(2px, 2px); box-shadow: 4px 4px 0 var(--shadow); }
+  a.core b { display: block; font: 600 24px/1.2 var(--font-heading); }
+  a.core span { display: block; color: var(--muted); font-size: 14px; }
+  a.core .go { margin-left: auto; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--heading-accent); white-space: nowrap; }
+  .notes { color: var(--muted); font-size: 14px; max-width: 46em; }
+  .notes p { margin: 0 0 8px; }
+  #drop-hint { background: var(--accent); color: var(--on-accent); padding: 10px 14px; font-weight: 700; }
+  .channel { display: inline-block; margin-left: 10px; padding: 2px 8px; vertical-align: middle; background: var(--accent);
+             color: var(--on-accent); font: 700 12px/1.4 var(--font-text); letter-spacing: 0.08em; text-shadow: none; }
 </style>
 </head>
-<body>
-<header><img src="icon-128.png" alt=""><h1>piccolo</h1></header>
-<p>Choose the emulator, then open a game file (or drop it on the page). Saves, states and settings stay in this browser.
-No games are included.</p>
-<a class="core" href="sameboy/"><b>SameBoy</b><span>Game Boy, Game Boy Color, Super Game Boy</span></a>
-<a class="core" href="snes9x/"><b>Snes9x</b><span>Super Nintendo, Super Famicom</span></a>
-<a class="core" id="piccoletto" href="piccoletto/" hidden><b>piccoletto</b><span>piccolo's companion: this device as a gamepad for a piccolo, remote play, devices</span></a>
-<p id="drop-hint" hidden>Choose the emulator first, then drop the game on its page.</p>
-<footer>piccolo is MIT licensed; each core under its own license (LICENSES/). Keyboard and gamepads (press a button
-first) work. Sound starts after a click or a key.</footer>
+<body data-site="play" data-channel="@CHANNEL@">
+<!-- sites-header filled in by web/package.sh -->
+<!-- /sites-header -->
+<main class="wrap">
+  <h1>Play in the browser<span class="channel" id="channel" hidden>DEV @COMMIT@</span></h1>
+  <p class="intro">Choose the emulator, then open a game file (or drop it on the page). Saves, states and settings stay
+  in this browser. No games are included.</p>
+  <div class="cores">
+    <a class="core panel" href="sameboy/"><div><b>SameBoy</b><span>Game Boy, Game Boy Color, Super Game Boy</span></div><span class="go">Play</span></a>
+    <a class="core panel" href="snes9x/"><div><b>Snes9x</b><span>Super Nintendo, Super Famicom</span></div><span class="go">Play</span></a>
+    <a class="core panel" id="piccoletto" href="piccoletto/" hidden><div><b>piccoletto</b><span>piccolo's companion: this device as a gamepad for a piccolo, remote play, devices</span></div><span class="go">Open</span></a>
+  </div>
+  <p id="drop-hint" hidden>Choose the emulator first, then drop the game on its page.</p>
+  <div class="notes">
+    <p>Keyboard and gamepads (press a button first) work. Sound starts after a click or a key.</p>
+    <p>piccolo is MIT licensed; each core under its own license (<a href="LICENSES/">LICENSES/</a>).</p>
+  </div>
+</main>
+<!-- sites-footer filled in by web/package.sh -->
+<!-- /sites-footer -->
 <script>
+  // The dev channel (every push to main) says so; a release says nothing.
+  if (document.body.dataset.channel === 'dev') {
+    document.getElementById('channel').hidden = false;
+  }
   // piccoletto is listed only when this site has it (web/package.sh with PICCOLETTO).
   fetch('piccoletto/manifest.webmanifest', { method: 'HEAD' }).then(function (response) {
     document.getElementById('piccoletto').hidden = !response.ok;

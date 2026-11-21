@@ -1,0 +1,188 @@
+/* piccolo's websites: the look they all share (assets/v1/README.md).
+   get-piccolo.app, play., cores., releases. and the beacon's status page link
+   or copy this file; each page adds only its own parts.
+   Colors from piccolo's BLUE theme (piccolo/assets/branding/README.md): dark
+   by default, light with prefers-color-scheme. Headings in Fredoka, text in
+   IBM Plex Mono (both OFL, fonts/), served from here: no font requests to
+   anyone else.
+   v1 stays compatible: class names and tokens here are only added, never
+   renamed or removed. A breaking change is a new folder, v2. */
+
+@font-face {
+  font-family: "Fredoka";
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/fredoka-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/plex-mono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/plex-mono-700.woff2") format("woff2");
+}
+
+:root {
+  --bg: #1A2840;
+  --band: #2A4068;
+  --card: #2A4068;
+  --card-on-band: #1A2840;
+  --text: #E0E6F0;
+  --muted: #AEBBD4;
+  --shadow: #101828;
+  --edge: #5878A8;
+  --grid: #3A5482;
+  --accent: #FFC93C;
+  --on-accent: #1A2840;
+  --heading-accent: #FFC93C;
+  --link: #9DB8E8;
+  --good: #6FD08C;
+  --code-bg: #101828;
+  --font-text: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --font-heading: "Fredoka", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #E8EDF5;
+    --band: #FFFFFF;
+    --card: #FFFFFF;
+    --card-on-band: #E8EDF5;
+    --text: #1A2840;
+    --muted: #4A5A78;
+    --shadow: #B4C2DC;
+    --edge: #B4C2DC;
+    --grid: #D2DBEA;
+    /* Yellow text doesn't read on the light page: headings go blue. */
+    --heading-accent: #2A4068;
+    --link: #2A4068;
+    --good: #1E8A45;
+    --code-bg: #1A2840;
+    color-scheme: light;
+  }
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 16px/1.6 var(--font-text);
+}
+
+a { color: var(--link); }
+a:hover { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+h1, h2, h3 { font-family: var(--font-heading); font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; }
+h1, h2 { line-height: 1.1; text-shadow: 3px 3px 0 var(--shadow); }
+h1 { font-size: 40px; margin: 0 0 20px; }
+h2 { font-size: 34px; margin: 0 0 24px; }
+
+/* Small uppercase label above a group. */
+.label {
+  margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ---- The sites bar: the same markup on every site (sites-header.html).
+   <body data-site="home|play|cores|releases|status"> lights its entry and
+   names the site next to the brand. ---- */
+.sites-bar { background: var(--band); border-bottom: 2px solid var(--shadow); }
+.sites-bar-row { display: flex; align-items: center; gap: 8px 20px; flex-wrap: wrap; min-height: 56px; }
+.sites-brand {
+  display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none;
+  font: 600 22px/1 var(--font-heading); letter-spacing: -0.01em; white-space: nowrap;
+}
+.sites-brand svg { width: 28px; height: 28px; flex: none; }
+.sites-brand::after { font: 400 14px/1 var(--font-text); color: var(--muted); letter-spacing: 0; }
+body[data-site="play"] .sites-brand::after { content: "/ play"; }
+body[data-site="cores"] .sites-brand::after { content: "/ cores"; }
+body[data-site="releases"] .sites-brand::after { content: "/ releases"; }
+body[data-site="status"] .sites-brand::after { content: "/ status"; }
+.sites-nav { display: flex; gap: 2px; margin-left: auto; }
+.sites-nav a {
+  color: var(--text); text-decoration: none; padding: 10px 11px; white-space: nowrap;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sites-nav a:hover { color: var(--text); box-shadow: inset 0 -3px 0 var(--accent); }
+body[data-site="home"] .sites-nav a[data-site="home"],
+body[data-site="play"] .sites-nav a[data-site="play"],
+body[data-site="cores"] .sites-nav a[data-site="cores"],
+body[data-site="releases"] .sites-nav a[data-site="releases"],
+body[data-site="status"] .sites-nav a[data-site="status"] {
+  background: var(--accent); color: var(--on-accent); box-shadow: none;
+}
+
+/* ---- The footer: identical everywhere (sites-footer.html). ---- */
+.sites-foot { border-top: 2px solid var(--shadow); color: var(--muted); font-size: 14px; padding: 28px 0 32px; }
+.sites-foot-row { display: flex; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; }
+.sites-foot p { margin: 0; }
+.sites-foot-links { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+
+/* ---- Pieces the pages share ---- */
+.btn {
+  display: inline-block; min-height: 48px; padding: 12px 22px;
+  font: 700 15px/1.4 var(--font-text); text-decoration: none; color: var(--text);
+  background: var(--band); border: 2px solid var(--edge); box-shadow: 4px 4px 0 var(--shadow);
+  cursor: pointer;
+}
+.btn:hover { color: var(--text); transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+.panel { background: var(--band); box-shadow: 6px 6px 0 var(--shadow); }
+.card { background: var(--card-on-band); padding: 20px 22px; box-shadow: 6px 6px 0 var(--shadow); }
+.card h3 {
+  margin: 0 0 8px; font: 700 14px/1.3 var(--font-text); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--heading-accent);
+}
+.card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+pre {
+  background: var(--code-bg); color: #E0E6F0; padding: 18px 20px; overflow-x: auto;
+  font: 14px/1.6 var(--font-text); box-shadow: 6px 6px 0 var(--shadow);
+}
+
+/* A file listing (cores., releases.): <div class="panel table-wrap"><table class="listing">. */
+.table-wrap { overflow-x: auto; }
+table.listing { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.listing th, table.listing td { padding: 8px 14px; text-align: left; white-space: nowrap; }
+table.listing th {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); border-bottom: 2px solid var(--shadow);
+}
+table.listing tr + tr td { border-top: 1px solid var(--shadow); }
+table.listing td.name { width: 100%; white-space: normal; overflow-wrap: anywhere; }
+table.listing a { text-decoration: none; }
+table.listing tr.dir a { font-weight: 700; }
+table.listing .size { text-align: right; }
+table.listing td.size, table.listing td.date { color: var(--muted); font-variant-numeric: tabular-nums; }
+table.listing tr.group td {
+  padding-top: 18px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); border-top: 2px solid var(--shadow);
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  h1 { font-size: 30px; }
+  h2 { font-size: 28px; }
+  .sites-bar-row { gap: 0; padding-top: 10px; }
+  /* The entries scroll sideways under the brand on a phone. */
+  .sites-nav { margin: 0 -16px; padding: 0 5px 2px; width: calc(100% + 32px); overflow-x: auto; scrollbar-width: none; }
+  table.listing th, table.listing td { padding: 8px 10px; }
+  table.listing .date { display: none; }
+}

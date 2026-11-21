@@ -88,6 +88,8 @@ jobs:
           else
             echo "piccoletto's main has no browser build yet: the zip has none"
           fi
+          # The channel the pages say: stable for a release tag, dev otherwise.
+          if [ "${{ github.ref_type }}" = tag ]; then export PICCOLO_WEB_CHANNEL=stable; else export PICCOLO_WEB_CHANNEL=dev; fi
           web/package.sh
           ls -la web/build/dist
 
@@ -108,10 +110,12 @@ jobs:
           curl -fsSI http://localhost:8080/sameboy/ | tee page-headers.txt
           curl -fsSI http://localhost:8080/sameboy/piccolo.wasm | tee wasm-headers.txt
           curl -fsSI http://localhost:8080/snes9x/piccolo.wasm > /dev/null
+          curl -fsSI http://localhost:8080/_site/v1/site.css | tee css-headers.txt
           docker stop piccolo-web
           grep -qi '^cross-origin-opener-policy: same-origin' page-headers.txt
           grep -qi '^cross-origin-embedder-policy: require-corp' page-headers.txt
           grep -qi '^content-type: application/wasm' wasm-headers.txt
+          grep -qi '^content-type: text/css' css-headers.txt
 
       - name: Publish the image (GHCR)
         if: github.event_name == 'push'

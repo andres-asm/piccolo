@@ -6,88 +6,107 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>piccolo</title>
+<title>piccolo: @CORE_NAME@</title>
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon-32.png">
+<link rel="stylesheet" href="../_site/v1/site.css">
 <style>
-  :root { --back: #101820; --panel: #18222c; --line: #2a3a4a; --bar: #2f4f7f; --text: #e8eef4; --dim: #9fb0c4; }
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
-  body { font: 13px/1.4 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--text); }
+  /* The look is piccolo's websites' (_site/v1/site.css: tokens, fonts), but
+     no sites bar: the game owns the screen. A thin strip on top instead. */
+  html, body { height: 100%; overflow: hidden; }
+  body { font-size: 13px; line-height: 1.4; }
   button { font: inherit; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  #strip { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; background: var(--band);
+           border-bottom: 2px solid var(--shadow); }
+  #strip a.home { display: flex; align-items: center; gap: 8px; color: var(--text); text-decoration: none;
+                  font: 600 17px/1 var(--font-heading); white-space: nowrap; }
+  #strip a.home img { width: 22px; height: 22px; }
+  #strip a.home span { font: 400 13px/1 var(--font-text); color: var(--muted); }
+  #strip .channel { padding: 1px 6px; background: var(--accent); color: var(--on-accent); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; }
+  #strip .space { flex: 1; }
+  #strip button { min-height: 26px; padding: 2px 10px; background: var(--bg); color: var(--text); border: 2px solid var(--edge);
+                  box-shadow: 2px 2px 0 var(--shadow); font-weight: 700; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+  #strip button:hover, #strip button.active { border-color: var(--accent); }
+  #strip button.active { background: var(--accent); color: var(--on-accent); }
+  #strip button[hidden] { display: none; }
+  #main { flex: 1; min-height: 0; display: flex; }
   /* The canvas fills its stage; SDL takes the window's size from the canvas's
-     CSS size (piccolo-page.js sends a resize event when the stage changes). */
-  #app { display: flex; height: 100%; }
-  #stage { position: relative; flex: 1; min-width: 0; }
-  /* touch-action: the fingers are the game's (the touch gamepad), never a zoom or a scroll. */
-  canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+     CSS size (multitap-page.js sends a resize event when the stage changes). */
+  #stage { position: relative; flex: 1; min-width: 0; background: #000; }
+  canvas { display: block; width: 100%; height: 100%; outline: none; }
   #overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
-             background: var(--back); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 16px; }
+             background: var(--bg); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 16px; }
   #overlay.gone { display: none; }
   #overlay .box { max-width: 36em; }
-  #overlay progress { width: 16em; height: 6px; margin-top: 12px; accent-color: var(--bar); }
-  #buttons { position: absolute; right: 8px; bottom: 6px; z-index: 2; display: flex; gap: 4px; }
-  #buttons button { background: var(--bar); color: var(--text); border: 0; padding: 3px 10px; font-size: 11px;
-                    text-transform: uppercase; letter-spacing: 1px; cursor: pointer; opacity: 0.85; }
-  #buttons button:hover, #buttons button.active { opacity: 1; }
-  #buttons button[hidden] { display: none; }
+  #overlay progress { width: 16em; height: 6px; margin-top: 12px; accent-color: var(--accent); }
   body.dragging::after { content: "DROP A GAME (OR, ON THE FILES PANEL, A FILE FOR THAT FOLDER)"; position: fixed; inset: 12px;
-                         z-index: 6; border: 2px dashed var(--dim); display: flex; align-items: center; justify-content: center;
-                         color: var(--text); background: rgba(16, 24, 32, 0.7); letter-spacing: 2px; pointer-events: none;
+                         z-index: 6; border: 2px dashed var(--accent); display: flex; align-items: center; justify-content: center;
+                         color: var(--text); background: rgba(16, 24, 40, 0.75); letter-spacing: 2px; pointer-events: none;
                          text-align: center; padding: 16px; }
 
   /* FILES: the session's filesystem (piccolo-files.js). */
-  #files { width: 320px; flex: none; display: flex; flex-direction: column; background: var(--panel);
-           border-left: 1px solid var(--line); font-size: 12px; text-transform: uppercase; }
+  #files { width: 320px; flex: none; display: flex; flex-direction: column; background: var(--band);
+           border-left: 2px solid var(--shadow); font-size: 12px; text-transform: uppercase; }
   #files.closed { display: none; }
-  #files header { display: flex; align-items: center; gap: 4px; padding: 4px 6px; background: var(--bar); letter-spacing: 1px; }
+  #files header { display: flex; align-items: center; gap: 4px; padding: 4px 6px; background: var(--bg);
+                  border-bottom: 2px solid var(--shadow); font-weight: 700; letter-spacing: 0.08em; }
   #files header .title { flex: 1; }
   #files button { background: transparent; color: var(--text); border: 1px solid transparent; padding: 1px 5px;
-                  font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
-  #files button:hover { border-color: var(--dim); }
-  #files-path { display: flex; flex-wrap: wrap; padding: 4px 6px; border-bottom: 1px solid var(--line); color: var(--dim);
+                  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+  #files button:hover { border-color: var(--accent); }
+  #files-path { display: flex; flex-wrap: wrap; padding: 4px 6px; border-bottom: 1px solid var(--shadow); color: var(--muted);
                 text-transform: none; }
-  #files-path button { padding: 0 1px; color: var(--dim); text-transform: none; letter-spacing: 0; }
+  #files-path button { padding: 0 1px; color: var(--muted); text-transform: none; letter-spacing: 0; }
   #files-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; text-transform: none; }
-  #files-list li { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-bottom: 1px solid rgba(42, 58, 74, 0.5); }
-  #files-list li:hover { background: rgba(47, 79, 127, 0.35); }
-  #files-list li.folder { cursor: pointer; color: #b8d4ff; }
-  #files-list li.empty { color: var(--dim); justify-content: center; padding: 12px; text-transform: uppercase; }
+  #files-list li { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-bottom: 1px solid var(--shadow); }
+  #files-list li:hover { background: var(--grid); }
+  #files-list li.folder { cursor: pointer; color: var(--link); font-weight: 700; }
+  #files-list li.empty { color: var(--muted); justify-content: center; padding: 12px; text-transform: uppercase; }
   #files-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #files-list .size { color: var(--dim); font-size: 11px; white-space: nowrap; }
+  #files-list .size { color: var(--muted); font-size: 11px; white-space: nowrap; }
   #files-list .actions { display: flex; gap: 2px; visibility: hidden; }
   #files-list li:hover .actions { visibility: visible; }
-  #files-list .actions button { padding: 0 4px; font-size: 10px; border-color: var(--line); }
-  #files footer { padding: 4px 6px; border-top: 1px solid var(--line); color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+  #files-list .actions button { padding: 0 4px; font-size: 10px; border-color: var(--edge); }
+  #files footer { padding: 4px 6px; border-top: 1px solid var(--shadow); color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
   /* Touch screens have no hover: the actions always show. */
   @media (hover: none) { #files-list .actions { visibility: visible; } }
-  /* Narrow screens: the panel goes over the game instead of beside it. */
+  /* Narrow screens: the panel goes over the game instead of beside it; the
+     strip keeps only the buttons. */
   @media (max-width: 640px) {
-    #files { position: fixed; inset: 0 0 0 auto; width: min(100%, 360px); z-index: 4; }
+    #files { position: fixed; inset: 38px 0 0 auto; width: min(100%, 360px); z-index: 4; }
+    #strip a.home span { display: none; }
   }
 </style>
 </head>
-<body>
+<body data-channel="@CHANNEL@">
 <div id="app">
-  <div id="stage">
-    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
-    <div id="buttons">
-      <button id="open" hidden title="Open a game file (or drop it on the page)">Open game</button>
-      <button id="files-toggle" hidden title="This session's files: saves, states, settings, games">Files</button>
-    </div>
+  <div id="strip">
+    <a class="home" href="../" title="Choose another emulator"><img src="../icon-32.png" alt="">piccolo <span>play / @CORE_NAME@</span></a>
+    <span class="channel" id="channel" hidden>DEV @COMMIT@</span>
+    <span class="space"></span>
+    <button id="open" hidden title="Open a game file (or drop it on the page)">Open game</button>
+    <button id="files-toggle" hidden title="This session's files: saves, states, settings, games">Files</button>
+    <button id="fullscreen" title="The game on the whole screen (Esc leaves)">Full screen</button>
   </div>
-  <aside id="files" class="closed">
-    <header>
-      <span class="title">Files</span>
-      <button id="files-home" title="piccolo's folder">Home</button>
-      <button id="files-upload" title="Add files to this folder (or drop them on this panel)">Add</button>
-      <button id="files-refresh" title="Read the folder again">Reload</button>
-      <button id="files-close" title="Hide the panel">&times;</button>
-    </header>
-    <div id="files-path"></div>
-    <ul id="files-list"></ul>
-    <footer id="files-usage"></footer>
-    <input id="files-input" type="file" multiple hidden>
-  </aside>
+  <div id="main">
+    <div id="stage">
+      <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    </div>
+    <aside id="files" class="closed">
+      <header>
+        <span class="title">Files</span>
+        <button id="files-home" title="piccolo's folder">Home</button>
+        <button id="files-upload" title="Add files to this folder (or drop them on this panel)">Add</button>
+        <button id="files-refresh" title="Read the folder again">Reload</button>
+        <button id="files-close" title="Hide the panel">&times;</button>
+      </header>
+      <div id="files-path"></div>
+      <ul id="files-list"></ul>
+      <footer id="files-usage"></footer>
+      <input id="files-input" type="file" multiple hidden>
+    </aside>
+  </div>
 </div>
 <div id="overlay"><div class="box"><div id="message">LOADING PICCOLO</div><progress id="progress" max="1" value="0"></progress></div></div>
 <input id="file" type="file" hidden>

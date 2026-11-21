@@ -48,12 +48,39 @@ function piccolo_page_files() {
   }, true);
 }
 
+// FULL SCREEN: the game alone on the screen (the stage, not the strip or
+// FILES); the browser's Esc leaves it.
+function piccolo_page_fullscreen() {
+  const button = document.getElementById('fullscreen');
+  const stage = document.getElementById('stage');
+  if (!stage.requestFullscreen) {
+    button.hidden = true;
+    return;
+  }
+  button.addEventListener('click', function () {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      stage.requestFullscreen().catch(function (error) { console.log('Full screen: ' + error.message); });
+    }
+    document.getElementById('canvas').focus();
+  });
+  document.addEventListener('fullscreenchange', function () {
+    button.classList.toggle('active', document.fullscreenElement === stage);
+  });
+}
+
 // The page as before, kept for scripts that call it (tests).
 function piccolo_page_open(file) {
   return multitap_page_open(file);
 }
 
 function piccolo_page_start() {
+  // The dev channel (every push to main) says so, with its commit; a release says nothing.
+  if (document.body.dataset.channel === 'dev') {
+    document.getElementById('channel').hidden = false;
+  }
+  piccolo_page_fullscreen();
   multitap_page_start({
     name: 'piccolo',
     title: 'PICCOLO',

@@ -5,6 +5,12 @@
 #   for core in sameboy snes9x; do web/build-core.sh $core && web/build.sh $core; done
 #   web/package.sh
 #
+# The look is piccolo's websites' (web/site/README.txt): get-piccolo.app's
+# assets/v1 fetched into _site/v1 (SITE_ASSETS_URL to change where from;
+# web/site/v1 when the fetch fails), the start page's sites bar and footer
+# filled in from it. PICCOLO_WEB_CHANNEL (stable or dev, default dev) goes
+# into the pages: dev shows a DEV pill with the commit.
+#
 # With PICCOLETTO=<a piccoletto checkout> whose web/build.sh ran, piccoletto
 # goes in too, as piccoletto/ (its page, its module; the shared scripts and
 # sw.js are the same ones, at the top).
@@ -13,6 +19,7 @@
 #
 # Layout (all paths relative):
 #   index.html                 choose the emulator (it lists every core below)
+#   _site/v1/                  piccolo's websites' shared look (site.css, fonts, bar, footer)
 #   sameboy/ snes9x/           piccolo with that core linked in: index.html, piccolo.js/.wasm/.data
 #   piccoletto/                piccoletto (PICCOLETTO=...): index.html, piccoletto-page.js,
 #                              manifest.webmanifest, icons, piccoletto.js/.wasm
@@ -58,6 +65,36 @@ for core in $cores; do
     mkdir -p "$dist/$core"
     cp "$here/page/core.html" "$dist/$core/index.html"
     cp "$build/wasm/$core/piccolo.js" "$build/wasm/$core/piccolo.wasm" "$build/wasm/$core/piccolo.data" "$dist/$core/"
+done
+
+# The shared look, of this day (or the committed copy without the network).
+site_copy="$build/site-assets"
+SITE_ASSETS_URL=${SITE_ASSETS_URL:-https://get-piccolo.app/assets/v1}
+rm -rf "$site_copy"
+if SITE_ASSETS_URL="$SITE_ASSETS_URL" "$here/site/fetch-site-assets.sh" "$site_copy"; then
+    echo "web/package.sh: the sites' look from $SITE_ASSETS_URL"
+else
+    echo "web/package.sh: can't fetch $SITE_ASSETS_URL: the committed copy (web/site/v1)"
+    rm -rf "$site_copy"
+    cp -r "$here/site/v1" "$site_copy"
+fi
+mkdir -p "$dist/_site"
+cp -r "$site_copy" "$dist/_site/v1"
+"$here/site/sync-snippets.sh" "$dist/_site/v1" "$dist/index.html"
+
+# The pages' placeholders: each core's name, the channel and the commit.
+channel=${PICCOLO_WEB_CHANNEL:-dev}
+commit=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
+for core in $cores; do
+    case "$core" in
+        sameboy) core_name=SameBoy ;;
+        snes9x)  core_name=Snes9x ;;
+        *)       core_name=$core ;;
+    esac
+    sed -i "s/@CORE_NAME@/$core_name/g" "$dist/$core/index.html"
+done
+for page in "$dist/index.html" "$dist"/*/index.html; do
+    sed -i "s/@CHANNEL@/$channel/g; s/@COMMIT@/$commit/g" "$page"
 done
 
 # Licenses: piccolo, our libraries, the third-party ones linked in, the core.
