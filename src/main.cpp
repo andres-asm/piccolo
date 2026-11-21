@@ -4351,10 +4351,12 @@ static bool app_frame(App* app)
                          : geometry->base_height > 0 ? static_cast<float>(geometry->base_width) / static_cast<float>(geometry->base_height)
                                                      : 4.0f / 3.0f;
             const ImGuiIO& io = ImGui::GetIO();
-            onscreen_pad_place(&app->onscreen_pad, game_running(app) && !ui_is_up(app), aspect, io.DisplaySize.x, io.DisplaySize.y);
+            onscreen_pad_place(&app->onscreen_pad, app->ui_derived.overlay_active, aspect, io.DisplaySize.x, io.DisplaySize.y);
         }
         draw_game(app);   // background, behind everything
-        // The touch gamepad over the game (or EDIT LAYOUT); MENU opens the QUICK MENU.
+        // The touch gamepad over the game, a GAME-mode device (it takes touches
+        // only in GAME), or its EDIT LAYOUT (MAIN MENU's top window, drawn by
+        // the overlay); MENU opens the QUICK MENU.
         onscreen_pad_draw(&app->onscreen_pad, app->pixel_font, piccolo_text(&app->strings, Str::touch_pad_menu),
                           static_cast<float>(settings_get_int(&app->settings, PICCOLO_TOUCH_PAD_OPACITY)) / 100.0f,
                           settings_get_bool(&app->settings, PICCOLO_TOUCH_PAD_VIBRATE));
