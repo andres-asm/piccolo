@@ -1089,6 +1089,48 @@ static void share_update(App* app, ShareTransferLine* line)
     }
 }
 
+// GAME > RESUME: back to the game whatever is up. Also the way out when
+// something holds the input: every window closes, a SET or a macro recording
+// is cancelled and the router runs again (both suspend it).
+static void resume_game(App* app)
+{
+    if (!game_running(app))
+    {
+        return;
+    }
+    if (app->quick_menu.macro_record != 0)
+    {
+        app->quick_menu.macro_record = 0;
+    }
+    if (map_window_open_now(&app->map_window))
+    {
+        map_window_close(&app->map_window, &app->input);
+    }
+    input_capture_cancel(&app->input);
+    app->input.suspended = false;
+    app->input_window.capturing = false;
+    app->quick_menu.capturing = false;
+    if (app->onscreen_pad.editor.active)
+    {
+        onscreen_pad_edit_end(&app->onscreen_pad);
+    }
+    if (app->ports_widget.open)
+    {
+        ports_widget_close(&app->ports_widget);
+    }
+    app->picker.open = false;
+    app->shader_picker.open = false;
+    app->settings_window.open = false;
+    app->settings_window.image_open = false;
+    app->quick_menu.open = false;
+    app->core_options_manager = false;
+    app->cores_window.open = false;
+    app->share_window.open = false;
+    app->input_window.open = false;
+    app->show_debug_window = false;
+    app->menu_visible = false;
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -1103,6 +1145,9 @@ static void handle_menu_action(App* app, MenuAction action)
             file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core, &game_folders);
             break;
         }
+        case MenuAction::resume:
+            resume_game(app);
+            break;
         case MenuAction::reset:
             if (game_running(app))
             {

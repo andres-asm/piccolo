@@ -14,3 +14,7 @@ imgui.ini
 
 # flatpak-builder state (build-flatpak* is covered by build*)
 .flatpak-builder/
+
+# docs/ holds working notes that stay local; only the build guide is committed
+docs/*
+!docs/compilation.md

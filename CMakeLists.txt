@@ -436,7 +436,7 @@ if(MULTITAP_BUILD_TESTS)
     add_test(NAME piccolo_gl_presets COMMAND piccolo_gl_presets_check "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gl")
     set_tests_properties(piccolo_gl_presets PROPERTIES
                          SKIP_RETURN_CODE 77
-                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load and run"
+                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load, run and come out even"
                          FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
     add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)

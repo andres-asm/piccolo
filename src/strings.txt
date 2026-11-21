@@ -16,6 +16,7 @@ menu_game = GAME
 menu_config = SETTINGS
 menu_tools = TOOLS
 menu_misc = MISC
+menu_resume = RESUME
 menu_load_game = LOAD GAME...
 menu_reset = RESET
 menu_save_state = SAVE STATE
