@@ -10,10 +10,10 @@
 # Layout (all paths relative):
 #   index.html                 choose the emulator (it lists every core below)
 #   sameboy/ snes9x/           piccolo with that core linked in: index.html, piccolo.js/.wasm/.data
-#   piccolo-page.js            the page's scripts, with piccolo-storage.js (its folder on OPFS)
-#                              and piccolo-files.js (the FILES panel)
-#   sw.js                      the service worker (COOP/COEP where the server can't send them,
-#                              offline cache)
+#   piccolo-page.js            the page's scripts, with piccolo-files.js (the FILES panel)
+#   multitap-page.js multitap-storage.js   frontends-common's web/: the start, the folder on OPFS
+#   sw.js                      the service worker (frontends-common's: COOP/COEP where the server
+#                              can't send them, offline cache)
 #   manifest.webmanifest icon-*.png   installable (PWA)
 #   .htaccess _headers nginx.conf.example README.txt
 #   LICENSES/                  piccolo's and every library's and core's license
@@ -39,8 +39,12 @@ dist="$build/dist/$name"
 rm -rf "$dist" "$build/dist/$name.zip"
 mkdir -p "$dist/LICENSES"
 
-cp "$here/page/index.html" "$here/page/piccolo-page.js" "$here/page/piccolo-storage.js" "$here/page/piccolo-files.js" "$here/page/sw.js" "$here/page/manifest.webmanifest" \
+cp "$here/page/index.html" "$here/page/piccolo-page.js" "$here/page/piccolo-files.js" "$here/page/manifest.webmanifest" \
    "$here/page/.htaccess" "$here/page/_headers" "$here/page/nginx.conf.example" "$here/page/README.txt" "$dist/"
+# The page's shared half (frontends-common's web/: the start, the folder on
+# OPFS, the service worker), shared with piccoletto's page.
+cp "$root/deps/common/frontends-common/web/multitap-page.js" "$root/deps/common/frontends-common/web/multitap-storage.js" \
+   "$root/deps/common/frontends-common/web/sw.js" "$dist/"
 for size in 32 128 512; do
     cp "$root/assets/branding/png/piccolo-icon-$size.png" "$dist/icon-$size.png"
 done

@@ -1,7 +1,7 @@
 // The FILES panel next to piccolo (docs/wasm.md): the session's filesystem,
 // what piccolo sees, starting in its folder (saves, states, settings, games).
 // Download, upload, delete, and open a file in piccolo. Changes inside
-// piccolo's folder reach OPFS with the next storage sync (piccolo-storage.js).
+// piccolo's folder reach OPFS with the next storage sync (multitap-storage.js, from frontends-common).
 
 'use strict';
 
@@ -45,7 +45,7 @@ function piccolo_files_list(folder) {
     }
     try {
       const stat = Module.FS.stat(piccolo_files_join(folder, name));
-      entries.push({ name: name, folder: piccolo_storage_is_folder(stat.mode), size: stat.size, mtime: Number(stat.mtime) });
+      entries.push({ name: name, folder: multitap_storage_is_folder(stat.mode), size: stat.size, mtime: Number(stat.mtime) });
     } catch (error) {
       // Gone since readdir.
     }
@@ -84,7 +84,7 @@ function piccolo_files_download(path) {
 }
 
 function piccolo_files_remove_tree(path) {
-  if (piccolo_storage_is_folder(Module.FS.stat(path).mode)) {
+  if (multitap_storage_is_folder(Module.FS.stat(path).mode)) {
     for (const name of Module.FS.readdir(path)) {
       if (name !== '.' && name !== '..') {
         piccolo_files_remove_tree(path + '/' + name);
@@ -106,12 +106,12 @@ function piccolo_files_delete(path, folder) {
   } catch (error) {
     window.alert('CAN\'T DELETE: ' + error.message);
   }
-  piccolo_storage_sync();
+  multitap_storage_sync();
   piccolo_files_refresh(true);
 }
 
 function piccolo_files_open_in_piccolo(path) {
-  Module.ccall('piccolo_web_open', null, ['string'], [path]);
+  Module.ccall('multitap_web_open', null, ['string'], [path]);
   piccolo_files_element('canvas').focus();
 }
 
@@ -125,7 +125,7 @@ async function piccolo_files_upload(files) {
       window.alert('CAN\'T WRITE ' + name + ': ' + error.message);
     }
   }
-  piccolo_storage_sync();
+  multitap_storage_sync();
   piccolo_files_refresh(true);
 }
 
@@ -195,7 +195,7 @@ function piccolo_files_draw(entries) {
 
 async function piccolo_files_draw_usage() {
   const usage = piccolo_files_element('files-usage');
-  if (piccolo_storage.root === null) {
+  if (multitap_storage.root === null) {
     usage.textContent = 'NOT KEPT: THIS BROWSER HAS NO OPFS';
     return;
   }
@@ -221,7 +221,7 @@ function piccolo_files_refresh(always) {
     entries = piccolo_files_list(piccolo_files.folder);
   } catch (error) {
     // The folder is gone: back to piccolo's.
-    piccolo_files.folder = PICCOLO_FOLDER;
+    piccolo_files.folder = multitap_storage.folder;
     entries = piccolo_files_list(piccolo_files.folder);
   }
   const signature = piccolo_files.folder + '|' + JSON.stringify(entries);
@@ -248,14 +248,14 @@ function piccolo_files_set_open(open) {
 
 // From Module.onRuntimeInitialized (the filesystem exists).
 function piccolo_files_start() {
-  piccolo_files.folder = PICCOLO_FOLDER;
+  piccolo_files.folder = multitap_storage.folder;
   const toggle = piccolo_files_element('files-toggle');
   toggle.hidden = false;
   toggle.addEventListener('click', function () {
     piccolo_files_set_open(piccolo_files_element('files').classList.contains('closed'));
   });
   piccolo_files_element('files-close').addEventListener('click', function () { piccolo_files_set_open(false); });
-  piccolo_files_element('files-home').addEventListener('click', function () { piccolo_files_go(PICCOLO_FOLDER); });
+  piccolo_files_element('files-home').addEventListener('click', function () { piccolo_files_go(multitap_storage.folder); });
   piccolo_files_element('files-refresh').addEventListener('click', function () { piccolo_files_refresh(true); });
   const input = piccolo_files_element('files-input');
   piccolo_files_element('files-upload').addEventListener('click', function () { input.click(); });

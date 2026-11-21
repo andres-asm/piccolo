@@ -147,22 +147,23 @@ src/
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
   share_window.*          TOOLS > SHARE: two panes (here / another piccolo with OWNER access), folders above,
                           files below, arrows in the middle copy games, saves and states (net_share_*)
-  app_icon.* bundled_files_android.* storage_web.*   window icon; files packed in the APK; OPFS in the browser
+  app_icon.* bundled_files_android.* bundled_files_web.*   window icon; files packed in the APK / linked core in the browser
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v7a, Android 5+), res/ (icons,
                           banner), res-debug/ (debug variant)
 web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh <core>
                           (runs deps/cores' recipe for the web: sameboy, snes9x), build.sh <core> (one wasm per core); src/bundled_files_web.cpp registers the linked core
-  main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
-                          leave, piccolo_web_open); storage.* the browser's piccolo folder: in memory,
-                          kept on OPFS by the page (web/page/piccolo-storage.js; WasmFS's OPFS backend
-                          hangs Firefox); web/page/piccolo-files.js the FILES panel (the session's files)
+  page/                   piccolo's page: core.html, piccolo-page.js (OPEN GAME, drops), piccolo-files.js
+                          (the FILES panel); the shared half (the start, the folder on OPFS, sw.js) is
+                          frontends-common's web/, and app_loop / app_storage its C++ side
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
                           codec on real games), netplay_measure (which netplay mode a core and game
                           suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
-deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
+deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui), app_loop (who drives
+                              the loop: a while, or the browser's animation frames) / app_storage (the folder on
+                              OPFS in the browser) + web/ (the pages' shared scripts, sw.js),
                               video_texture / video_output (what frontends draw the picture with: Vulkan's
                               picture + shader_chain, or the GLES path's gl_texture + gl_picture),
                               gl_context / gl_texture / gl_picture / gl_shader_chain (the GLES fallback when Vulkan

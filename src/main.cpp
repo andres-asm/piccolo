@@ -21,11 +21,11 @@
 #include "imgui.h"
 
 #include "app_icon.h"
+#include "app_loop.h"
 #include "app_paths.h"
 #include "app_shell.h"
+#include "app_storage.h"
 #include "bundled_files.h"
-#include "main_loop.h"
-#include "storage.h"
 #include "frame_delay.h"
 #include "game_mode.h"
 #include "host_libretro_version.h"
@@ -1320,7 +1320,7 @@ static void update_window(App* app)
 {
     ViewportInput picture = {};
     bool has_picture = game_picture(app, &picture);
-    if (!main_loop_window_follows_page())
+    if (!app_loop_window_follows_page())
     {
         piccolo_window_apply(&app->window, app->shell.window, &app->settings, has_picture ? &picture : nullptr);
     }
@@ -3797,8 +3797,8 @@ static void net_update_locked(App* app)
 
 // One turn of piccolo's loop: events, the game's frame, the UI, present.
 // False when piccolo should end (QUIT, or a fatal rendering error). Called
-// by main_loop_run: a plain loop on desktop, the browser's animation frames
-// in the web build (main_loop.h).
+// by app_loop_run: a plain loop on desktop, the browser's animation frames
+// in the web build (app_loop.h).
 static bool app_frame(App* app)
 {
     app_handle_events(app);
@@ -3860,9 +3860,9 @@ static bool app_frame(App* app)
     // A streaming device's frame delay needs present waits (piccolo's
     // frame delay works only that way): turned on here, in memory only.
     // Never in the browser: on GL it's a glFinish after every swap, a stall
-    // per frame there, and the browser paces presents itself (main_loop.h).
+    // per frame there, and the browser paces presents itself (app_loop.h).
     app_shell_set_wait_for_present(&app->shell,
-                                   main_loop_can_wait() &&
+                                   app_loop_can_wait() &&
                                        (settings_get_bool(&app->settings, PICCOLO_LATENCY_WAIT_FOR_PRESENT) ||
                                         (stream_delay_overrides(app) &&
                                          app->stream_tuning.delay != NetStreamDelay::off)));
@@ -4176,14 +4176,14 @@ static bool app_frame(App* app)
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Fatal rendering error, exiting");
             return false;
         }
-        if (main_loop_can_wait())
+        if (app_loop_can_wait())
         {
             frame_delay(app);
         }
     }
-    if (main_loop_can_wait())
+    if (app_loop_can_wait())
     {
-        core_session_wait(&app->session);   // the browser paces its own frames (main_loop.h)
+        core_session_wait(&app->session);   // the browser paces its own frames (app_loop.h)
     }
     return app->running;
 }
@@ -4206,7 +4206,7 @@ static const CoreCatalogEntry* core_for_file(const App* app, const char* path)
     return nullptr;
 }
 
-// A file the page opened (main_loop_on_open, the browser): kept in
+// A file the page opened (app_loop_on_open, the browser): kept in
 // <piccolo>/games (so RECENT finds it again after a reload), then started
 // with the first core that takes its extension, like LOAD GAME would.
 static void app_open_file(void* data, const char* path)
@@ -4257,7 +4257,7 @@ static void app_open_file(void* data, const char* path)
     app->has_pending_start = true;   // started at the top of the next frame, like LOAD GAME
 }
 
-// The browser is leaving (main_loop_on_leave): what piccolo writes at exit,
+// The browser is leaving (app_loop_on_leave): what piccolo writes at exit,
 // written now, since its exit never runs there. Hidden: the game keeps
 // running if the page comes back. Unloading: a proper end, so the running
 // marker goes too (or the next visit would think the core crashed).
@@ -4274,7 +4274,7 @@ static void app_save_on_leave(void* data, bool unloading)
     {
         remove_running_marker(app);
     }
-    storage_flush();
+    app_storage_flush();
 }
 
 int main(int argc, char** argv)
@@ -4283,7 +4283,7 @@ int main(int argc, char** argv)
     (void)argv;
 
     SDL_Log("piccolo %s, host-libretro %s", PICCOLO_VERSION, HOST_LIBRETRO_VERSION);
-    storage_init(bundled_files_folder_name());   // the browser: piccolo's folder on OPFS
+    app_storage_init(bundled_files_folder_name());   // the browser: piccolo's folder on OPFS
 
     // The session, catalog and file picker are large (paths, file lists): off the stack.
     App* app = new App{};
@@ -4313,7 +4313,7 @@ int main(int argc, char** argv)
     {
         SDL_SetWindowTitle(app->shell.window, "piccolo " PICCOLO_VERSION);
     }
-    main_loop_prepare_window(app->shell.window);
+    app_loop_prepare_window(app->shell.window);
     debug_ui_set_draw_data_hook(add_text_shadows, app);
     app->pixel_font = pixel_font_imgui_add();
     if (app->pixel_font == nullptr)
@@ -4453,9 +4453,9 @@ int main(int argc, char** argv)
     refresh_audio_devices(app);
 
     app->running = true;
-    main_loop_on_leave(app_save_on_leave, app);
-    main_loop_on_open(app_open_file, app);
-    main_loop_run(app_frame_callback, app);
+    app_loop_on_leave(app_save_on_leave, app);
+    app_loop_on_open(app_open_file, app);
+    app_loop_run(app_frame_callback, app);
 
     headless_leave(&app->headless, app->shell.window);   // the tray icon goes, the window comes back for its size
     piccolo_window_capture(&app->window, app->shell.window);
