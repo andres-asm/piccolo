@@ -256,6 +256,11 @@ const char* piccolo_settings_ui_color_key(uint32_t index);
 // The Input settings (SETTINGS > INPUT) as the input layer's.
 void piccolo_settings_input(const Settings* settings, InputSettings* input);
 
+// The ports piccolo shows (CONTROLS, the ports' tabs, DEVICES, the network's
+// lists): as many as INPUT > PORTS says, no more than the core describes
+// (`core_ports`; 0 = it says nothing).
+uint32_t piccolo_settings_ports(const Settings* settings, uint32_t core_ports);
+
 // INPUT > ENABLE OSK resolved for this machine ("auto" decided here).
 bool piccolo_settings_osk(const Settings* settings);
 

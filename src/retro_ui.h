@@ -93,6 +93,25 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
 // One line of text at the bottom left of the window, behind other windows, in
 // the pixel font with a drop shadow.
 void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text);
+// The same, starting `left` retro pixels from the left (past the ports' tabs).
+void retro_ui_status_line_from(ImFont* pixel_font, int32_t scale, const char* text, float left);
+
+// The palette everything is drawn with now.
+const RetroUiPalette* retro_ui_palette();
+
+// Drawing over the game without widgets (the ports' tabs, DEVICES): a
+// full-screen layer that takes no input, with the pixel font at `scale`.
+// `front`: above every window; otherwise behind them all (like the status
+// line). Shapes and text in window pixels, colors ARGB (alpha used). A line
+// of text is 7 retro pixels: the glyphs start one below `y`. Pair begin / end
+// and clip / unclip.
+void  retro_ui_begin_layer(const char* id, ImFont* pixel_font, int32_t scale, bool front);
+void  retro_ui_end_layer();
+void  retro_ui_layer_rect(float x, float y, float width, float height, uint32_t argb);
+void  retro_ui_layer_text(float x, float y, const char* text, uint32_t argb);
+float retro_ui_layer_text_width(const char* text);
+void  retro_ui_layer_clip(float x, float y, float width, float height);
+void  retro_ui_layer_unclip();
 
 // The retro look for any window and widget between push and pop: palette,
 // pixel font at `scale`, square corners, spacing in retro pixels. Pair them.

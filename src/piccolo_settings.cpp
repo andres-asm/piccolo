@@ -1164,6 +1164,18 @@ bool piccolo_settings_complete_ui_theme(Settings* settings)
     return changed;
 }
 
+uint32_t piccolo_settings_ports(const Settings* settings, uint32_t core_ports)
+{
+    int32_t wanted = settings_get_int(settings, PICCOLO_INPUT_PORTS);
+    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
+                                                                                     : INPUT_PORT_COUNT;
+    if (core_ports > 0 && core_ports < ports)
+    {
+        ports = core_ports;   // (no more than the core has)
+    }
+    return ports;
+}
+
 void piccolo_settings_input(const Settings* settings, InputSettings* input)
 {
     input->keyboard_shares_port1 = settings_get_bool(settings, PICCOLO_INPUT_SHARE_PORT1);

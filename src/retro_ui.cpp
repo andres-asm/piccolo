@@ -404,6 +404,11 @@ MenuAction retro_ui_menu_bar(ImFont* pixel_font, int32_t scale, const Localizati
 
 void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text)
 {
+    retro_ui_status_line_from(pixel_font, scale, text, 4.0f);
+}
+
+void retro_ui_status_line_from(ImFont* pixel_font, int32_t scale, const char* text, float left)
+{
     float block = static_cast<float>(scale);
     const ImGuiIO& io = ImGui::GetIO();
 
@@ -417,12 +422,76 @@ void retro_ui_status_line(ImFont* pixel_font, int32_t scale, const char* text)
     ImGui::Begin("##retro_status", nullptr, flags);
     push_pixel_font(pixel_font, block);
     use_nearest_sampler();
-    // 4 retro pixels from the left and from the bottom (line = 7, glyph starts 1 down).
-    ImVec2 position = ImVec2(4.0f * block, io.DisplaySize.y - (4.0f + 6.0f) * block);
+    // `left` retro pixels from the left, 4 from the bottom (line = 7, glyph starts 1 down).
+    ImVec2 position = ImVec2(left * block, io.DisplaySize.y - (4.0f + 6.0f) * block);
     draw_label(ImGui::GetWindowDrawList(), position, text, false);
     use_linear_sampler();
     ImGui::PopFont();
     ImGui::End();
+}
+
+const RetroUiPalette* retro_ui_palette()
+{
+    return &g_palette;
+}
+
+// ---------------------------------------------------------------------------
+// Layers over the game
+// ---------------------------------------------------------------------------
+
+void retro_ui_begin_layer(const char* id, ImFont* pixel_font, int32_t scale, bool front)
+{
+    const ImGuiIO& io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
+    ImGui::SetNextWindowSize(io.DisplaySize);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground |
+                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
+                             ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+    ImGui::Begin(id, nullptr, flags);
+    // Its place among the windows, every frame (it never takes focus, so
+    // nothing else would move it).
+    if (front)
+    {
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+    }
+    else
+    {
+        ImGui::BringWindowToDisplayBack(ImGui::GetCurrentWindow());
+    }
+    push_pixel_font(pixel_font, static_cast<float>(scale));
+    use_nearest_sampler();
+}
+
+void retro_ui_end_layer()
+{
+    use_linear_sampler();
+    ImGui::PopFont();
+    ImGui::End();
+}
+
+void retro_ui_layer_rect(float x, float y, float width, float height, uint32_t argb)
+{
+    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(x, y), ImVec2(x + width, y + height), to_imgui_u32(argb));
+}
+
+void retro_ui_layer_text(float x, float y, const char* text, uint32_t argb)
+{
+    ImGui::GetWindowDrawList()->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(x, y), to_imgui_u32(argb), text);
+}
+
+float retro_ui_layer_text_width(const char* text)
+{
+    return ImGui::CalcTextSize(text).x;
+}
+
+void retro_ui_layer_clip(float x, float y, float width, float height)
+{
+    ImGui::GetWindowDrawList()->PushClipRect(ImVec2(x, y), ImVec2(x + width, y + height), true);
+}
+
+void retro_ui_layer_unclip()
+{
+    ImGui::GetWindowDrawList()->PopClipRect();
 }
 
 // ---------------------------------------------------------------------------

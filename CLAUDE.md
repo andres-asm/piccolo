@@ -130,6 +130,9 @@ src/
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
+  ports_widget.*          the ports over the game (piccoletto's look): tabs at the bottom left that rise
+                          when a port changes (peek under the menu), and DEVICES (hotkey.ports: each pad
+                          moves itself LEFT / RIGHT, port 1 picks any with UP / DOWN; a mouse clicks)
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
@@ -166,7 +169,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               frontend_net (optional, with deps/enet):
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
-                              net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              port_indicators.h (port LEDs and ping bars: sizes, colors, thresholds shared
+                              with piccoletto), net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),

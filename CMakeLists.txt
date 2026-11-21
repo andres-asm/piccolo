@@ -225,6 +225,7 @@ set(PICCOLO_SOURCES
     src/shader_check_window.cpp
     src/text_input_window.cpp
     src/quick_menu.cpp
+    src/ports_widget.cpp
 )
 if(ANDROID)
     # Android (hosts-common's cmake/android-toolchain.cmake, android/build-apk.sh):

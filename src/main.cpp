@@ -35,6 +35,7 @@
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "piccolo_window.h"
+#include "ports_widget.h"
 #include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
@@ -314,6 +315,8 @@ struct App
     uint32_t           share_rate_kbps = 0;
 
     QuickMenu quick_menu;              // F1 while a game runs
+    PortsWidget ports_widget;          // the ports' tabs over the game, and DEVICES (the ports hotkey)
+    uint64_t    ports_ping_ms = 0;     // when the tabs' pings were last read
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
@@ -525,7 +528,7 @@ static void update_pause(App* app)
 {
     bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
-                     app->input_window.open || map_window_open_now(&app->map_window);
+                     app->input_window.open || map_window_open_now(&app->map_window) || app->ports_widget.open;
     // The text box always pauses (the core's text isn't typed into a running game).
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
                           text_input_pending(app);
@@ -1410,7 +1413,7 @@ static bool any_window_open(const App* app)
            app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->share_window.open ||
            app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
-           map_window_open_now(&app->map_window) || text_input_pending(app);
+           map_window_open_now(&app->map_window) || text_input_pending(app) || app->ports_widget.open;
 }
 
 // A menu or a dialog is up: the controllers drive it, not the game.
@@ -1430,7 +1433,11 @@ static bool game_has_keyboard(const App* app)
 static void close_topmost_or_toggle_menu(App* app)
 {
     {
-        if (text_input_pending(app))
+        if (app->ports_widget.open)
+        {
+            ports_widget_close(&app->ports_widget);   // DEVICES covers everything
+        }
+        else if (text_input_pending(app))
         {
             libretro_host_text_input_answer(app->session.host, nullptr);   // the core's box is on top: cancelled
         }
@@ -1513,6 +1520,18 @@ static void app_handle_hotkeys(App* app, const InputFrame* frame)
         {
             quick_menu_open(&app->quick_menu, app->session.state_slot);
             app->core_options_state.choose_layer = true;   // SAVE TO: the most specific layer in use
+        }
+    }
+    // DEVICES: in a game with nothing else up; the same hotkey closes it.
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_ports)])
+    {
+        if (app->ports_widget.open)
+        {
+            ports_widget_close(&app->ports_widget);
+        }
+        else if (game_running(app) && !ui_is_up(app) && app->ports_widget.port_count > 0)
+        {
+            ports_widget_open(&app->ports_widget, &app->input);
         }
     }
     if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_save_state)])
@@ -1883,6 +1902,29 @@ static void follow_what_plays(App* app, const InputFrame* frame)
     }
 }
 
+// The remote pads' ping in the ports' tabs and DEVICES: read from the
+// network (ENet's round trip) twice a second while they show.
+constexpr uint64_t PORT_PING_EVERY_MS = 500;
+
+static void update_port_pings(App* app)
+{
+    uint64_t now = SDL_GetTicks();
+    bool showing = ports_widget_tabs_visible(&app->ports_widget) || app->ports_widget.open;
+    if (!showing || !app->net_running || now - app->ports_ping_ms < PORT_PING_EVERY_MS)
+    {
+        return;
+    }
+    app->ports_ping_ms = now;
+    net_service_lock(&app->net_service);
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        NetLinkStats stats;
+        bool known = net_access_peer_stats(&app->net_service.access, peer, &stats);
+        ports_widget_set_ping(&app->ports_widget, peer, known, stats.round_trip_ms);
+    }
+    net_service_unlock(&app->net_service);
+}
+
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
@@ -1930,9 +1972,19 @@ static void app_update_input(App* app)
         }
     }
     follow_what_plays(app, &frame);
+    // The ports' tabs and DEVICES: its moves first (each controller reads
+    // its own buttons), then who is where.
+    bool board_was_open = app->ports_widget.open;
+    ports_widget_board_update(&app->ports_widget, &app->input);
+    uint32_t shown_ports = game_running(app) ? piccolo_settings_ports(&app->settings, app->session.host->input_info.port_count) : 0;
+    ports_widget_update(&app->ports_widget, &app->input, &app->input_net, &frame, shown_ports, SDL_GetTicks());
+    update_port_pings(app);
     app_handle_hotkeys(app, &frame);
-    drive_ui_with_gamepads(app, &frame, ui_up);
-    if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])
+    // DEVICES reads the pads itself: they don't drive ImGui meanwhile, and
+    // its BACK (Escape too) only closes it.
+    bool board = board_was_open || app->ports_widget.open;
+    drive_ui_with_gamepads(app, &frame, ui_up && !board);
+    if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)] && !board_was_open)
     {
         close_topmost_or_toggle_menu(app);   // Escape in the UI: back, at once
     }
@@ -2683,14 +2735,7 @@ static uint32_t net_core_ports(const App* app)
     {
         return 0;
     }
-    int32_t wanted = settings_get_int(&app->settings, PICCOLO_INPUT_PORTS);
-    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
-                                                                                     : INPUT_PORT_COUNT;
-    if (host->input_info.port_count > 0 && host->input_info.port_count < ports)
-    {
-        ports = host->input_info.port_count;
-    }
-    return ports;
+    return piccolo_settings_ports(&app->settings, host->input_info.port_count);
 }
 
 // The port a peer's pad plays on, or -1.
@@ -3910,10 +3955,14 @@ static bool app_frame(App* app)
 
         draw_game(app);   // background, behind everything
         bool menu_shown = app->menu_visible || !game_running(app);
+        // The ports' tabs, behind every window (they peek while the menu is up).
+        ports_widget_draw_tabs(&app->ports_widget, app->pixel_font, app->ui_scale, &app->strings, menu_shown, SDL_GetTicks());
         if (menu_shown)
         {
-            // The status line's window goes first, so it stays behind the others.
-            retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
+            // The status line's window goes first, so it stays behind the
+            // others; it starts past the tabs.
+            float status_left = ports_widget_tabs_width(&app->ports_widget);
+            retro_ui_status_line_from(app->pixel_font, app->ui_scale, app->status, status_left > 4.0f ? status_left : 4.0f);
             int32_t recent_picked = -1;
             MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
                                                   app->recent_label_pointers.data(),
@@ -3971,6 +4020,7 @@ static bool app_frame(App* app)
         quick.shaders_available = app->shader_library.loaded;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
         draw_remap_prompt(app);
+        ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, &app->strings);
         if (app->quick_menu.choose_shader_request)
         {
             app->quick_menu.choose_shader_request = false;

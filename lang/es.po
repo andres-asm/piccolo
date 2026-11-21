@@ -3401,3 +3401,39 @@ msgstr "REEMPLAZAR TODOS (%u)"
 msgctxt "share_skip_all"
 msgid "SKIP ALL"
 msgstr "SALTAR TODOS"
+
+msgctxt "input_action_hotkey_ports"
+msgid "DEVICES"
+msgstr "DISPOSITIVOS"
+
+msgctxt "ports_tab"
+msgid "P%u"
+msgstr "P%u"
+
+msgctxt "ports_ping"
+msgid "%u MS"
+msgstr "%u MS"
+
+msgctxt "ports_nobody"
+msgid "NOBODY"
+msgstr "NADIE"
+
+msgctxt "ports_off"
+msgid "OFF"
+msgstr "DESC."
+
+msgctxt "ports_out"
+msgid "OUT"
+msgstr "SIN PUERTO"
+
+msgctxt "ports_title"
+msgid "DEVICES"
+msgstr "DISPOSITIVOS"
+
+msgctxt "ports_done"
+msgid "DONE"
+msgstr "LISTO"
+
+msgctxt "ports_help"
+msgid "LEFT / RIGHT: MOVE YOUR CONTROLLER. PORT 1: UP / DOWN PICKS ANY, B: DONE"
+msgstr "IZQUIERDA / DERECHA: MUEVE TU CONTROL. PUERTO 1: ARRIBA / ABAJO ELIGE CUALQUIERA, B: LISTO"
