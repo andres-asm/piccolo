@@ -3966,6 +3966,25 @@ static void net_update_locked(App* app)
     net_follow_stream_tuning(app);
 }
 
+// INTERFACE > BACKDROP: while a menu or a window (DEVICES too) is up over a
+// game, the whole game is covered by black at that opacity, behind every
+// window (the menu bar stays on top of it): the UI reads well over any
+// picture. Widgets don't dim the game themselves.
+static void draw_menu_backdrop(App* app)
+{
+    int32_t percent = settings_get_int(&app->settings, PICCOLO_MENU_BACKDROP);
+    if (!game_running(app) || !ui_is_up(app) || percent <= 0)
+    {
+        return;
+    }
+    percent = percent > 100 ? 100 : percent;
+    uint32_t alpha = static_cast<uint32_t>(percent) * 255u / 100u;
+    const ImGuiIO& io = ImGui::GetIO();
+    retro_ui_begin_layer("##menu_backdrop", app->pixel_font, app->ui_scale, false);
+    retro_ui_layer_rect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y, alpha << 24);
+    retro_ui_end_layer();
+}
+
 // One turn of piccolo's loop: events, the game's frame, the UI, present.
 // False when piccolo should end (QUIT, or a fatal rendering error). Called
 // by main_loop_run: a plain loop on desktop, the browser's animation frames
@@ -4103,6 +4122,7 @@ static bool app_frame(App* app)
         bool menu_shown = (app->menu_visible || !game_running(app)) && !app->onscreen_pad.editor.active;
         // The ports' tabs, behind every window (they peek while the menu is up).
         ports_widget_draw_tabs(&app->ports_widget, app->pixel_font, app->ui_scale, &app->strings, menu_shown, SDL_GetTicks());
+        draw_menu_backdrop(app);   // (after the tabs: behind them and every window)
         if (menu_shown)
         {
             // The status line's window goes first, so it stays behind the

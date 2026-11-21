@@ -367,6 +367,8 @@ static const SettingDescriptor SETTINGS[] = {
     // the BLUE theme (retro_ui.cpp). The THEME presets set them all.
     {.key = PICCOLO_UI_MENU_BOXES, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_menu_boxes), .help = text_id(Str::setting_ui_menu_boxes_help)},
+    {.key = PICCOLO_MENU_BACKDROP, .type = SettingType::integer, .default_value = "60", .min = 0, .max = 100, .step = 10,
+     .label = text_id(Str::setting_menu_backdrop), .help = text_id(Str::setting_menu_backdrop_help)},
     {.key = PICCOLO_UI_SHADOWS, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_shadows), .help = text_id(Str::setting_ui_shadows_help)},
     {.key = PICCOLO_UI_COLOR_BACKGROUND, .type = SettingType::color, .default_value = "#000000",

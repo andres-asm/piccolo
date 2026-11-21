@@ -911,3 +911,5 @@ input_section_touch_pad = ON-SCREEN GAMEPAD
 input_touch_pad_edit = EDIT LAYOUT
 input_touch_pad_edit_help = Move and resize the touch gamepad's buttons (drag a group, pinch or SIZE, RESET, DONE). Upright and sideways have their own layouts.
 touch_pad_menu = MENU
+setting_menu_backdrop = BACKDROP
+setting_menu_backdrop_help = While a menu or a window is open over a game, the game is darkened this much so the text reads well over any picture (0: not darkened).

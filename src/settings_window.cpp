@@ -646,6 +646,7 @@ static void draw_interface(SettingsWindow* window, const SettingsUiContext* cont
     settings_ui_row(ui, PICCOLO_UI_MENU_BOXES, nullptr);
     settings_ui_row(ui, PICCOLO_UI_SHADOWS, nullptr);
     settings_ui_row(ui, PICCOLO_UI_THEME_CURSOR, nullptr);
+    settings_ui_row(ui, PICCOLO_MENU_BACKDROP, nullptr);
     retro_ui_separator_text(piccolo_text(ui->strings, Str::section_colors));
     for (uint32_t i = 0; i < piccolo_settings_ui_color_count(); i++)
     {

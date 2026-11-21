@@ -3497,3 +3497,11 @@ msgstr "Mueve y cambia el tamaño de los botones del control táctil (arrastra u
 msgctxt "touch_pad_menu"
 msgid "MENU"
 msgstr "MENÚ"
+
+msgctxt "setting_menu_backdrop"
+msgid "BACKDROP"
+msgstr "FONDO"
+
+msgctxt "setting_menu_backdrop_help"
+msgid "While a menu or a window is open over a game, the game is darkened this much so the text reads well over any picture (0: not darkened)."
+msgstr "Mientras un menú o una ventana está abierto sobre un juego, el juego se oscurece así para que el texto se lea bien sobre cualquier imagen (0: sin oscurecer)."

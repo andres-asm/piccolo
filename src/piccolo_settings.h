@@ -110,6 +110,10 @@ constexpr const char* PICCOLO_WINDOW_ASPECT = "window_aspect";
 constexpr const char* PICCOLO_WINDOW_HEIGHT = "window_height";
 constexpr const char* PICCOLO_WINDOW_SCALE = "window_scale";
 constexpr const char* PICCOLO_WINDOW_REMEMBER = "window_remember";
+// INTERFACE > BACKDROP: while a menu or window is up over a game, the game
+// is covered by black at this opacity (percent; 0 = not covered). Not part of
+// a theme (not ui_*): readability over any picture.
+constexpr const char* PICCOLO_MENU_BACKDROP = "menu_backdrop";
 constexpr const char* PICCOLO_UI_MENU_BOXES = "ui_menu_boxes";
 constexpr const char* PICCOLO_UI_SHADOWS = "ui_shadows";
 constexpr const char* PICCOLO_UI_COLOR_BACKGROUND = "ui_color_background";
