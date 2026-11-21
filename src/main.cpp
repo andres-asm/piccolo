@@ -2020,19 +2020,18 @@ static void app_update_input(App* app)
     {
         input_config_save(&app->input, app->input_config_path.c_str());   // a turbo's speed, by taps (in the game)
     }
+    // Joins and disconnects: the ports' tabs show them (no status line); logged.
     char message[300] = {};
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_joined),
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.joined_controller)).c_str(), frame.joined_port + 1);
-        set_status(app, message);
         SDL_Log("%s", message);
     }
     if (frame.left_port != INPUT_NO_PORT && frame.left_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_left),
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
-        set_status(app, message);
         SDL_Log("%s", message);
         // No CONTROLS here (Andrés): joining again is just START. The game
         // pauses if that was the last gamepad playing (the setting).
