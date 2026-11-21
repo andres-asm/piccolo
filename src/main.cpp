@@ -4326,9 +4326,15 @@ static bool app_frame(App* app)
         net_stream_frame(app);
         measure_shader_check(app);
     }
-    if (ran != CoreSessionFrame::skipped || !game_running(app))
+    // Taps seen by a core frame, or by the UI, are done. A loop that ran no
+    // frame keeps them for the next one that does (a key tapped between two
+    // frames still reaches the core), but only while frames will run: paused,
+    // nothing ever cleared them, and every key tapped in a paused menu stayed
+    // down in the router (a tapped Shift: the HOTKEY layer for good, Escape
+    // and the interface keys dead; the lockout seen on Linux and the web).
+    if (ran != CoreSessionFrame::skipped || !game_running(app) || app->session.paused)
     {
-        input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
+        input_devices_end_frame(&app->input.devices);
     }
     if (ran == CoreSessionFrame::shut_down)
     {
