@@ -311,6 +311,8 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
         action = QuickMenuAction::load;
     }
     ImGui::EndDisabled();
+    ImGui::SameLine();
+    action = retro_ui_button(piccolo_text(strings, Str::quick_menu_dvr)) ? QuickMenuAction::dvr : action;
     ImGui::Spacing();
     if (retro_ui_button(piccolo_text(strings, Str::quick_menu_reset)))
     {

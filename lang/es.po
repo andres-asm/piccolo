@@ -3505,3 +3505,239 @@ msgstr "FONDO"
 msgctxt "setting_menu_backdrop_help"
 msgid "While a menu or a window is open over a game, the game is darkened this much so the text reads well over any picture (0: not darkened)."
 msgstr "Mientras un menú o una ventana está abierto sobre un juego, el juego se oscurece así para que el texto se lea bien sobre cualquier imagen (0: sin oscurecer)."
+
+msgctxt "input_action_hotkey_dvr"
+msgid "DVR"
+msgstr "DVR"
+
+msgctxt "section_rewind"
+msgid "REWIND"
+msgstr "REBOBINAR"
+
+msgctxt "setting_rewind"
+msgid "REWIND"
+msgstr "REBOBINAR"
+
+msgctxt "setting_rewind_help"
+msgid "Keeps the game's recent past so the DVR (its hotkey, or QUICK MENU > DVR) can go back to it. AUTO measures the core for a few seconds and picks SCRUB when a state every frame is cheap, else SNAPSHOTS."
+msgstr "Guarda el pasado reciente del juego para que el DVR (su atajo, o MENÚ RÁPIDO > DVR) pueda volver a él. AUTO mide el core unos segundos y elige SCRUB si un estado por frame es barato, si no SNAPSHOTS."
+
+msgctxt "value_rewind_off"
+msgid "OFF"
+msgstr "NO"
+
+msgctxt "value_rewind_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_rewind_scrub"
+msgid "SCRUB"
+msgstr "SCRUB"
+
+msgctxt "value_rewind_snapshots"
+msgid "SNAPSHOTS"
+msgstr "SNAPSHOTS"
+
+msgctxt "setting_rewind_scrub_length"
+msgid "SCRUB LENGTH"
+msgstr "DURACIÓN DE SCRUB"
+
+msgctxt "setting_rewind_scrub_length_help"
+msgid "How far back SCRUB keeps every frame. ALL MEMORY HOLDS: as far as MEMORY goes."
+msgstr "Hasta dónde guarda SCRUB cada frame. TODO LO QUE ENTRE: hasta donde alcance la MEMORIA."
+
+msgctxt "value_rewind_all"
+msgid "ALL MEMORY HOLDS"
+msgstr "TODO LO QUE ENTRE"
+
+msgctxt "value_minutes_1"
+msgid "1 MIN"
+msgstr "1 MIN"
+
+msgctxt "value_minutes_2"
+msgid "2 MIN"
+msgstr "2 MIN"
+
+msgctxt "value_minutes_5"
+msgid "5 MIN"
+msgstr "5 MIN"
+
+msgctxt "value_minutes_10"
+msgid "10 MIN"
+msgstr "10 MIN"
+
+msgctxt "value_minutes_30"
+msgid "30 MIN"
+msgstr "30 MIN"
+
+msgctxt "setting_rewind_snapshot_every"
+msgid "SNAPSHOT EVERY"
+msgstr "UN SNAPSHOT CADA"
+
+msgctxt "setting_rewind_snapshot_every_help"
+msgid "In SNAPSHOTS, a state this often; the frames between them are played again from the input."
+msgstr "En SNAPSHOTS, un estado con esta frecuencia; los frames entre ellos se vuelven a jugar desde el input."
+
+msgctxt "value_seconds_5"
+msgid "5 S"
+msgstr "5 S"
+
+msgctxt "value_seconds_10"
+msgid "10 S"
+msgstr "10 S"
+
+msgctxt "value_seconds_15"
+msgid "15 S"
+msgstr "15 S"
+
+msgctxt "value_seconds_30"
+msgid "30 S"
+msgstr "30 S"
+
+msgctxt "value_seconds_60"
+msgid "60 S"
+msgstr "60 S"
+
+msgctxt "setting_rewind_snapshots_kept"
+msgid "SNAPSHOTS KEPT"
+msgstr "SNAPSHOTS GUARDADOS"
+
+msgctxt "setting_rewind_snapshots_kept_help"
+msgid "How many snapshots SNAPSHOTS keeps. ALL MEMORY HOLDS: as many as MEMORY takes."
+msgstr "Cuántos snapshots guarda SNAPSHOTS. TODO LO QUE ENTRE: los que quepan en la MEMORIA."
+
+msgctxt "value_count_10"
+msgid "10"
+msgstr "10"
+
+msgctxt "value_count_30"
+msgid "30"
+msgstr "30"
+
+msgctxt "value_count_60"
+msgid "60"
+msgstr "60"
+
+msgctxt "value_count_120"
+msgid "120"
+msgstr "120"
+
+msgctxt "setting_rewind_memory"
+msgid "MEMORY"
+msgstr "MEMORIA"
+
+msgctxt "setting_rewind_memory_help"
+msgid "Memory for the rewind history, taken when a game starts. AUTO: 256 MB (128 MB on Android). Never more than a quarter of this device's memory."
+msgstr "Memoria para la historia del rebobinado, tomada al empezar un juego. AUTO: 256 MB (128 MB en Android). Nunca más de un cuarto de la memoria de este equipo."
+
+msgctxt "value_memory_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_memory_128"
+msgid "128 MB"
+msgstr "128 MB"
+
+msgctxt "value_memory_256"
+msgid "256 MB"
+msgstr "256 MB"
+
+msgctxt "value_memory_512"
+msgid "512 MB"
+msgstr "512 MB"
+
+msgctxt "value_memory_1024"
+msgid "1 GB"
+msgstr "1 GB"
+
+msgctxt "value_memory_2048"
+msgid "2 GB"
+msgstr "2 GB"
+
+msgctxt "rewind_note_chose"
+msgid "THIS GAME: AUTO CHOSE"
+msgstr "ESTE JUEGO: AUTO ELIGIÓ"
+
+msgctxt "rewind_note_measuring"
+msgid "THIS GAME: AUTO IS MEASURING THE CORE."
+msgstr "ESTE JUEGO: AUTO ESTÁ MIDIENDO EL CORE."
+
+msgctxt "rewind_note_unsupported"
+msgid "THIS CORE HAS NO SAVESTATES: NO REWIND."
+msgstr "ESTE CORE NO TIENE SAVESTATES: NO HAY REBOBINADO."
+
+msgctxt "rewind_measure_again"
+msgid "MEASURE AGAIN"
+msgstr "MEDIR DE NUEVO"
+
+msgctxt "rewind_measure_again_help"
+msgid "Forget what AUTO chose for this game; it measures again the next time the game starts."
+msgstr "Olvida lo que AUTO eligió para este juego; vuelve a medir la próxima vez que empiece."
+
+msgctxt "quick_menu_dvr"
+msgid "DVR"
+msgstr "DVR"
+
+msgctxt "dvr_title"
+msgid "◀◀ DVR"
+msgstr "◀◀ DVR"
+
+msgctxt "dvr_watching"
+msgid "▶ WATCHING"
+msgstr "▶ VIENDO"
+
+msgctxt "dvr_mode_scrub"
+msgid "SCRUB"
+msgstr "SCRUB"
+
+msgctxt "dvr_mode_snapshots"
+msgid "SNAPSHOTS EVERY"
+msgstr "SNAPSHOTS CADA"
+
+msgctxt "dvr_kept"
+msgid "KEPT"
+msgstr "GUARDADO"
+
+msgctxt "dvr_hint_frame"
+msgid "FRAME"
+msgstr "FRAME"
+
+msgctxt "dvr_hint_snapshot"
+msgid "SNAPSHOT"
+msgstr "SNAPSHOT"
+
+msgctxt "dvr_hint_jump"
+msgid "±5 S"
+msgstr "±5 S"
+
+msgctxt "dvr_play_here"
+msgid "PLAY FROM HERE"
+msgstr "JUGAR DESDE AQUÍ"
+
+msgctxt "dvr_watch"
+msgid "WATCH"
+msgstr "VER"
+
+msgctxt "dvr_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
+msgctxt "dvr_back_to_now"
+msgid "BACK TO NOW"
+msgstr "VOLVER AL PRESENTE"
+
+msgctxt "dvr_hud_from"
+msgid "◀◀ PLAYING FROM"
+msgstr "◀◀ JUGANDO DESDE"
+
+msgctxt "dvr_hud_nothing"
+msgid "REWIND: NOTHING RECORDED YET"
+msgstr "REBOBINAR: NADA GRABADO TODAVÍA"
+
+msgctxt "dvr_hud_unsupported"
+msgid "REWIND: THIS CORE HAS NO SAVESTATES"
+msgstr "REBOBINAR: ESTE CORE NO TIENE SAVESTATES"
+
+msgctxt "dvr_hud_off"
+msgid "REWIND IS OFF (SETTINGS > GENERAL)"
+msgstr "EL REBOBINADO ESTÁ APAGADO (AJUSTES > GENERAL)"

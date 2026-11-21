@@ -146,6 +146,24 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
         settings_ui_row(ui, PICCOLO_GAME_MODE, nullptr);
         ImGui::TextDisabled("%s", context->game_mode);
     }
+    retro_ui_separator_text(piccolo_text(ui->strings, Str::section_rewind));
+    settings_ui_row(ui, PICCOLO_REWIND, nullptr);
+    settings_ui_row(ui, PICCOLO_REWIND_SCRUB_LENGTH, nullptr);
+    settings_ui_row(ui, PICCOLO_REWIND_SNAPSHOT_EVERY, nullptr);
+    settings_ui_row(ui, PICCOLO_REWIND_SNAPSHOTS_KEPT, nullptr);
+    settings_ui_row(ui, PICCOLO_REWIND_MEMORY, nullptr);
+    if (context->rewind_note != nullptr && context->rewind_note[0] != '\0')
+    {
+        ImGui::TextDisabled("%s", context->rewind_note);
+    }
+    if (context->rewind_known)
+    {
+        if (retro_ui_button(piccolo_text(ui->strings, Str::rewind_measure_again)))
+        {
+            window->rewind_measure_again = true;
+        }
+        retro_ui_item_tooltip(piccolo_text(ui->strings, Str::rewind_measure_again_help));
+    }
     // FOLDERS: rarely changed, closed until opened. A click on a field
     // opens CHOOSE FOLDER (piccolo); RESET goes back to the default shown.
     if (folder_section(window, FolderSection::folders, piccolo_text(ui->strings, Str::section_folders), "folders"))

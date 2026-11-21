@@ -27,6 +27,15 @@ constexpr const char* PICCOLO_PAUSE_ON_FOCUS_LOSS = "pause_on_focus_loss";
 constexpr const char* PICCOLO_PAUSE_ON_DISCONNECT = "pause_on_disconnect";
 constexpr const char* PICCOLO_SCREENSAVER_WHEN_PAUSED = "screensaver_when_paused";
 constexpr const char* PICCOLO_GAME_MODE = "game_mode";
+// Rewind (SETTINGS > GENERAL > REWIND; core_rewind.h). REWIND may be set per
+// core / game; REWIND KNOWN is AUTO's verdict, kept in the game's layer only
+// (not shown).
+constexpr const char* PICCOLO_REWIND = "rewind";
+constexpr const char* PICCOLO_REWIND_SCRUB_LENGTH = "rewind_scrub_length";
+constexpr const char* PICCOLO_REWIND_SNAPSHOT_EVERY = "rewind_snapshot_every";
+constexpr const char* PICCOLO_REWIND_SNAPSHOTS_KEPT = "rewind_snapshots_kept";
+constexpr const char* PICCOLO_REWIND_MEMORY = "rewind_memory";
+constexpr const char* PICCOLO_REWIND_KNOWN = "rewind_known";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
 constexpr const char* PICCOLO_INPUT_PRESS_TIME = "input_press_seconds";   // binding: wait for a press this long, then go on
 constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // binding with SET / MAP CONTROLLER: hold this long

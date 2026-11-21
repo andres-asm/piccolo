@@ -69,6 +69,51 @@ static const SettingEnumValue TIMING_VALUES[] = {
     {"exact", text_id(Str::value_timing_exact)},
 };
 
+static const SettingEnumValue REWIND_VALUES[] = {
+    {"off", text_id(Str::value_rewind_off)},
+    {"auto", text_id(Str::value_rewind_auto)},
+    {"scrub", text_id(Str::value_rewind_scrub)},
+    {"snapshots", text_id(Str::value_rewind_snapshots)},
+};
+constexpr uint32_t REWIND_COUNT = sizeof(REWIND_VALUES) / sizeof(REWIND_VALUES[0]);
+
+// Minutes ("0": all the memory holds).
+static const SettingEnumValue SCRUB_LENGTH_VALUES[] = {
+    {"0", text_id(Str::value_rewind_all)},  {"1", text_id(Str::value_minutes_1)},
+    {"2", text_id(Str::value_minutes_2)},   {"5", text_id(Str::value_minutes_5)},
+    {"10", text_id(Str::value_minutes_10)}, {"30", text_id(Str::value_minutes_30)},
+};
+constexpr uint32_t SCRUB_LENGTH_COUNT = sizeof(SCRUB_LENGTH_VALUES) / sizeof(SCRUB_LENGTH_VALUES[0]);
+
+static const SettingEnumValue SNAPSHOT_EVERY_VALUES[] = {
+    {"5", text_id(Str::value_seconds_5)},   {"10", text_id(Str::value_seconds_10)},
+    {"15", text_id(Str::value_seconds_15)}, {"30", text_id(Str::value_seconds_30)},
+    {"60", text_id(Str::value_seconds_60)},
+};
+constexpr uint32_t SNAPSHOT_EVERY_COUNT = sizeof(SNAPSHOT_EVERY_VALUES) / sizeof(SNAPSHOT_EVERY_VALUES[0]);
+
+static const SettingEnumValue SNAPSHOTS_KEPT_VALUES[] = {
+    {"0", text_id(Str::value_rewind_all)}, {"10", text_id(Str::value_count_10)},
+    {"30", text_id(Str::value_count_30)},  {"60", text_id(Str::value_count_60)},
+    {"120", text_id(Str::value_count_120)},
+};
+constexpr uint32_t SNAPSHOTS_KEPT_COUNT = sizeof(SNAPSHOTS_KEPT_VALUES) / sizeof(SNAPSHOTS_KEPT_VALUES[0]);
+
+// MB ("auto": 256, 128 on Android).
+static const SettingEnumValue REWIND_MEMORY_VALUES[] = {
+    {"auto", text_id(Str::value_memory_auto)}, {"128", text_id(Str::value_memory_128)},
+    {"256", text_id(Str::value_memory_256)},   {"512", text_id(Str::value_memory_512)},
+    {"1024", text_id(Str::value_memory_1024)}, {"2048", text_id(Str::value_memory_2048)},
+};
+constexpr uint32_t REWIND_MEMORY_COUNT = sizeof(REWIND_MEMORY_VALUES) / sizeof(REWIND_MEMORY_VALUES[0]);
+
+static const SettingEnumValue REWIND_KNOWN_VALUES[] = {
+    {"auto", text_id(Str::value_rewind_auto)},
+    {"scrub", text_id(Str::value_rewind_scrub)},
+    {"snapshots", text_id(Str::value_rewind_snapshots)},
+};
+constexpr uint32_t REWIND_KNOWN_COUNT = sizeof(REWIND_KNOWN_VALUES) / sizeof(REWIND_KNOWN_VALUES[0]);
+
 static const SettingEnumValue LANGUAGE_VALUES[] = {
     {"auto", text_id(Str::value_language_auto)},
     {"en", text_id(Str::value_language_english)},
@@ -202,6 +247,24 @@ static const SettingDescriptor SETTINGS[] = {
      .min = 0, .max = 0x7fffffff, .label = text_id(Str::setting_input_port_device), .help = text_id(Str::setting_input_port_device_help)},
     {.key = PICCOLO_GAME_MODE, .type = SettingType::boolean, .default_value = "true",
      .label = text_id(Str::setting_game_mode), .help = text_id(Str::setting_game_mode_help)},
+    // Rewind (GENERAL > REWIND).
+    {.key = PICCOLO_REWIND, .type = SettingType::enumeration, .default_value = "auto", .overridable = true,
+     .values = REWIND_VALUES, .value_count = REWIND_COUNT, .label = text_id(Str::setting_rewind),
+     .help = text_id(Str::setting_rewind_help)},
+    {.key = PICCOLO_REWIND_SCRUB_LENGTH, .type = SettingType::enumeration, .default_value = "0",
+     .values = SCRUB_LENGTH_VALUES, .value_count = SCRUB_LENGTH_COUNT, .label = text_id(Str::setting_rewind_scrub_length),
+     .help = text_id(Str::setting_rewind_scrub_length_help)},
+    {.key = PICCOLO_REWIND_SNAPSHOT_EVERY, .type = SettingType::enumeration, .default_value = "10",
+     .values = SNAPSHOT_EVERY_VALUES, .value_count = SNAPSHOT_EVERY_COUNT,
+     .label = text_id(Str::setting_rewind_snapshot_every), .help = text_id(Str::setting_rewind_snapshot_every_help)},
+    {.key = PICCOLO_REWIND_SNAPSHOTS_KEPT, .type = SettingType::enumeration, .default_value = "0",
+     .values = SNAPSHOTS_KEPT_VALUES, .value_count = SNAPSHOTS_KEPT_COUNT,
+     .label = text_id(Str::setting_rewind_snapshots_kept), .help = text_id(Str::setting_rewind_snapshots_kept_help)},
+    {.key = PICCOLO_REWIND_MEMORY, .type = SettingType::enumeration, .default_value = "auto",
+     .values = REWIND_MEMORY_VALUES, .value_count = REWIND_MEMORY_COUNT, .label = text_id(Str::setting_rewind_memory),
+     .help = text_id(Str::setting_rewind_memory_help)},
+    {.key = PICCOLO_REWIND_KNOWN, .type = SettingType::enumeration, .default_value = "auto", .overridable = true,
+     .values = REWIND_KNOWN_VALUES, .value_count = REWIND_KNOWN_COUNT, .label = text_id(Str::setting_rewind)},
     // Network (CONFIG > NETWORK); 55420 = NET_DEFAULT_PORT.
     {.key = PICCOLO_NET_ENABLED, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_net_enabled), .help = text_id(Str::setting_net_enabled_help)},

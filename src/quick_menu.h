@@ -42,6 +42,7 @@ enum class QuickMenuAction
     load,         // load `slot`
     reset,
     close_game,
+    dvr,          // open the rewind DVR (the QUICK MENU closes)
 };
 
 struct QuickMenu

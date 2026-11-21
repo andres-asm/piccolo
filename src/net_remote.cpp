@@ -43,6 +43,11 @@ static void build_layout(std::vector<LayoutRow>* rows)
     {
         add_row(rows, Str::tab_general, none, none, PICCOLO_GAME_MODE);
     }
+    add_row(rows, Str::tab_general, none, text_id(Str::section_rewind), PICCOLO_REWIND);
+    add_row(rows, Str::tab_general, none, text_id(Str::section_rewind), PICCOLO_REWIND_SCRUB_LENGTH);
+    add_row(rows, Str::tab_general, none, text_id(Str::section_rewind), PICCOLO_REWIND_SNAPSHOT_EVERY);
+    add_row(rows, Str::tab_general, none, text_id(Str::section_rewind), PICCOLO_REWIND_SNAPSHOTS_KEPT);
+    add_row(rows, Str::tab_general, none, text_id(Str::section_rewind), PICCOLO_REWIND_MEMORY);
 
     add_row(rows, Str::tab_interface, none, none, PICCOLO_UI_MENU_BOXES);
     add_row(rows, Str::tab_interface, none, none, PICCOLO_UI_SHADOWS);

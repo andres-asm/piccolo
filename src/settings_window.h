@@ -66,6 +66,7 @@ struct SettingsWindow
     FolderSection folder_section = FolderSection::game_folders;   // GAME FOLDERS open at first
     const char*  choose_folder_key = nullptr; // a folder field or GAME FOLDERS' "+" was clicked: that setting
                                                // (piccolo opens CHOOSE FOLDER, sets it, then clears this)
+    bool         rewind_measure_again = false; // MEASURE AGAIN was pressed (piccolo forgets AUTO's verdict, then clears it)
 };
 
 // What the window needs from piccolo this frame.
@@ -86,6 +87,8 @@ struct SettingsWindowContext
     uint32_t                 audio_device_count = 0;
     const char*              audio_latency = "";  // the latency in use, for the Sound tab
     const char*              game_mode = "";      // GameMode's state, for the General tab
+    const char*              rewind_note = "";    // what AUTO chose for the running game ("" = nothing to say)
+    bool                     rewind_known = false;   // the running game has AUTO's verdict (MEASURE AGAIN shows)
     const std::vector<PiccoloThemeFile>* themes = nullptr;   // themes/*.cfg, for THEME
     const NetWindowContext*  network = nullptr;  // the NETWORK tab
 };

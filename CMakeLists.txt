@@ -217,6 +217,7 @@ set(PICCOLO_SOURCES
     src/text_input_window.cpp
     src/quick_menu.cpp
     src/ports_widget.cpp
+    src/dvr_widget.cpp
     src/onscreen_pad.cpp
 )
 if(ANDROID)
@@ -455,3 +456,9 @@ endif()
 add_executable(rewind_measure tools/rewind_measure.cpp tools/measure_common.cpp)
 target_link_libraries(rewind_measure PRIVATE host_libretro frontend_common)
 multitap_set_project_flags(rewind_measure)
+
+# The rewind DVR on a real core, paced like a game (docs/rewind.md): AUTO's
+# verdict, then back, WATCH and PLAY FROM HERE.
+add_executable(rewind_dvr_check tools/rewind_dvr_check.cpp tools/measure_common.cpp)
+target_link_libraries(rewind_dvr_check PRIVATE frontend_libretro)
+multitap_set_project_flags(rewind_dvr_check)

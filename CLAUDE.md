@@ -147,6 +147,8 @@ src/
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
+  dvr_widget.*            the rewind DVR (branch rewind): GENERAL > REWIND, hotkey.dvr, the strip (retroui's
+                          dvr_view) over the shrunk game; the history is frontend-libretro's core_rewind
   headless.*              GO HEADLESS: a streaming device takes the game (window hidden behind a tray icon)
   core_options_ui.* safe_start_window.*
   shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
