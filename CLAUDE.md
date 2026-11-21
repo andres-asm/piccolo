@@ -125,6 +125,9 @@ STYLE.md                  code rules (mandatory)
 src/
   main.cpp                the app: game fills the window, menus, hotkeys, input frame -> core session
   menus.*                 menu contents and actions (data only; main builds retroui's menu bar data from them)
+  ui_mode.*               the UI modes (GAME / QUICK MENU / WIDGET / MAIN MENU + its window stack), grabs, Esc,
+                          and everything derived from the mode (router layer, hotkeys, overlay, pause causes);
+                          no ImGui / SDL (tools/ui_mode_test). main.cpp changes modes only through it
   strings.txt             ALL of piccolo's UI text in English (key = text); lang/<code>.po translations
   piccolo_text.*          piccolo_text(strings, Str::x): the text in the current language
   piccolo_settings.*      piccolo's settings table (settings/piccolo.cfg)
@@ -134,7 +137,7 @@ src/
                           FOLDER: the game folders (SETTINGS > GENERAL, "+") or HOME;
                           CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
-  quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
+  quick_menu.*            QUICK MENU (a slide-out from the right, tabs in a column): SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   onscreen_pad.*          the touch gamepad (retroui's touch pad, piccoletto's layouts): TOUCH PAD in the router
@@ -164,7 +167,7 @@ web/                      the browser build (Emscripten, WebGL 2, pthreads): bui
                           leave, piccolo_web_open); storage.* the browser's piccolo folder: in memory,
                           kept on OPFS by the page (web/page/piccolo-storage.js; WasmFS's OPFS backend
                           hangs Firefox); web/page/piccolo-files.js the FILES panel (the session's files)
-tools/                    strings_check, recent_games_test, stream_measure (remote play
+tools/                    strings_check, recent_games_test, ui_mode_test, stream_measure (remote play
                           codec on real games), netplay_measure (which netplay mode a core and game
                           suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
@@ -245,7 +248,7 @@ android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-100 tests with test-libretro. Before calling a larger change done:
+101 tests with test-libretro. Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -329,7 +332,8 @@ Everything below is on main (piccolo ec86c7f); main CI (Flatpak, Windows, Androi
   release.yml turns a v* tag into a GitHub Release (PICCOLO_VERSION_BASE must
   be raised to 0.4.0 first). Releases site and self-update: designed, not built.
   Branding: assets/branding. Site: get-piccolo.app (repo multitap-org/piccolo-site).
-- In progress on branches (not on main): `rewind` (piccolo-rewind: SCRUB /
+- In progress on branches (not on main): `ui-state` (UI modes and pause causes,
+  design-notes "UI modes"; piccolo + frontends-common, waiting for Andrés's OK), `rewind` (piccolo-rewind: SCRUB /
   SNAPSHOT / AUTO, DVR-style PLAY, input replay, export to video; plan in
   docs/rewind.md). Planned, not started: console / TV UI and phone UI
   (docs/mockups), Android SAF.
