@@ -34,6 +34,12 @@ constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // bin
 // a core that asks for the keyboard. "auto" = on for phones, TVs and handhelds
 // (Android, Steam Deck, no physical keyboard), off on a PC. Global only.
 constexpr const char* PICCOLO_INPUT_OSK = "input_osk";
+// INPUT > ON-SCREEN GAMEPAD (onscreen_pad.h): SHOW auto / on / off (auto = a
+// touch screen, hidden while a real gamepad plays), OPACITY (percent, the
+// layouts not changed in EDIT LAYOUT), VIBRATE ON PRESS. Global only.
+constexpr const char* PICCOLO_TOUCH_PAD = "touch_pad";
+constexpr const char* PICCOLO_TOUCH_PAD_OPACITY = "touch_pad_opacity";
+constexpr const char* PICCOLO_TOUCH_PAD_VIBRATE = "touch_pad_vibrate";
 constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
@@ -104,6 +110,10 @@ constexpr const char* PICCOLO_WINDOW_ASPECT = "window_aspect";
 constexpr const char* PICCOLO_WINDOW_HEIGHT = "window_height";
 constexpr const char* PICCOLO_WINDOW_SCALE = "window_scale";
 constexpr const char* PICCOLO_WINDOW_REMEMBER = "window_remember";
+// INTERFACE > BACKDROP: while a menu or window is up over a game, the game
+// is covered by black at this opacity (percent; 0 = not covered). Not part of
+// a theme (not ui_*): readability over any picture.
+constexpr const char* PICCOLO_MENU_BACKDROP = "menu_backdrop";
 constexpr const char* PICCOLO_UI_MENU_BOXES = "ui_menu_boxes";
 constexpr const char* PICCOLO_UI_SHADOWS = "ui_shadows";
 constexpr const char* PICCOLO_UI_COLOR_BACKGROUND = "ui_color_background";
@@ -256,8 +266,16 @@ const char* piccolo_settings_ui_color_key(uint32_t index);
 // The Input settings (SETTINGS > INPUT) as the input layer's.
 void piccolo_settings_input(const Settings* settings, InputSettings* input);
 
+// The ports piccolo shows (CONTROLS, the ports' tabs, DEVICES, the network's
+// lists): as many as INPUT > PORTS says, no more than the core describes
+// (`core_ports`; 0 = it says nothing).
+uint32_t piccolo_settings_ports(const Settings* settings, uint32_t core_ports);
+
 // INPUT > ENABLE OSK resolved for this machine ("auto" decided here).
 bool piccolo_settings_osk(const Settings* settings);
+
+// INPUT > ON-SCREEN GAMEPAD > SHOW: 0 auto, 1 on, 2 off (OnscreenPadShow's order).
+uint32_t piccolo_settings_touch_pad(const Settings* settings);
 
 // The Sound settings as audio_output's config.
 void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);

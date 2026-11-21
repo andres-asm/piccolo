@@ -35,6 +35,8 @@
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "piccolo_window.h"
+#include "onscreen_pad.h"
+#include "ports_widget.h"
 #include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
@@ -68,6 +70,7 @@
 #include "file_picker.h"
 #include "headless.h"
 #include "pixel_font.h"
+#include "menus.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
 
@@ -236,6 +239,10 @@ struct App
     std::string              recent_path;
     std::vector<std::string> recent_labels;
     std::vector<const char*> recent_label_pointers;
+    // The menu bar as retroui draws it (rebuilt with the labels: language, RECENT).
+    std::vector<std::string>     menu_texts;   // the translated labels the items point to
+    std::vector<RetroUiMenuItem> menu_items;   // every menu's items, back to back
+    std::vector<RetroUiMenu>     menus;
 
     // UI text (piccolo_text.h) and the language setting it was loaded for.
     Localization strings = {};
@@ -314,6 +321,9 @@ struct App
     uint32_t           share_rate_kbps = 0;
 
     QuickMenu quick_menu;              // F1 while a game runs
+    PortsWidget ports_widget;          // the ports' tabs over the game, and DEVICES (the ports hotkey)
+    uint64_t    ports_ping_ms = 0;     // when the tabs' pings were last read
+    OnscreenPad onscreen_pad;          // the touch gamepad over the game (onscreen_pad.h)
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
 
     GameMode game_mode = {};   // held while a game runs (GAME MODE setting)
@@ -471,6 +481,58 @@ static void update_settings_context(App* app)
 // Recent games
 // ---------------------------------------------------------------------------
 
+// The menu bar's item ids: a MenuAction's number, or this plus the index of
+// a game in RECENT.
+constexpr int32_t MENU_ID_RECENT = 1000;
+
+// piccolo's menus (menus.h) as retroui's menu bar takes them: RECENT first
+// (the hamburger glyph), then the menus in the current language. Built when
+// the labels change, never per frame.
+static void build_menus(App* app)
+{
+    app->menu_texts.clear();
+    app->menu_items.clear();
+    app->menus.clear();
+    // The labels first: the items point into them (push_back may move them).
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        app->menu_texts.push_back(piccolo_text(&app->strings, menus_label(menu)));
+        for (int32_t item = 0; item < menus_item_count(menu); item++)
+        {
+            app->menu_texts.push_back(piccolo_text(&app->strings, menus_item_label(menu, item)));
+        }
+    }
+    // The items, every menu's back to back (the menus point into them).
+    for (size_t i = 0; i < app->recent_label_pointers.size(); i++)
+    {
+        app->menu_items.push_back(RetroUiMenuItem{app->recent_label_pointers[i], MENU_ID_RECENT + static_cast<int32_t>(i)});
+    }
+    size_t text = 0;
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        text++;   // (the menu's own label)
+        for (int32_t item = 0; item < menus_item_count(menu); item++)
+        {
+            MenuAction action = menus_item_action(menu, item);
+            int32_t id = action == MenuAction::separator ? RETRO_UI_MENU_SEPARATOR : static_cast<int32_t>(action);
+            app->menu_items.push_back(RetroUiMenuItem{app->menu_texts[text].c_str(), id});
+            text++;
+        }
+    }
+    int32_t recent_count = static_cast<int32_t>(app->recent_label_pointers.size());
+    app->menus.push_back(RetroUiMenu{PIXEL_FONT_UTF8_MENU, app->menu_items.data(), recent_count,
+                                     piccolo_text(&app->strings, Str::menu_recent_empty)});
+    size_t first_item = static_cast<size_t>(recent_count);
+    text = 0;
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        int32_t count = menus_item_count(menu);
+        app->menus.push_back(RetroUiMenu{app->menu_texts[text].c_str(), app->menu_items.data() + first_item, count, nullptr});
+        first_item += static_cast<size_t>(count);
+        text += static_cast<size_t>(count) + 1;
+    }
+}
+
 static void refresh_recent_labels(App* app)
 {
     app->recent_labels.clear();
@@ -487,6 +549,7 @@ static void refresh_recent_labels(App* app)
     {
         app->recent_label_pointers.push_back(app->recent_labels[i].c_str());
     }
+    build_menus(app);
 }
 
 static void remember_recent(App* app, const char* core_path, const char* content_path)
@@ -525,7 +588,8 @@ static void update_pause(App* app)
 {
     bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
-                     app->input_window.open || map_window_open_now(&app->map_window);
+                     app->input_window.open || map_window_open_now(&app->map_window) || app->ports_widget.open ||
+                     app->onscreen_pad.editor.active;
     // The text box always pauses (the core's text isn't typed into a running game).
     bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
                           text_input_pending(app);
@@ -1025,6 +1089,48 @@ static void share_update(App* app, ShareTransferLine* line)
     }
 }
 
+// GAME > RESUME: back to the game whatever is up. Also the way out when
+// something holds the input: every window closes, a SET or a macro recording
+// is cancelled and the router runs again (both suspend it).
+static void resume_game(App* app)
+{
+    if (!game_running(app))
+    {
+        return;
+    }
+    if (app->quick_menu.macro_record != 0)
+    {
+        app->quick_menu.macro_record = 0;
+    }
+    if (map_window_open_now(&app->map_window))
+    {
+        map_window_close(&app->map_window, &app->input);
+    }
+    input_capture_cancel(&app->input);
+    app->input.suspended = false;
+    app->input_window.capturing = false;
+    app->quick_menu.capturing = false;
+    if (app->onscreen_pad.editor.active)
+    {
+        onscreen_pad_edit_end(&app->onscreen_pad);
+    }
+    if (app->ports_widget.open)
+    {
+        ports_widget_close(&app->ports_widget);
+    }
+    app->picker.open = false;
+    app->shader_picker.open = false;
+    app->settings_window.open = false;
+    app->settings_window.image_open = false;
+    app->quick_menu.open = false;
+    app->core_options_manager = false;
+    app->cores_window.open = false;
+    app->share_window.open = false;
+    app->input_window.open = false;
+    app->show_debug_window = false;
+    app->menu_visible = false;
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -1039,6 +1145,9 @@ static void handle_menu_action(App* app, MenuAction action)
             file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core, &game_folders);
             break;
         }
+        case MenuAction::resume:
+            resume_game(app);
+            break;
         case MenuAction::reset:
             if (game_running(app))
             {
@@ -1410,7 +1519,8 @@ static bool any_window_open(const App* app)
            app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->share_window.open ||
            app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
-           map_window_open_now(&app->map_window) || text_input_pending(app);
+           map_window_open_now(&app->map_window) || text_input_pending(app) || app->ports_widget.open ||
+           app->onscreen_pad.editor.active;
 }
 
 // A menu or a dialog is up: the controllers drive it, not the game.
@@ -1430,7 +1540,15 @@ static bool game_has_keyboard(const App* app)
 static void close_topmost_or_toggle_menu(App* app)
 {
     {
-        if (text_input_pending(app))
+        if (app->onscreen_pad.editor.active)
+        {
+            onscreen_pad_edit_end(&app->onscreen_pad);   // EDIT LAYOUT: Escape is DONE
+        }
+        else if (app->ports_widget.open)
+        {
+            ports_widget_close(&app->ports_widget);   // DEVICES covers everything
+        }
+        else if (text_input_pending(app))
         {
             libretro_host_text_input_answer(app->session.host, nullptr);   // the core's box is on top: cancelled
         }
@@ -1513,6 +1631,18 @@ static void app_handle_hotkeys(App* app, const InputFrame* frame)
         {
             quick_menu_open(&app->quick_menu, app->session.state_slot);
             app->core_options_state.choose_layer = true;   // SAVE TO: the most specific layer in use
+        }
+    }
+    // DEVICES: in a game with nothing else up; the same hotkey closes it.
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_ports)])
+    {
+        if (app->ports_widget.open)
+        {
+            ports_widget_close(&app->ports_widget);
+        }
+        else if (game_running(app) && !ui_is_up(app) && app->ports_widget.port_count > 0)
+        {
+            ports_widget_open(&app->ports_widget, &app->input);
         }
     }
     if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_save_state)])
@@ -1883,6 +2013,31 @@ static void follow_what_plays(App* app, const InputFrame* frame)
     }
 }
 
+// The remote pads' ping in the ports' tabs and DEVICES: read from the
+// network (ENet's round trip) twice a second while they show.
+constexpr uint64_t PORT_PING_EVERY_MS = 500;
+
+static void update_port_pings(App* app)
+{
+    uint64_t now = SDL_GetTicks();
+    if (!ports_widget_showing(&app->ports_widget) || !app->net_running || now - app->ports_ping_ms < PORT_PING_EVERY_MS)
+    {
+        return;
+    }
+    app->ports_ping_ms = now;
+    bool known[NET_MAX_PEERS] = {};
+    uint32_t ping_ms[NET_MAX_PEERS] = {};
+    net_service_lock(&app->net_service);
+    for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
+    {
+        NetLinkStats stats;
+        known[peer] = net_access_peer_stats(&app->net_service.access, peer, &stats);
+        ping_ms[peer] = stats.round_trip_ms;
+    }
+    net_service_unlock(&app->net_service);
+    ports_widget_set_pings(&app->ports_widget, &app->input, &app->input_net, known, ping_ms);
+}
+
 static void app_update_input(App* app)
 {
     bool ui_up = ui_is_up(app);
@@ -1896,6 +2051,11 @@ static void app_update_input(App* app)
     {
         app->input.port_devices[port] = app->session.host->port_devices[port];
     }
+    // The touch gamepad: a controller while SHOW allows it; what its parts
+    // held (drawn last frame) goes to the router while a game plays.
+    OnscreenPadShow show = static_cast<OnscreenPadShow>(piccolo_settings_touch_pad(&app->settings));
+    onscreen_pad_update(&app->onscreen_pad, &app->input, onscreen_pad_enabled(&app->onscreen_pad, show), show,
+                        game_running(app) && !ui_up);
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
     update_remap_prompt(app, SDL_GetTicks());
@@ -1905,19 +2065,18 @@ static void app_update_input(App* app)
     {
         input_config_save(&app->input, app->input_config_path.c_str());   // a turbo's speed, by taps (in the game)
     }
+    // Joins and disconnects: the ports' tabs show them (no status line); logged.
     char message[300] = {};
     if (frame.joined_port != INPUT_NO_PORT && frame.joined_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_joined),
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.joined_controller)).c_str(), frame.joined_port + 1);
-        set_status(app, message);
         SDL_Log("%s", message);
     }
     if (frame.left_port != INPUT_NO_PORT && frame.left_controller >= 0)
     {
         std::snprintf(message, sizeof(message), piccolo_text(&app->strings, Str::input_left),
                       input_controller_label(&app->input, static_cast<uint32_t>(frame.left_controller)).c_str(), frame.left_port + 1);
-        set_status(app, message);
         SDL_Log("%s", message);
         // No CONTROLS here (Andrés): joining again is just START. The game
         // pauses if that was the last gamepad playing (the setting).
@@ -1930,9 +2089,19 @@ static void app_update_input(App* app)
         }
     }
     follow_what_plays(app, &frame);
+    // The ports' tabs and DEVICES: its moves first (each controller reads
+    // its own buttons), then who is where.
+    bool board_was_open = app->ports_widget.open;
+    ports_widget_board_update(&app->ports_widget, &app->input);
+    uint32_t shown_ports = game_running(app) ? piccolo_settings_ports(&app->settings, app->session.host->input_info.port_count) : 0;
+    ports_widget_update(&app->ports_widget, &app->input, &app->input_net, &frame, shown_ports, SDL_GetTicks());
+    update_port_pings(app);
     app_handle_hotkeys(app, &frame);
-    drive_ui_with_gamepads(app, &frame, ui_up);
-    if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)])
+    // DEVICES reads the pads itself: they don't drive ImGui meanwhile, and
+    // its BACK (Escape too) only closes it.
+    bool board = board_was_open || app->ports_widget.open;
+    drive_ui_with_gamepads(app, &frame, ui_up && !board);
+    if (frame.keyboard_pressed[static_cast<uint32_t>(InputAction::ui_back)] && !board_was_open)
     {
         close_topmost_or_toggle_menu(app);   // Escape in the UI: back, at once
     }
@@ -1974,6 +2143,8 @@ static void app_handle_events(App* app)
             app_shell_process_event(&app->shell, &event);
         }
         input_sdl_handle_event(&app->input_sdl, &app->input, &event);
+        const ImGuiIO& io = ImGui::GetIO();
+        onscreen_pad_event(&app->onscreen_pad, &event, io.DisplaySize.x, io.DisplaySize.y);
         if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE && app->input.suspended)
         {
             map_window_close(&app->map_window, &app->input);   // the router is off while mapping: Escape still gives up
@@ -2162,6 +2333,11 @@ static void draw_game(App* app)
     input.core_aspect = static_cast<double>(session->host->av_info.geometry.aspect_ratio);
     input.window_width = static_cast<uint32_t>(io.DisplaySize.x);
     input.window_height = static_cast<uint32_t>(io.DisplaySize.y);
+    if (app->onscreen_pad.below)
+    {
+        // Upright with the touch gamepad under it: the picture keeps the top.
+        input.window_height = static_cast<uint32_t>(app->onscreen_pad.picture_height);
+    }
     piccolo_settings_viewport(&app->settings, &input);
 
     update_shader_stages(app, input.filter);
@@ -2683,14 +2859,7 @@ static uint32_t net_core_ports(const App* app)
     {
         return 0;
     }
-    int32_t wanted = settings_get_int(&app->settings, PICCOLO_INPUT_PORTS);
-    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
-                                                                                     : INPUT_PORT_COUNT;
-    if (host->input_info.port_count > 0 && host->input_info.port_count < ports)
-    {
-        ports = host->input_info.port_count;
-    }
-    return ports;
+    return piccolo_settings_ports(&app->settings, host->input_info.port_count);
 }
 
 // The port a peer's pad plays on, or -1.
@@ -3139,8 +3308,10 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
         net_change_port_device(app, event->peer, pad, device_id, device);
         return;
     }
-    // devices / device_port: FULL (net_access let them through only then).
-    if (net_settings_read_devices_request(event->data, event->size, &id))
+    // devices / device_port: FULL (net_access let them through only then);
+    // devices_watch, the same list read only, at any level (the ports' tabs).
+    if (net_settings_read_devices_request(event->data, event->size, &id) ||
+        net_settings_read_devices_watch(event->data, event->size, &id))
     {
         app->net_devices_wanted[event->peer] = true;
         net_send_devices(app, event->peer, id);
@@ -3795,6 +3966,25 @@ static void net_update_locked(App* app)
     net_follow_stream_tuning(app);
 }
 
+// INTERFACE > BACKDROP: while a menu or a window (DEVICES too) is up over a
+// game, the whole game is covered by black at that opacity, behind every
+// window (the menu bar stays on top of it): the UI reads well over any
+// picture. Widgets don't dim the game themselves.
+static void draw_menu_backdrop(App* app)
+{
+    int32_t percent = settings_get_int(&app->settings, PICCOLO_MENU_BACKDROP);
+    if (!game_running(app) || !ui_is_up(app) || percent <= 0)
+    {
+        return;
+    }
+    percent = percent > 100 ? 100 : percent;
+    uint32_t alpha = static_cast<uint32_t>(percent) * 255u / 100u;
+    const ImGuiIO& io = ImGui::GetIO();
+    retro_ui_begin_layer("##menu_backdrop", app->pixel_font, app->ui_scale, false);
+    retro_ui_layer_rect(0.0f, 0.0f, io.DisplaySize.x, io.DisplaySize.y, alpha << 24);
+    retro_ui_end_layer();
+}
+
 // One turn of piccolo's loop: events, the game's frame, the UI, present.
 // False when piccolo should end (QUIT, or a fatal rendering error). Called
 // by main_loop_run: a plain loop on desktop, the browser's animation frames
@@ -3908,18 +4098,51 @@ static bool app_frame(App* app)
     {
         app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
+        // Where the touch gamepad goes (under the picture upright, if it fits),
+        // before the picture is placed.
+        {
+            const retro_game_geometry* geometry = &app->session.host->av_info.geometry;
+            float aspect = geometry->aspect_ratio > 0.0f ? geometry->aspect_ratio
+                         : geometry->base_height > 0 ? static_cast<float>(geometry->base_width) / static_cast<float>(geometry->base_height)
+                                                     : 4.0f / 3.0f;
+            const ImGuiIO& io = ImGui::GetIO();
+            onscreen_pad_place(&app->onscreen_pad, game_running(app) && !ui_is_up(app), aspect, io.DisplaySize.x, io.DisplaySize.y);
+        }
         draw_game(app);   // background, behind everything
-        bool menu_shown = app->menu_visible || !game_running(app);
+        // The touch gamepad over the game (or EDIT LAYOUT); MENU opens the QUICK MENU.
+        onscreen_pad_draw(&app->onscreen_pad, app->pixel_font, piccolo_text(&app->strings, Str::touch_pad_menu),
+                          static_cast<float>(settings_get_int(&app->settings, PICCOLO_TOUCH_PAD_OPACITY)) / 100.0f,
+                          settings_get_bool(&app->settings, PICCOLO_TOUCH_PAD_VIBRATE));
+        if (app->onscreen_pad.menu_pressed && game_running(app) && !app->quick_menu.open)
+        {
+            quick_menu_open(&app->quick_menu, app->session.state_slot);
+            app->core_options_state.choose_layer = true;
+        }
+        // (EDIT LAYOUT has the whole screen: no menu bar meanwhile.)
+        bool menu_shown = (app->menu_visible || !game_running(app)) && !app->onscreen_pad.editor.active;
+        // The ports' tabs, behind every window (they peek while the menu is up).
+        ports_widget_draw_tabs(&app->ports_widget, app->pixel_font, app->ui_scale, &app->strings, menu_shown, SDL_GetTicks());
+        draw_menu_backdrop(app);   // (after the tabs: behind them and every window)
         if (menu_shown)
         {
-            // The status line's window goes first, so it stays behind the others.
-            retro_ui_status_line(app->pixel_font, app->ui_scale, app->status);
-            int32_t recent_picked = -1;
-            MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
-                                                  app->recent_label_pointers.data(),
-                                                  static_cast<int32_t>(app->recent_label_pointers.size()),
-                                                  &recent_picked, app->open_first_menu);
+            // The status line's window goes first, so it stays behind the
+            // others; it starts past the tabs.
+            float status_left = ports_widget_tabs_width(&app->ports_widget);
+            retro_ui_status_line_from(app->pixel_font, app->ui_scale, app->status, status_left > 4.0f ? status_left : 4.0f);
+            int32_t picked = retro_ui_menu_bar(app->pixel_font, app->ui_scale, app->menus.data(),
+                                               static_cast<int32_t>(app->menus.size()), app->open_first_menu);
             app->open_first_menu = false;
+            int32_t recent_picked = -1;
+            MenuAction action = MenuAction::none;
+            if (picked >= MENU_ID_RECENT)
+            {
+                action = MenuAction::recent_game;
+                recent_picked = picked - MENU_ID_RECENT;
+            }
+            else if (picked >= 0)
+            {
+                action = static_cast<MenuAction>(picked);
+            }
             if (action == MenuAction::recent_game && recent_picked >= 0)
             {
                 // Started at the top of the next loop, like LOAD GAME (see pending_start).
@@ -3971,6 +4194,7 @@ static bool app_frame(App* app)
         quick.shaders_available = app->shader_library.loaded;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
         draw_remap_prompt(app);
+        ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, SDL_GetTicks(), &app->strings);
         if (app->quick_menu.choose_shader_request)
         {
             app->quick_menu.choose_shader_request = false;
@@ -4072,6 +4296,13 @@ static bool app_frame(App* app)
         map_context.layouts = &app->layouts;
         map_context.now_ms = SDL_GetTicks();
         map_window_draw(&app->map_window, &map_context, app->pixel_font, app->ui_scale);
+        if (app->input_window.edit_touch_layout)
+        {
+            // EDIT LAYOUT: INPUT closes, the touch gamepad's editor takes the screen.
+            app->input_window.edit_touch_layout = false;
+            app->input_window.open = false;
+            onscreen_pad_edit(&app->onscreen_pad);
+        }
         if (input_was_open && !app->input_window.open)
         {
             save_settings(app);   // SETTINGS tab
@@ -4164,6 +4395,7 @@ static bool app_frame(App* app)
         save_after_options_windows(app);
         retro_ui_scrollbars(app->ui_scale);
         retro_ui_cursor(app->ui_scale, ui_up);   // the theme's cursor, on top of everything
+        onscreen_pad_end_frame(&app->onscreen_pad);   // (the fingers seen by this frame are done)
 
         core_session_upload_video(&app->session, &app->shell);
         quick_menu_upload(&app->quick_menu, &app->shell);
@@ -4274,6 +4506,7 @@ static void app_save_on_leave(void* data, bool unloading)
     {
         remove_running_marker(app);
     }
+    storage_flush();
 }
 
 int main(int argc, char** argv)
@@ -4439,6 +4672,7 @@ int main(int argc, char** argv)
         input_config_load(&app->input, app->input_config_path.c_str());
     }
     input_sdl_init(&app->input_sdl, &app->input, database_path.empty() ? nullptr : database_path.c_str());
+    onscreen_pad_init(&app->onscreen_pad, app->paths.settings.c_str());
     update_language(app);
     set_status(app, piccolo_text(&app->strings, Str::status_start));
 
@@ -4478,6 +4712,7 @@ int main(int argc, char** argv)
         input_config_save(&app->input, app->input_config_path.c_str());
     }
     input_sdl_shutdown(&app->input_sdl);
+    onscreen_pad_shutdown(&app->onscreen_pad);
     net_shutdown_all(app);
     app_shell_destroy(&app->shell);
     delete app;

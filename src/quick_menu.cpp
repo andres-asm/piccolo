@@ -2019,12 +2019,8 @@ static void draw_controls_tab(QuickMenu* menu, const QuickMenuContext* context, 
     uint32_t ports = INPUT_PORT_COUNT;
     if (context->settings != nullptr)
     {
-        int32_t wanted = settings_get_int(context->settings, PICCOLO_INPUT_PORTS);
-        ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted) : INPUT_PORT_COUNT;
-    }
-    if (host != nullptr && host->game_loaded && host->input_info.port_count > 0 && host->input_info.port_count < ports)
-    {
-        ports = host->input_info.port_count;   // (no more than the core has)
+        uint32_t core_ports = host != nullptr && host->game_loaded ? host->input_info.port_count : 0;
+        ports = piccolo_settings_ports(context->settings, core_ports);
     }
     bool shown[INPUT_PORT_COUNT] = {true, true, true, true};
     float label_width = 60.0f * block;

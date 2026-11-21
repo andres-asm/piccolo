@@ -83,6 +83,13 @@ static const SettingEnumValue OSK_VALUES[] = {
 };
 constexpr uint32_t OSK_COUNT = sizeof(OSK_VALUES) / sizeof(OSK_VALUES[0]);
 
+static const SettingEnumValue TOUCH_PAD_VALUES[] = {
+    {"auto", text_id(Str::value_touch_pad_auto)},
+    {"on", text_id(Str::value_touch_pad_on)},
+    {"off", text_id(Str::value_touch_pad_off)},
+};
+constexpr uint32_t TOUCH_PAD_COUNT = sizeof(TOUCH_PAD_VALUES) / sizeof(TOUCH_PAD_VALUES[0]);
+
 static const SettingEnumValue FRAMES_IN_FLIGHT_VALUES[] = {
     {"2", text_id(Str::value_frames_2)},
     {"1", text_id(Str::value_frames_1)},
@@ -177,6 +184,12 @@ static const SettingDescriptor SETTINGS[] = {
      .step_real = 0.1, .label = text_id(Str::setting_input_hold_time), .help = text_id(Str::setting_input_hold_time_help)},
     {.key = PICCOLO_INPUT_OSK, .type = SettingType::enumeration, .default_value = "auto", .values = OSK_VALUES,
      .value_count = OSK_COUNT, .label = text_id(Str::setting_input_osk), .help = text_id(Str::setting_input_osk_help)},
+    {.key = PICCOLO_TOUCH_PAD, .type = SettingType::enumeration, .default_value = "auto", .values = TOUCH_PAD_VALUES,
+     .value_count = TOUCH_PAD_COUNT, .label = text_id(Str::setting_touch_pad), .help = text_id(Str::setting_touch_pad_help)},
+    {.key = PICCOLO_TOUCH_PAD_OPACITY, .type = SettingType::integer, .default_value = "60", .min = 10, .max = 100, .step = 10,
+     .label = text_id(Str::setting_touch_pad_opacity), .help = text_id(Str::setting_touch_pad_opacity_help)},
+    {.key = PICCOLO_TOUCH_PAD_VIBRATE, .type = SettingType::boolean, .default_value = "true",
+     .label = text_id(Str::setting_touch_pad_vibrate), .help = text_id(Str::setting_touch_pad_vibrate_help)},
     {.key = PICCOLO_INPUT_PORTS, .type = SettingType::integer, .default_value = "4", .overridable = true, .min = 1, .max = 4,
      .label = text_id(Str::setting_input_ports), .help = text_id(Str::setting_input_ports_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
@@ -354,6 +367,8 @@ static const SettingDescriptor SETTINGS[] = {
     // the BLUE theme (retro_ui.cpp). The THEME presets set them all.
     {.key = PICCOLO_UI_MENU_BOXES, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_menu_boxes), .help = text_id(Str::setting_ui_menu_boxes_help)},
+    {.key = PICCOLO_MENU_BACKDROP, .type = SettingType::integer, .default_value = "60", .min = 0, .max = 100, .step = 10,
+     .label = text_id(Str::setting_menu_backdrop), .help = text_id(Str::setting_menu_backdrop_help)},
     {.key = PICCOLO_UI_SHADOWS, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::setting_ui_shadows), .help = text_id(Str::setting_ui_shadows_help)},
     {.key = PICCOLO_UI_COLOR_BACKGROUND, .type = SettingType::color, .default_value = "#000000",
@@ -1164,11 +1179,29 @@ bool piccolo_settings_complete_ui_theme(Settings* settings)
     return changed;
 }
 
+uint32_t piccolo_settings_ports(const Settings* settings, uint32_t core_ports)
+{
+    int32_t wanted = settings_get_int(settings, PICCOLO_INPUT_PORTS);
+    uint32_t ports = wanted >= 1 && wanted <= static_cast<int32_t>(INPUT_PORT_COUNT) ? static_cast<uint32_t>(wanted)
+                                                                                     : INPUT_PORT_COUNT;
+    if (core_ports > 0 && core_ports < ports)
+    {
+        ports = core_ports;   // (no more than the core has)
+    }
+    return ports;
+}
+
 void piccolo_settings_input(const Settings* settings, InputSettings* input)
 {
     input->keyboard_shares_port1 = settings_get_bool(settings, PICCOLO_INPUT_SHARE_PORT1);
     input->press_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_PRESS_TIME) * 1000.0 + 0.5);
     input->hold_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_HOLD_TIME) * 1000.0 + 0.5);
+}
+
+uint32_t piccolo_settings_touch_pad(const Settings* settings)
+{
+    uint32_t value = settings_get_enum(settings, PICCOLO_TOUCH_PAD);   // TOUCH_PAD_VALUES: auto, on, off
+    return value < TOUCH_PAD_COUNT ? value : 0;
 }
 
 bool piccolo_settings_osk(const Settings* settings)

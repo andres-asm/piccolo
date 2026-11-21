@@ -1,5 +1,6 @@
 // piccolo's page in the browser (docs/wasm.md): starts the module, checks
-// that threads are possible, opens files (button, drag and drop).
+// that threads are possible, opens files (button, drag and drop). Its folder
+// on OPFS: piccolo-storage.js; the FILES panel: piccolo-files.js.
 //
 // Threads need the page to be "cross-origin isolated" (COOP/COEP headers).
 // A server that sends them (the Docker image, the .htaccess / nginx /
@@ -87,10 +88,34 @@ function piccolo_page_files() {
     event.stopPropagation();
     depth = 0;
     document.body.classList.remove('dragging');
-    if (event.dataTransfer.files.length > 0) {
+    if (event.dataTransfer.files.length === 0) {
+      return;
+    }
+    // On the FILES panel: into the folder it shows. Elsewhere: play it.
+    if (document.getElementById('files').contains(event.target)) {
+      piccolo_files_upload(Array.from(event.dataTransfer.files));
+    } else {
       piccolo_page_open(event.dataTransfer.files[0]);
     }
   }, true);
+}
+
+// SDL takes the window's size from the canvas's CSS size, but only on the
+// browser's resize event: send one whenever the stage changes (the FILES
+// panel opening or closing, the page resized).
+function piccolo_page_follow_stage() {
+  let pending = false;
+  const observer = new ResizeObserver(function () {
+    if (pending) {
+      return;
+    }
+    pending = true;
+    requestAnimationFrame(function () {
+      pending = false;
+      window.dispatchEvent(new Event('resize'));
+    });
+  });
+  observer.observe(document.getElementById('stage'));
 }
 
 async function piccolo_page_start() {
@@ -106,6 +131,9 @@ async function piccolo_page_start() {
   if (navigator.storage && navigator.storage.persist) {
     navigator.storage.persist();
   }
+  // piccolo's folder from OPFS, before the module starts (piccolo-storage.js).
+  piccolo_page_message('LOADING PICCOLO', true);
+  await piccolo_storage_read();
   window.Module = {
     canvas: document.getElementById('canvas'),
     print: function (text) { console.log(text); },
@@ -119,9 +147,14 @@ async function piccolo_page_start() {
         progress.value = Number(match[1]);
       }
     },
+    preRun: [piccolo_storage_environment],
+    // The filesystem exists and main() hasn't run: piccolo's folder goes in now.
     onRuntimeInitialized: function () {
+      piccolo_storage_install();
       document.getElementById('overlay').classList.add('gone');
       piccolo_page_files();
+      piccolo_files_start();
+      piccolo_page_follow_stage();
       document.getElementById('canvas').focus();
     },
     onAbort: function (what) {

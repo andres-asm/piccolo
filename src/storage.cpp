@@ -6,3 +6,7 @@ void storage_init(const char* folder_name)
 {
     (void)folder_name;
 }
+
+void storage_flush()
+{
+}
