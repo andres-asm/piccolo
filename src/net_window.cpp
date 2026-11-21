@@ -4,8 +4,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include <SDL3/SDL.h>
-
+#include "clipboard.h"
 #include "imgui.h"
 #include "net_pair_link.h"
 #include "qrcodegen.h"
@@ -132,7 +131,7 @@ static void draw_pairing(const NetWindowContext* context)
         update_link(context->state, access->host_key, settings_get_text(context->settings, PICCOLO_NET_BEACON));
         if (retro_ui_button(piccolo_text(strings, Str::net_pair_copy_link)))
         {
-            SDL_SetClipboardText(context->state->qr_link.c_str());
+            clipboard_set_text(context->state->qr_link.c_str());
         }
         retro_ui_item_tooltip(piccolo_text(strings, Str::net_pair_copy_link_help));
         draw_qr(context->state);
@@ -384,13 +383,14 @@ static void draw_devices(const NetWindowContext* context)
     draw_owner_confirm(context);
 }
 
-// INTERNET STATUS: what the beacon says (net_access_beacon_status).
+// INTERNET STATUS: what the beacon says, UDP and signaling together
+// (net_access_internet_status; a browser has only signaling).
 static void draw_beacon_status(const NetWindowContext* context, float label_width)
 {
     const Localization* strings = context->strings;
     Str text = Str::net_beacon_off;
     bool good = false;
-    switch (net_access_beacon_status(context->access))
+    switch (net_access_internet_status(context->access))
     {
     case NetBeaconStatus::off:
         text = Str::net_beacon_off;
