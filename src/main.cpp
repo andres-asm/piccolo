@@ -97,13 +97,6 @@ struct App
     std::vector<PiccoloThemeFile> themes;   // interface themes from files (themes/*.cfg)
     std::vector<uint32_t> map_offered;   // joysticks offered MAP CONTROLLER this session
 
-    // HOLD START TO REMAP: a controller plays a core's device it hasn't
-    // played before (no decided InputCoreProfile).
-    bool     remap_prompt = false;
-    uint32_t remap_prompt_controller = 0;
-    uint32_t remap_prompt_port = 0;
-    uint64_t remap_prompt_started_ms = 0;
-    uint64_t remap_prompt_start_held_ms = 0;   // when START began being held (0 = not held)   // OPEN MENU pressed: the menu bar opens its first menu this frame
     bool     running = false;
     bool     show_debug_window = false;
     bool     show_imgui_demo = false;
@@ -591,7 +584,7 @@ static void update_pause(App* app)
                      app->input_window.open || map_window_open_now(&app->map_window) || app->ports_widget.open ||
                      app->onscreen_pad.editor.active;
     // The text box always pauses (the core's text isn't typed into a running game).
-    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
+    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) ||
                           text_input_pending(app);
     if (app->headless.on)
     {
@@ -1526,7 +1519,7 @@ static bool any_window_open(const App* app)
 // A menu or a dialog is up: the controllers drive it, not the game.
 static bool ui_is_up(const App* app)
 {
-    return app->menu_visible || !game_running(app) || any_window_open(app) || app->remap_prompt;
+    return app->menu_visible || !game_running(app) || any_window_open(app);
 }
 
 // The game has the keyboard: its keys go to the core (and are the RetroPad).
@@ -1733,110 +1726,6 @@ static void drive_ui_with_gamepads(App* app, const InputFrame* source_frame, boo
     {
         app->open_first_menu = true;
     }
-}
-
-// HOLD START TO REMAP: the first controller on a port playing a core's
-// device it hasn't played before. START held 1 s opens the remap in the
-// quick menu; 5 s without it keeps the RetroPad and remembers that.
-constexpr uint64_t REMAP_PROMPT_MS = 5000;
-constexpr uint64_t REMAP_HOLD_MS = 1000;
-
-static void update_remap_prompt(App* app, uint64_t now_ms)
-{
-    InputSystem* input = &app->input;
-    if (!game_running(app) || input->core_name.empty())
-    {
-        app->remap_prompt = false;
-        return;
-    }
-    if (app->remap_prompt)
-    {
-        uint32_t controller = app->remap_prompt_controller;
-        bool held = input_controller_action_held(input, controller, InputAction::pad_start);
-        if (!held)
-        {
-            app->remap_prompt_start_held_ms = 0;
-        }
-        else if (app->remap_prompt_start_held_ms == 0)
-        {
-            app->remap_prompt_start_held_ms = now_ms;
-        }
-        if (held && now_ms - app->remap_prompt_start_held_ms >= REMAP_HOLD_MS)
-        {
-            app->remap_prompt = false;
-            quick_menu_open_remap(&app->quick_menu, app->session.state_slot, app->remap_prompt_port, controller);
-        }
-        else if (now_ms - app->remap_prompt_started_ms >= REMAP_PROMPT_MS)
-        {
-            app->remap_prompt = false;
-            // (The game's remap if it has one, else the core's.)
-            std::string id = input_controller_profile_id(input, controller);
-            uint32_t device = input->port_devices[app->remap_prompt_port];
-            bool game_has = input_core_profile(input, input->core_name.c_str(), input->game_name.c_str(), device, id) != nullptr;
-            InputCoreProfile* profile = input_core_profile_for(input, input->core_name.c_str(),
-                                                               game_has ? input->game_name.c_str() : "", device, id);
-            profile->decided = true;   // the RetroPad, remembered
-            if (!app->input_config_path.empty())
-            {
-                input_config_save(input, app->input_config_path.c_str());
-            }
-        }
-        return;
-    }
-    if (ui_is_up(app))
-    {
-        return;   // asked when the game is playing
-    }
-    for (uint32_t port = 0; port < INPUT_PORT_COUNT; port++)
-    {
-        for (size_t m = 0; m < input->ports[port].size(); m++)
-        {
-            uint32_t controller = input->ports[port][m];
-            const InputCoreProfile* profile = input_active_core_profile(input, controller, port);
-            if (profile == nullptr || !profile->decided)
-            {
-                app->remap_prompt = true;
-                app->remap_prompt_controller = controller;
-                app->remap_prompt_port = port;
-                app->remap_prompt_started_ms = now_ms;
-                app->remap_prompt_start_held_ms = 0;
-                return;
-            }
-        }
-    }
-}
-
-// The prompt as a line at the top of the window.
-static void draw_remap_prompt(App* app)
-{
-    if (!app->remap_prompt)
-    {
-        return;
-    }
-    const LibretroHost* host = app->session.host;
-    uint32_t port = app->remap_prompt_port;
-    const char* device = libretro_input_controller_name(&host->input_info, port, host->port_devices[port]);
-    uint64_t now = SDL_GetTicks();
-    uint64_t elapsed = now - app->remap_prompt_started_ms;
-    int left = static_cast<int>((REMAP_PROMPT_MS - (elapsed < REMAP_PROMPT_MS ? elapsed : REMAP_PROMPT_MS) + 999) / 1000);
-    char text[400] = {};
-    std::snprintf(text, sizeof(text), piccolo_text(&app->strings, Str::remap_prompt), device != nullptr ? device : "RETROPAD",
-                  static_cast<int>(port + 1), input_controller_label(&app->input, app->remap_prompt_controller).c_str(), left);
-    retro_ui_push_theme(app->pixel_font, app->ui_scale);
-    const ImGuiIO& io = ImGui::GetIO();
-    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, 16.0f * static_cast<float>(app->ui_scale)), ImGuiCond_Always,
-                            ImVec2(0.5f, 0.0f));
-    ImGui::SetNextWindowBgAlpha(1.0f);
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs |
-                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
-    if (ImGui::Begin("##remap_prompt", nullptr, flags))
-    {
-        retro_ui_begin_window(app->ui_scale);
-        ImGui::TextUnformatted(text);
-        retro_ui_end_window();
-    }
-    ImGui::End();
-    retro_ui_pop_theme();
 }
 
 // MAP CONTROLLER offered: once per session for a controller SDL doesn't
@@ -2058,7 +1947,6 @@ static void app_update_input(App* app)
                         game_running(app) && !ui_up);
     InputFrame frame = {};
     input_update(&app->input, SDL_GetTicks(), &frame);
-    update_remap_prompt(app, SDL_GetTicks());
     offer_mapping(app, &frame);
     update_cursors(app, &frame, ui_up);
     if (frame.profiles_changed && !app->input_config_path.empty())
@@ -4193,7 +4081,6 @@ static bool app_frame(App* app)
         quick.game_name = app->game_name;
         quick.shaders_available = app->shader_library.loaded;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
-        draw_remap_prompt(app);
         ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, SDL_GetTicks(), &app->strings);
         if (app->quick_menu.choose_shader_request)
         {

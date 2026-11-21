@@ -673,7 +673,6 @@ remap_macro_change_steps = CHANGE STEPS TO
 remap_macro_change_pauses = CHANGE PAUSES TO
 remap_macro_apply = APPLY
 remap_macro_delete_help = Deletes the macro from this core, and from every remap that binds it.
-remap_prompt = %s ON PORT %d (%s): HOLD START TO REMAP (%d)
 input_press_button = HOLD A BUTTON (%d)
 input_press_key = PRESS A KEY (%d)
 map_title = MAP CONTROLLER

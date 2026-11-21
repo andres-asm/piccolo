@@ -2338,10 +2338,6 @@ msgctxt "remap_macro_delete_help"
 msgid "Deletes the macro from this core, and from every remap that binds it."
 msgstr "Borra la macro de este core y de todos los remapeos que la usan."
 
-msgctxt "remap_prompt"
-msgid "%s ON PORT %d (%s): HOLD START TO REMAP (%d)"
-msgstr "%s EN EL PUERTO %d (%s): MANTÉN START PARA REMAPEAR (%d)"
-
 msgctxt "input_press_button"
 msgid "HOLD A BUTTON (%d)"
 msgstr "MANTÉN UN BOTÓN (%d)"
