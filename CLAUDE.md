@@ -180,7 +180,8 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _none; peers
+                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _emscripten (the browser,
+                              net_webrtc.js; WebRTC only there) / _none; peers
                               carry their transport, the same channels and bytes as ENet),
                               net_beacon (across the internet: register with the beacon, meet,
                               punch, peer-reflexive), net_signal (WebRTC signaling over the beacon's
