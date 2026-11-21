@@ -3410,6 +3410,10 @@ msgctxt "input_action_hotkey_ports"
 msgid "DEVICES"
 msgstr "DISPOSITIVOS"
 
+msgctxt "input_action_hotkey_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
 msgctxt "ports_tab"
 msgid "P%u"
 msgstr "P%u"
