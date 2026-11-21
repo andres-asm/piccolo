@@ -18,6 +18,10 @@ msgctxt "menu_misc"
 msgid "MISC"
 msgstr "VARIOS"
 
+msgctxt "menu_resume"
+msgid "RESUME"
+msgstr "CONTINUAR"
+
 msgctxt "menu_load_game"
 msgid "LOAD GAME..."
 msgstr "CARGAR JUEGO..."
