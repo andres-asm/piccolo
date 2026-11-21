@@ -100,13 +100,15 @@ Hosts never use SDL or frontend code.
 ## Stack
 
 - Rendering: raw Vulkan 1.3 (dynamic rendering, synchronization2), 1.1 path for
-  1.1-only drivers. Not SDL_GPU. We own the swapchain.
+  1.1-only drivers. Not SDL_GPU. We own the swapchain. OpenGL ES fallback (GLES 3,
+  GLES 2 with MULTITAP_GL_ES2) when Vulkan isn't usable, and WebGL 2 in the browser.
 - Platform: SDL3 for window, input, audio only.
 - UI: Dear ImGui (official SDL3 + Vulkan backends, unmodified), themed, with
   piccolo's pixel font. No RmlUi in piccolo.
 - Shaders: our own pass 0 + librashader loaded at run time by our own loader
   (librashader's MIT C headers; ABI 2, API >= 5).
-- Build: CMake ≥ 3.25, Ninja. Targets: Linux, Windows, Android; macOS (no CI, state unknown).
+- Build: CMake ≥ 3.25, Ninja. Targets: Linux, Windows, Android (+ legacy armv7 GLES 2),
+  the browser (Emscripten, pthreads); macOS (no CI, state unknown).
 
 ## Layout
 
@@ -139,6 +141,9 @@ src/
   shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
   text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
+  share_window.*          TOOLS > SHARE: two panes (here / another piccolo with OWNER access), folders above,
+                          files below, arrows in the middle copy games, saves and states (net_share_*)
+  app_icon.* bundled_files_android.* storage_web.*   window icon; files packed in the APK; OPFS in the browser
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v7a, Android 5+), res/ (icons,
                           banner), res-debug/ (debug variant)
@@ -156,15 +161,18 @@ deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, at
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
                               video_texture / video_output (what frontends draw the picture with: Vulkan's
                               picture + shader_chain, or the GLES path's gl_texture + gl_picture),
-                              gl_context (GLES fallback when Vulkan isn't usable: docs/gl.md, branch gl),
-                              vk_* (context, swapchain, texture, barrier), renderer, debug_ui, audio_output (+DRC),
+                              gl_context / gl_texture / gl_picture / gl_shader_chain (the GLES fallback when Vulkan
+                              isn't usable: docs/gl.md), app_shell_vulkan / debug_ui_vulkan (+ _none without Vulkan),
+                              vk_* (context, swapchain, texture, barrier), renderer, debug_ui, text_input (the
+                              on-screen keyboard), audio_output (+DRC), game_mode (Linux),
                               frame_timing, frame_delay, rate_control, frame_delta (lossless
                               frame codec for remote play), settings_file / settings (layers global ->
                               core -> game), app_paths, viewport, picture, window_size, localization,
                               input_devices / input_bindings (the router) / input_config / input_sdl /
                               input_sdl_mapping / input_layouts, archive (zip/7z, "a.7z#file" paths) /
                               content_cache (extracted files, LRU); frontend_download (signature, net_http,
-                              file_hash: the core downloader; built where libcurl is found);
+                              file_hash: the core downloader; net_http over libcurl on Linux, WinHTTP on
+                              Windows, HttpURLConnection through JNI on Android);
                               frontend_net (optional, with deps/enet):
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
@@ -175,7 +183,10 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               net_rtc (WebRTC under NetHost: net_rtc_datachannel / _none; peers
                               carry their transport, the same channels and bytes as ENet),
                               net_beacon (across the internet: register with the beacon, meet,
-                              punch, peer-reflexive), net_service (the network on its own thread; remote play is coded and sent
+                              punch, peer-reflexive), net_signal (WebRTC signaling over the beacon's
+                              WebSocket), net_share / _client / _host / _engine / _folders / _link (SHARE:
+                              listing and copying files, OWNER access), net_client_service (the client's
+                              connection on its own thread, for piccoletto), net_service (the network on its own thread; remote play is coded and sent
                               there), net_stream (remote play packets), net_settings (settings and
                               actions described by the host), net_speed (speed
                               test), net_wire (fields);
@@ -223,7 +234,7 @@ android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-77 tests with test-libretro. Before calling a larger change done:
+100 tests with test-libretro. Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
@@ -232,25 +243,42 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 
 ## Current state (2026-11-20)
 
+Everything below is on main (piccolo ec86c7f); main CI (Flatpak, Windows, Android, Web) is green.
+
 - piccolo 0.3: plays games through frontend-libretro; LOAD GAME, RECENT,
   SETTINGS (global / core / game layers), IMAGE SETTINGS, QUICK MENU
-  (savestates 1-9 with thumbnails, core options, controls), fast forward,
-  native pixel formats, frame delay, RUN-AHEAD (one setting, for cores with
-  their own run-ahead), localization (es), games from zip / 7z (extracted into
-  <root>/cache, trimmed to 4 GiB; cores never get virtual paths). Retro UI
-  scale: the biggest block that leaves 640 x 360.
-- Shaders (milestone 6, on main): frontends-common's shader_chain loads
-  librashader at run time (our own loader; ABI 2, API >= 5). Stage 0 = pass 0
-  (PICTURE CONTROLS + color profiles: GBA, GBC, DS, PSP, ... NTSC), stage 1 =
-  the `video_shader_preset` setting or piccolo's scale preset for FILTER.
-  Curated presets from deps/piccolo-shaders; SETTINGS > SHADER: CHOOSE. Without
-  librashader the plain picture path draws. Details: docs/handoff-shaders.md.
+  (SAVESTATES 1-9 with thumbnails, CORE OPTIONS, CONTROLS, SHADER), fast
+  forward, native pixel formats, frame delay, RUN-AHEAD (one setting, for cores
+  with their own run-ahead), localization (es), games from zip / 7z (extracted
+  into <root>/cache, trimmed to 4 GiB; cores never get virtual paths). Retro UI
+  scale: the biggest block that leaves 640 x 360. Window title shows the branch
+  on builds from a branch other than main.
+- Rendering: Vulkan, or the GLES fallback (renderer split behind video_texture /
+  video_output; MULTITAP_GPU=gl forces it). Legacy APK (armv7, Android 5+, GLES 2)
+  runs at 60 fps on the SHIELD's Tegra X1; a real Tegra 4 is untested. Open
+  decision (docs/gl.md): Vulkan uses-feature required="false" in the main APK.
+- Shaders: frontends-common's shader_chain loads librashader at run time (our
+  own loader; ABI 2, API >= 5). Stage 0 = pass 0 (PICTURE CONTROLS + color
+  profiles: GBA, GBC, DS, PSP, ... NTSC), stage 1 = the `video_shader_preset`
+  setting or piccolo's scale preset for FILTER. Curated presets from
+  deps/piccolo-shaders, chosen in QUICK MENU > SHADER; a preset too slow for the
+  machine asks KEEP / REVERT (15). GLES: piccolo's own presets in shaders/gl/.
+  librashader is in the Flatpak and the main APK (not the legacy one). Without
+  librashader the plain picture path draws. Not done: preset parameters as
+  knobs, frame blending.
 - libretro extensions (Multitap's private environment calls, host-libretro
   `src/libretro_extensions.h`): run-ahead (0x4D01/02) and text input (0x4D03:
-  KEYS opens a phone's on-screen keyboard only when the core asks, TEXT shows
-  piccolo's text box). Planned: multitap adapters, media slots (docs/design-notes.md).
+  KEYS opens the system's on-screen keyboard only when the core asks, TEXT shows
+  piccolo's text box). Multitap adapters stay on the unmerged `multitap`
+  branches until real cores are patched. Planned: media slots. Subsystems
+  (retro_load_game_special, per-cart save RAM) are in host-libretro; no UI yet.
+- On-screen keyboard: INPUT > SETTINGS > ON-SCREEN KEYBOARD (AUTO: phones, TVs,
+  handhelds), for ImGui fields and core requests, Vulkan and GLES. Left:
+  Windows' touch keyboard, KDE's through D-Bus, a network hook for piccoletto.
 - TOOLS > CORES: the core downloader (core_updater in frontend-libretro, signed
-  index); SHOW NON-FREE CORES off by default, confirmed when turned on.
+  index; cores built in multitap-org/cores, served by cores-server); SHOW
+  NON-FREE CORES off by default, confirmed when turned on; works on Linux,
+  Windows (WinHTTP) and Android (JNI).
 - Input (done for this version): N:N ports (hotkeys and UI from port 1 + the
   keyboard), per-core remaps with per-game copies, combos and macros (recorder)
   per core, turbo (row box + TURBO BUTTON for the session), mouse / pointer /
@@ -261,28 +289,46 @@ Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 - Untested on hardware: SN30 over USB (unknown pad), Genesis / Saturn layouts,
   Shield touchpad pointer, mouse grab, lightguns (Zapper, Super Scope).
 - Network (pending work in docs/netcode-pending.md): on its own thread
-  (net_service); one UDP port (ENet) with LAN discovery, Noise XX encryption,
-  6-digit pairing, access levels gamepad / stream / full; remote pads (standard
-  pads remapped here, or RetroPad mapped on the phone), what runs, actions
-  (save / load state, slot, fast forward, pause, reset, close), settings,
-  controllers per port, DEVICES (a phone lists who plays on which port and moves
-  them), game folders browsed and games loaded from the client. SETTINGS >
-  NETWORK. Remote play: piccolo streams the frame it shows (lossless,
-  frame_delta) and the audio it plays; the streaming device negotiates the frame
-  delay (in memory only). piccoletto plays it (tested on the SHIELD).
+  (net_service); one UDP port (zpl-c ENet, IPv6 dual-stack) with LAN discovery,
+  Noise XX encryption, 6-digit pairing, access levels gamepad / stream / full /
+  owner (level changes reach a connected device at once); remote pads, what
+  runs, actions, settings, controllers per port, DEVICES, game folders browsed
+  and games loaded from the client. Remote play: piccolo streams the frame it
+  shows (lossless, frame_delta) and the audio it plays; GO HEADLESS hands the
+  game to the streaming device (tray icon). Across the internet: the beacon
+  (repo multitap-beacon, beacon.get-piccolo.app: UDP rendezvous + STUN +
+  WebSocket signaling rooms); WebRTC data channels with libdatachannel (desktop;
+  not on Android yet). Left: the browser's WebRTC backend, QR / link pairing
+  through the beacon, TURN for symmetric NATs, netplay. Known host bugs (from
+  piccoletto): a network pad's START can't leave the pause; a stream started
+  while paused gets no frame.
+- SHARE (TOOLS > SHARE, OWNER access): steps 1-9 done (games with their save and
+  states, REPLACE?, net_probe as a headless client / host). Untested between two
+  real piccolos.
+- Browser (web/, docs/wasm.md): WebGL 2, SameBoy linked statically, OPFS through
+  WasmFS, pthreads (COOP/COEP: the zip ships .htaccess / nginx / _headers configs
+  plus coi-serviceworker; web/docker for a ready server). Published at
+  get-piccolo.app/play/. frontend_net is compiled in but inert. Untested:
+  Firefox / Safari, real fps, gamepad.
 - Packaging (docs/packaging.md): app ID site.multitap.piccolo. CI builds the
-  Flatpak (librashader and libgamemode bundled), the Windows zip (MSYS2 UCRT64)
-  and the Android APK. Android is back on main from deps/ (android/,
-  build-apk.sh): with PICCOLO_KEYSTORE a release build, without it a debug
-  variant (android/res-debug, its own banner); CI signs with the
-  ANDROID_KEYSTORE_* secrets when they're set. Branding, adaptive icon included:
-  assets/branding. Site: get-piccolo.app (repo multitap-org/piccolo-site).
+  Flatpak (librashader and libgamemode bundled), the Windows zip (MSYS2 UCRT64,
+  x64 and ARM64), the Android APKs (main + legacy) and the web zip / Docker
+  image. With PICCOLO_KEYSTORE a release build, without it a debug variant;
+  CI signs with the ANDROID_KEYSTORE_* secrets when they're set (not set yet).
+  release.yml turns a v* tag into a GitHub Release (PICCOLO_VERSION_BASE must
+  be raised to 0.4.0 first). Releases site and self-update: designed, not built.
+  Branding: assets/branding. Site: get-piccolo.app (repo multitap-org/piccolo-site).
+- In progress on branches (not on main): `rewind` (piccolo-rewind: SCRUB /
+  SNAPSHOT / AUTO, DVR-style PLAY, input replay, export to video; plan in
+  docs/rewind.md). Planned, not started: console / TV UI and phone UI
+  (docs/mockups), Android SAF.
 - Release plan (early December): piccolo (Linux Flatpak, Windows, Android) +
-  piccoletto (Android: gamepad, remote play, devices). The `big-picture` branch
-  still needs adapting to deps/.
+  piccoletto (Android: gamepad, remote play, devices). The `big-picture`,
+  `retroui` and old `android` branches are stale (far behind main).
 - Known: Release builds fail with warnings-as-errors (GCC -O2 only:
   `instance_layer_available` unused outside Debug, a -Wformat-truncation in a
-  log note). Pending: imgui docking branch.
+  log note). frontend_net_signal failed once under ASan with -j4 (passes alone).
+  Pending: imgui docking branch.
 
 ## Design points to preserve
 
