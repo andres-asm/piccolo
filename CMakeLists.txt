@@ -217,6 +217,7 @@ set(PICCOLO_SOURCES
     src/text_input_window.cpp
     src/quick_menu.cpp
     src/ports_widget.cpp
+    src/onscreen_pad.cpp
 )
 if(ANDROID)
     # Android (hosts-common's cmake/android-toolchain.cmake, android/build-apk.sh):

@@ -358,6 +358,16 @@ static void draw_settings(InputWindow* window, const InputWindowContext* context
     static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_PORTS, PICCOLO_INPUT_PRESS_TIME,
                                        PICCOLO_INPUT_HOLD_TIME, PICCOLO_INPUT_OSK};
     draw_scoped_settings(window, context, KEYS, sizeof(KEYS) / sizeof(KEYS[0]));
+    // The on-screen gamepad (onscreen_pad.h): its settings and EDIT LAYOUT.
+    ImGui::Spacing();
+    retro_ui_separator_text(piccolo_text(context->strings, Str::input_section_touch_pad));
+    static const char* const TOUCH_KEYS[] = {PICCOLO_TOUCH_PAD, PICCOLO_TOUCH_PAD_OPACITY, PICCOLO_TOUCH_PAD_VIBRATE};
+    draw_scoped_settings(window, context, TOUCH_KEYS, sizeof(TOUCH_KEYS) / sizeof(TOUCH_KEYS[0]));
+    if (retro_ui_button(piccolo_text(context->strings, Str::input_touch_pad_edit)))
+    {
+        window->edit_touch_layout = true;
+    }
+    retro_ui_item_tooltip(piccolo_text(context->strings, Str::input_touch_pad_edit_help));
 }
 
 // ---------------------------------------------------------------------------

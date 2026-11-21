@@ -133,6 +133,9 @@ src/
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
+  onscreen_pad.*          the touch gamepad (retroui's touch pad, piccoletto's layouts): TOUCH PAD in the router
+                          (a RetroPad device), over the game (upright: under the picture if it fits), MENU =
+                          QUICK MENU, SETTINGS > INPUT > ON-SCREEN GAMEPAD (SHOW / OPACITY / VIBRATE, EDIT LAYOUT)
   ports_widget.*          the ports over the game: fills retroui's ports_view (tabs that rise when a port
                           changes, peeking under the menu; DEVICES) from the router; DEVICES' pads (hotkey.ports:
                           each moves itself LEFT / RIGHT, port 1 picks any with UP / DOWN)

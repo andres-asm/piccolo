@@ -34,6 +34,12 @@ constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // bin
 // a core that asks for the keyboard. "auto" = on for phones, TVs and handhelds
 // (Android, Steam Deck, no physical keyboard), off on a PC. Global only.
 constexpr const char* PICCOLO_INPUT_OSK = "input_osk";
+// INPUT > ON-SCREEN GAMEPAD (onscreen_pad.h): SHOW auto / on / off (auto = a
+// touch screen, hidden while a real gamepad plays), OPACITY (percent, the
+// layouts not changed in EDIT LAYOUT), VIBRATE ON PRESS. Global only.
+constexpr const char* PICCOLO_TOUCH_PAD = "touch_pad";
+constexpr const char* PICCOLO_TOUCH_PAD_OPACITY = "touch_pad_opacity";
+constexpr const char* PICCOLO_TOUCH_PAD_VIBRATE = "touch_pad_vibrate";
 constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
@@ -263,6 +269,9 @@ uint32_t piccolo_settings_ports(const Settings* settings, uint32_t core_ports);
 
 // INPUT > ENABLE OSK resolved for this machine ("auto" decided here).
 bool piccolo_settings_osk(const Settings* settings);
+
+// INPUT > ON-SCREEN GAMEPAD > SHOW: 0 auto, 1 on, 2 off (OnscreenPadShow's order).
+uint32_t piccolo_settings_touch_pad(const Settings* settings);
 
 // The Sound settings as audio_output's config.
 void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);
