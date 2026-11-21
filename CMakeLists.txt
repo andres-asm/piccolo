@@ -381,10 +381,12 @@ if(EMSCRIPTEN)
         # desktop-sized one (host-libretro keeps a few KB of paths on it).
         -sSTACK_SIZE=1mb -sDEFAULT_PTHREAD_STACK_SIZE=1mb
         # The page writes the files people open into the virtual filesystem.
-        -sEXPORTED_RUNTIME_METHODS=FS,ccall
-        # WasmFS: piccolo's folder on OPFS (storage_web.cpp). Its OPFS worker and
-        # the thread that mounts it come from a pool started with the page, so
-        # the main thread can wait for them without going back to the browser.
+        -sEXPORTED_RUNTIME_METHODS=FS,ENV,ccall
+        # WasmFS (in memory): files used from threads without going through the
+        # main thread. piccolo's folder is kept on OPFS by the page
+        # (storage_web.cpp, web/page/piccolo-storage.js). Threads come from a pool
+        # started with the page: one started later would need the main thread
+        # to go back to the browser first.
         -sWASMFS -sPTHREAD_POOL_SIZE=4
         # The files piccolo ships next to its program (bundled_files_web.cpp:
         # the root of the virtual filesystem), packed into piccolo.data.

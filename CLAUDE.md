@@ -145,7 +145,9 @@ android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v
 web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh (SameBoy
                           as a static archive), build.sh; src/bundled_files_web.cpp registers the linked core
   main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
-                          leave, piccolo_web_open); storage.* the browser's piccolo folder on OPFS (WasmFS)
+                          leave, piccolo_web_open); storage.* the browser's piccolo folder: in memory,
+                          kept on OPFS by the page (web/page/piccolo-storage.js; WasmFS's OPFS backend
+                          hangs Firefox); web/page/piccolo-files.js the FILES panel (the session's files)
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
                           codec on real games), netplay_measure (which netplay mode a core and game
                           suit: determinism, exact states, cost), lsan-suppressions.txt
