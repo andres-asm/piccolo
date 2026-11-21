@@ -4064,7 +4064,16 @@ static bool app_frame(App* app)
         net_stream_frame(app);
         measure_shader_check(app);
     }
-    if (ran != CoreSessionFrame::skipped || !game_running(app))
+    // Taps (a key down and up inside one loop) are kept through a loop whose
+    // core frame wasn't due yet, so that frame still sees them; otherwise
+    // they're done. A paused game (the menu, focus loss) or a minimized
+    // window runs no frame at all: kept there, a tap would stay "held" for
+    // good, and the router ignores what's held as it enters a layer until
+    // it's let go (Escape opened the menu, then neither Escape nor the
+    // hotkey closed it: the browser, and the desktop whenever the menu pauses).
+    bool minimized = (SDL_GetWindowFlags(app->shell.window) & SDL_WINDOW_MINIMIZED) != 0;
+    bool frame_coming = game_running(app) && !app->session.paused && !minimized;
+    if (ran != CoreSessionFrame::skipped || !frame_coming)
     {
         input_devices_end_frame(&app->input.devices);   // taps seen by a frame (or the UI) are done
     }
