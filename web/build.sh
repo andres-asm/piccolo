@@ -2,8 +2,11 @@
 # Builds piccolo for the browser (WebAssembly, Emscripten + SDL3, WebGL 2
 # through the OpenGL ES path). See docs/wasm.md.
 #
-#   web/build-core.sh       -> web/build/cores/sameboy_libretro_emscripten.a
-#   web/build.sh            -> web/build/wasm/piccolo.{js,wasm}, SameBoy linked in
+#   web/build-core.sh [core]   -> web/build/cores/<core>_libretro_emscripten.a
+#   web/build.sh [core]        -> web/build/wasm/<core>/piccolo.{js,wasm,data}, the core linked in
+#
+# core: sameboy (the default) or snes9x (web/build-core.sh). Each core is its
+# own build folder (the same piccolo, a different core linked in).
 #
 # Needs Emscripten in the environment (emcc on PATH), the version CI pins:
 #   git clone https://github.com/emscripten-core/emsdk ~/emsdk
@@ -19,21 +22,22 @@
 #
 # Overridable from the environment:
 #   BUILD_TYPE   CMake build type (default Release)
-#   CORE_ARCHIVE the core's static archive (default: SameBoy's, from web/build-core.sh)
-#   CORE_FILE    the file name it answers to (default sameboy_libretro.so)
+#   CORE_ARCHIVE the core's static archive (default: <core>'s, from web/build-core.sh)
+#   CORE_FILE    the file name it answers to (default <core>_libretro.so)
 
 set -eu
 
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/.." && pwd)
 build="$here/build"
+core=${1:-sameboy}
 host_build="$build/host"
-wasm_build="$build/wasm"
+wasm_build="$build/wasm/$core"
 BUILD_TYPE=${BUILD_TYPE:-Release}
-CORE_ARCHIVE=${CORE_ARCHIVE:-$build/cores/sameboy_libretro_emscripten.a}
-CORE_FILE=${CORE_FILE:-sameboy_libretro.so}
+CORE_ARCHIVE=${CORE_ARCHIVE:-$build/cores/${core}_libretro_emscripten.a}
+CORE_FILE=${CORE_FILE:-${core}_libretro.so}
 if [ ! -f "$CORE_ARCHIVE" ]; then
-    echo "web/build.sh: no core archive at $CORE_ARCHIVE (run web/build-core.sh first)" >&2
+    echo "web/build.sh: no core archive at $CORE_ARCHIVE (run web/build-core.sh $core first)" >&2
     exit 1
 fi
 

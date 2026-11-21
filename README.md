@@ -17,7 +17,7 @@ with every other dependency, in `deps/`:
 
 piccolo 0.3. Platforms: **Linux** (Flatpak), **Windows** (zip), **Android**
 (APK, Android 9+; a legacy APK for Android 5+ with OpenGL ES 2) and the
-**browser** (WebAssembly, SameBoy built in: [get-piccolo.app/play](https://get-piccolo.app/play/)).
+**browser** (WebAssembly, SameBoy and Snes9x built in: [get-piccolo.app/play](https://get-piccolo.app/play/)).
 macOS builds but isn't tested.
 
 ### What's there
@@ -296,7 +296,7 @@ Other platforms (details in [`CLAUDE.md`](CLAUDE.md#build-run-check) and `docs/p
 ```sh
 MULTITAP_GPU=gl ./build/piccolo       # try the OpenGL ES path on the desktop
 android/build-apk.sh [--legacy]       # the APK (--legacy: Android 5+, armv7, GLES 2)
-web/build-core.sh && web/build.sh     # the browser build (emsdk), web/package.sh for the zip
+web/build-core.sh snes9x && web/build.sh snes9x   # the browser build (emsdk; sameboy too), web/package.sh for the zip
 ```
 
 CI builds the Flatpak, the Windows zip (MSYS2 UCRT64, x64 and ARM64), the APKs

@@ -147,8 +147,8 @@ src/
 layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v7a, Android 5+), res/ (icons,
                           banner), res-debug/ (debug variant)
-web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh (SameBoy
-                          as a static archive), build.sh; src/bundled_files_web.cpp registers the linked core
+web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh <core>
+                          (sameboy, snes9x: a static archive), build.sh <core> (one wasm per core); src/bundled_files_web.cpp registers the linked core
   main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
                           leave, piccolo_web_open); storage.* the browser's piccolo folder: in memory,
                           kept on OPFS by the page (web/page/piccolo-storage.js; WasmFS's OPFS backend
@@ -229,7 +229,8 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
                                    # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
 MULTITAP_GPU=gl ./build/piccolo     # the OpenGL ES path (GLES 3); -DMULTITAP_GL_ES2=ON builds test like the Tegra 4
-web/build-core.sh && web/build.sh  # wasm (emsdk 6.0.13 sourced, rgbds): SameBoy linked into web/build/wasm/piccolo.{js,wasm}
+web/build-core.sh snes9x && web/build.sh snes9x  # wasm (emsdk 6.0.13 sourced; rgbds for sameboy): web/build/wasm/<core>/
+web/package.sh                     # the zip with every core (sameboy and snes9x built first)
 android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-DMULTITAP_GPU_VULKAN=OFF), the SHIELD Portable
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
@@ -305,8 +306,8 @@ Everything below is on main (piccolo ec86c7f); main CI (Flatpak, Windows, Androi
 - SHARE (TOOLS > SHARE, OWNER access): steps 1-9 done (games with their save and
   states, REPLACE?, net_probe as a headless client / host). Untested between two
   real piccolos.
-- Browser (web/, docs/wasm.md): WebGL 2, SameBoy linked statically, OPFS through
-  WasmFS, pthreads (COOP/COEP: the zip ships .htaccess / nginx / _headers configs
+- Browser (web/, docs/wasm.md): WebGL 2, one page per core (SameBoy, Snes9x) with
+  the core linked statically, piccolo's folder in memory kept on OPFS by the page, pthreads (COOP/COEP: the zip ships .htaccess / nginx / _headers configs
   plus coi-serviceworker; web/docker for a ready server). Published at
   get-piccolo.app/play/. frontend_net is compiled in but inert. Untested:
   Firefox / Safari, real fps, gamepad.

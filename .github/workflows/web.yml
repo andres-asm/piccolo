@@ -75,8 +75,10 @@ jobs:
       - name: Build and package
         run: |
           . "$HOME/emsdk/emsdk_env.sh"
-          RGBDS="$HOME/rgbds/" web/build-core.sh
-          web/build.sh
+          for core in sameboy snes9x; do
+            RGBDS="$HOME/rgbds/" web/build-core.sh "$core"
+            web/build.sh "$core"
+          done
           web/package.sh
           ls -la web/build/dist
 
@@ -96,6 +98,7 @@ jobs:
           sleep 2
           curl -fsSI http://localhost:8080/sameboy/ | tee page-headers.txt
           curl -fsSI http://localhost:8080/sameboy/piccolo.wasm | tee wasm-headers.txt
+          curl -fsSI http://localhost:8080/snes9x/piccolo.wasm > /dev/null
           docker stop piccolo-web
           grep -qi '^cross-origin-opener-policy: same-origin' page-headers.txt
           grep -qi '^cross-origin-embedder-policy: require-corp' page-headers.txt
