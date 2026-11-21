@@ -9,6 +9,7 @@ constexpr uint8_t HELD_RIGHT = 2;
 constexpr uint8_t HELD_UP    = 4;
 constexpr uint8_t HELD_DOWN  = 8;
 constexpr uint8_t HELD_BACK  = 16;
+constexpr uint8_t HELD_ACCEPT = 32;
 
 // ---------------------------------------------------------------------------
 // Who is where
@@ -332,6 +333,7 @@ static uint8_t held_bits(const InputSystem* input, uint32_t controller)
     bits |= input_controller_action_held(input, controller, InputAction::ui_up) ? HELD_UP : 0u;
     bits |= input_controller_action_held(input, controller, InputAction::ui_down) ? HELD_DOWN : 0u;
     bits |= input_controller_action_held(input, controller, InputAction::ui_back) ? HELD_BACK : 0u;
+    bits |= input_controller_action_held(input, controller, InputAction::ui_accept) ? HELD_ACCEPT : 0u;
     return static_cast<uint8_t>(bits);
 }
 
@@ -555,7 +557,16 @@ void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
             {
                 ports_view_pick_next(view, 1);
             }
-            if (direction != 0)
+            if (view->done_focus)
+            {
+                // On DONE (UP / DOWN got there): A closes; LEFT / RIGHT move nothing.
+                if ((pressed & HELD_ACCEPT) != 0)
+                {
+                    ports_widget_close(widget, input);
+                    break;
+                }
+            }
+            else if (direction != 0)
             {
                 if (!view->has_pick)
                 {
