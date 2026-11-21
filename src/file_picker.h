@@ -48,7 +48,6 @@
 
 struct ImFont;
 
-constexpr int32_t FILE_PICKER_MAX_ENTRIES = 2048;
 constexpr size_t  FILE_PICKER_NAME_MAX    = 256;
 
 enum class FilePickerMode
@@ -72,10 +71,10 @@ struct FilePicker
 
     // Current folder's contents, sorted (case-insensitive). Re-read when the
     // folder, the core or "show all" changes.
-    char    folders[FILE_PICKER_MAX_ENTRIES][FILE_PICKER_NAME_MAX] = {};
-    int32_t folder_count = 0;
-    char    files[FILE_PICKER_MAX_ENTRIES][FILE_PICKER_NAME_MAX] = {};
-    int32_t file_count = 0;
+    // Any number of them (a full No-Intro set is thousands); only the rows
+    // in view are drawn (ImGuiListClipper).
+    std::vector<std::string> folders;
+    std::vector<std::string> files;
     int32_t selected_file = -1;
     bool    listing_stale = true;
 

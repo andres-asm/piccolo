@@ -1,5 +1,6 @@
 #include "file_picker.h"
 
+#include <algorithm>   // std::sort (the names)
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -99,9 +100,15 @@ static void go_to_parent(char* directory)
 // Listing
 // ---------------------------------------------------------------------------
 
-static int compare_names(const void* a, const void* b)
+// Names in order, case-insensitive (std::sort's comparison).
+static bool name_before(const std::string& a, const std::string& b)
 {
-    return SDL_strcasecmp(static_cast<const char*>(a), static_cast<const char*>(b));
+    return SDL_strcasecmp(a.c_str(), b.c_str()) < 0;
+}
+
+static void sort_names(std::vector<std::string>* names)
+{
+    std::sort(names->begin(), names->end(), name_before);
 }
 
 static const LibretroCoreInfo* selected_core(const FilePicker* picker, const CoreCatalog* catalog)
@@ -115,28 +122,26 @@ static const LibretroCoreInfo* selected_core(const FilePicker* picker, const Cor
 
 static void add_folder(FilePicker* picker, const char* name)
 {
-    if (picker->folder_count < FILE_PICKER_MAX_ENTRIES && std::strlen(name) < FILE_PICKER_NAME_MAX)
+    if (std::strlen(name) < FILE_PICKER_NAME_MAX)
     {
-        std::snprintf(picker->folders[picker->folder_count], FILE_PICKER_NAME_MAX, "%s", name);
-        picker->folder_count++;
+        picker->folders.push_back(name);
     }
 }
 
 static void add_file(FilePicker* picker, const char* name)
 {
-    if (picker->file_count < FILE_PICKER_MAX_ENTRIES && std::strlen(name) < FILE_PICKER_NAME_MAX)
+    if (std::strlen(name) < FILE_PICKER_NAME_MAX)
     {
-        std::snprintf(picker->files[picker->file_count], FILE_PICKER_NAME_MAX, "%s", name);
-        picker->file_count++;
+        picker->files.push_back(name);
     }
 }
 
 // Archives list folders once per file inside them ("d/a", "d/b"): added once.
 static void add_folder_once(FilePicker* picker, const char* name)
 {
-    for (int32_t i = 0; i < picker->folder_count; i++)
+    for (size_t i = 0; i < picker->folders.size(); i++)
     {
-        if (std::strcmp(picker->folders[i], name) == 0)
+        if (picker->folders[i] == name)
         {
             return;
         }
@@ -215,8 +220,8 @@ static bool listed_file(const FilePicker* picker, const LibretroCoreInfo* core, 
 
 static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
 {
-    picker->folder_count = 0;
-    picker->file_count = 0;
+    picker->folders.clear();
+    picker->files.clear();
     picker->selected_file = -1;
     picker->listing_stale = false;
 
@@ -226,41 +231,33 @@ static void list_folder(FilePicker* picker, const CoreCatalog* catalog)
     if (archive_split_path(picker->directory, &archive, &folder))
     {
         list_archive(picker, core, &archive, &folder);
-        std::qsort(picker->folders, static_cast<size_t>(picker->folder_count), FILE_PICKER_NAME_MAX, compare_names);
-        std::qsort(picker->files, static_cast<size_t>(picker->file_count), FILE_PICKER_NAME_MAX, compare_names);
+        sort_names(&picker->folders);
+        sort_names(&picker->files);
         return;
     }
 
-    int count = 0;
-    char** names = SDL_GlobDirectory(picker->directory, "*", 0, &count);
-    for (int i = 0; names != nullptr && i < count; i++)
+    // One listing with the types in it (host_fs_list_entries): no question
+    // per file, which on a network share (a NAS) is a round trip each.
+    std::vector<HostFsEntry> entries;
+    host_fs_list_entries(picker->directory, &entries);   // (a failure is logged: an empty list)
+    for (size_t i = 0; i < entries.size(); i++)
     {
-        const char* name = names[i];
-        if (name[0] == '.' || std::strlen(name) >= FILE_PICKER_NAME_MAX)
+        const char* name = entries[i].name.c_str();
+        if (name[0] == '.' || entries[i].name.size() >= FILE_PICKER_NAME_MAX)
         {
             continue;   // hidden files and folders, and names we can't hold
         }
-        char path[LIBRETRO_PATH_MAX] = {};
-        SDL_PathInfo info = {};
-        if (!join_path(picker->directory, name, path, sizeof(path)) || !SDL_GetPathInfo(path, &info))
-        {
-            continue;
-        }
-        if (info.type == SDL_PATHTYPE_DIRECTORY)
+        if (entries[i].is_directory)
         {
             add_folder(picker, name);
         }
-        else if (info.type == SDL_PATHTYPE_FILE && listed_file(picker, core, name))
+        else if (listed_file(picker, core, name))
         {
             add_file(picker, name);
         }
     }
-    if (names != nullptr)
-    {
-        SDL_free(names);
-    }
-    std::qsort(picker->folders, static_cast<size_t>(picker->folder_count), FILE_PICKER_NAME_MAX, compare_names);
-    std::qsort(picker->files, static_cast<size_t>(picker->file_count), FILE_PICKER_NAME_MAX, compare_names);
+    sort_names(&picker->folders);
+    sort_names(&picker->files);
 }
 
 // ---------------------------------------------------------------------------
@@ -445,7 +442,7 @@ static bool selected_archive(const FilePicker* picker)
     std::string folder;
     return picker->mode == FilePickerMode::game && picker->selected_file >= 0 &&
            !archive_split_path(picker->directory, &archive, &folder) &&
-           archive_format(picker->files[picker->selected_file]) != ArchiveFormat::none;
+           archive_format(picker->files[static_cast<size_t>(picker->selected_file)].c_str()) != ArchiveFormat::none;
 }
 
 // What's in the selected archive for the chosen core (see file_picker.h).
@@ -458,7 +455,7 @@ static void peek_selected(FilePicker* picker, const CoreCatalog* catalog)
         return;
     }
     char path[LIBRETRO_PATH_MAX] = {};
-    if (!join_path(picker->directory, picker->files[picker->selected_file], path, sizeof(path)))
+    if (!join_path(picker->directory, picker->files[static_cast<size_t>(picker->selected_file)].c_str(), path, sizeof(path)))
     {
         return;
     }
@@ -472,7 +469,7 @@ static void peek_selected(FilePicker* picker, const CoreCatalog* catalog)
 static void browse_selected(FilePicker* picker)
 {
     char next[LIBRETRO_PATH_MAX] = {};
-    if (join_path(picker->directory, picker->files[picker->selected_file], next, sizeof(next)) &&
+    if (join_path(picker->directory, picker->files[static_cast<size_t>(picker->selected_file)].c_str(), next, sizeof(next)) &&
         std::strlen(next) + 1 < sizeof(next))
     {
         std::strcat(next, "#");
@@ -514,7 +511,7 @@ static bool choose_shader(FilePicker* picker, const char* file_name, FilePickerC
 // rules in file_picker.h. True if something was picked.
 static bool load_selected(FilePicker* picker, const CoreCatalog* catalog, FilePickerChoice* choice)
 {
-    const char* name = picker->files[picker->selected_file];
+    const char* name = picker->files[static_cast<size_t>(picker->selected_file)].c_str();
     if (picker->mode == FilePickerMode::shader_preset)
     {
         return choose_shader(picker, name, choice);
@@ -574,7 +571,7 @@ static bool draw_shader_buttons(FilePicker* picker, const Localization* strings,
     ImGui::PopID();
     if (use_clicked && picker->selected_file >= 0)
     {
-        picked = choose_shader(picker, picker->files[picker->selected_file], choice);
+        picked = choose_shader(picker, picker->files[static_cast<size_t>(picker->selected_file)].c_str(), choice);
     }
     ImGui::EndDisabled();
     return picked;
@@ -781,26 +778,38 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         {
             retro_ui_begin_list("files", files_width, list_height);
         }
-        for (int32_t i = 0; i < picker->file_count && !choosing_folder; i++)
+        int32_t file_count = static_cast<int32_t>(picker->files.size());
+        if (!choosing_folder)
         {
-            ImGui::PushID(i);
-            if (ImGui::Selectable(picker->files[i], i == picker->selected_file, ImGuiSelectableFlags_AllowDoubleClick))
+            // Only the rows in view are drawn (thousands of files stay smooth;
+            // the clipper keeps keyboard / gamepad navigation working).
+            ImGuiListClipper clipper;
+            clipper.Begin(file_count);
+            while (clipper.Step())
             {
-                if (picker->selected_file != i)
+                for (int32_t i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
                 {
-                    picker->selected_file = i;
-                    peek_selected(picker, catalog);
-                }
-                if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                {
-                    picked = load_selected(picker, catalog, choice);
+                    ImGui::PushID(i);
+                    if (ImGui::Selectable(picker->files[static_cast<size_t>(i)].c_str(), i == picker->selected_file,
+                                          ImGuiSelectableFlags_AllowDoubleClick))
+                    {
+                        if (picker->selected_file != i)
+                        {
+                            picker->selected_file = i;
+                            peek_selected(picker, catalog);
+                        }
+                        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                        {
+                            picked = load_selected(picker, catalog, choice);
+                        }
+                    }
+                    ImGui::PopID();
                 }
             }
-            ImGui::PopID();
         }
         if (!choosing_folder)
         {
-            if (picker->file_count == 0)
+            if (file_count == 0)
             {
                 ImGui::TextDisabled("%s", piccolo_text(strings, Str::picker_nothing_here));
             }
@@ -814,14 +823,19 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
             go_to_parent(picker->directory);
             picker->listing_stale = true;
         }
-        for (int32_t i = 0; i < picker->folder_count; i++)
+        ImGuiListClipper folder_clipper;
+        folder_clipper.Begin(static_cast<int32_t>(picker->folders.size()));
+        while (folder_clipper.Step())
         {
-            ImGui::PushID(i);
-            if (ImGui::Selectable(picker->folders[i]))
+            for (int32_t i = folder_clipper.DisplayStart; i < folder_clipper.DisplayEnd; i++)
             {
-                open_folder = picker->folders[i];
+                ImGui::PushID(i);
+                if (ImGui::Selectable(picker->folders[static_cast<size_t>(i)].c_str()))
+                {
+                    open_folder = picker->folders[static_cast<size_t>(i)].c_str();
+                }
+                ImGui::PopID();
             }
-            ImGui::PopID();
         }
         retro_ui_end_list();
         if (open_folder != nullptr)
@@ -837,7 +851,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         // Where we are, or what LOAD does with the selected archive.
         if (selected_archive(picker))
         {
-            const char* name = picker->files[picker->selected_file];
+            const char* name = picker->files[static_cast<size_t>(picker->selected_file)].c_str();
             if (content_archive_core_takes_whole(core, name))
             {
                 ImGui::TextDisabled("%s: %s", name, piccolo_text(strings, Str::picker_peek_whole));
