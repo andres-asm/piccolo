@@ -99,7 +99,9 @@ Hosts never use SDL or frontend code.
    checkout's branch unless this session owns it. To commit to another branch,
    use a temporary worktree.
 9. `CLAUDE.md` is committed (keep it current); `docs/` stays untracked (notes go
-   to `docs/design-notes.md`).
+   to `docs/design-notes.md`), except `docs/compilation.md`: the build guide for
+   other people, one section per platform, committed (keep it current when the
+   build, its packages or its submodules change).
    Ask before anything destructive.
 
 ## Stack
