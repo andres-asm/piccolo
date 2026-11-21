@@ -13,32 +13,94 @@ with every other dependency, in `deps/`:
 - `deps/common/frontends-common`: window, Vulkan, audio, settings, input;
 - `deps/libretro/frontend-libretro`: the core session, core options, cores.
 
-## What it does so far
+## Features
 
-- **GAME > LOAD GAME**: pick a core first, then a file. The file list shows
-  only what that core says it can load (asked from the core itself, not from
-  `.info` files). Cores that run without content can be started directly.
-- The game fills the window at the core's aspect ratio, with sharp pixels.
-- **Esc** shows and hides the menu while a game runs; the game pauses while
-  the menu or the LOAD GAME window is up.
-- **GAME**: reset, save state / load state (the current slot, also F2 / F4), quit.
-- **F1: quick menu** while a game runs (see [Quick menu](#quick-menu)).
-- Save RAM and savestates are kept automatically.
-- Keyboard and gamepad as the controller (fixed mapping for now).
+piccolo 0.3. Platforms: **Linux** (Flatpak), **Windows** (zip), **Android**
+(APK, Android 9+; a legacy APK for Android 5+ with OpenGL ES 2) and the
+**browser** (WebAssembly, SameBoy built in: [get-piccolo.app/play](https://get-piccolo.app/play/)).
+macOS builds but isn't tested.
+
+### What's there
+
+**Playing**
+- **GAME > LOAD GAME**: pick a core first, then a file. The list shows only
+  what that core says it loads (asked from the core, not from `.info` files).
+  Games inside **zip / 7z** archives: the whole archive, the one loadable file,
+  or a folder in it. Game folders of your own (SETTINGS > GENERAL) show up in
+  the picker.
 - **RECENT** (the first menu entry): the last 10 games started.
-- **CONFIG > GENERAL / INTERFACE / VIDEO / SOUND**: settings, each one global or, where it
-  makes sense, just for the running core or game (the SCOPE at the top).
-  Video: aspect ratio, integer / auto scaling, filters, overscan crop (IMAGE
-  SETTINGS), window and fullscreen, Vsync / Exact timing, low latency. Sound:
-  output device, volume, latency, rate control, resampler quality.
-- **CONFIG > INTERFACE**: the look (see [Interface themes](#interface-themes)).
-- **Core options**: the running core's options, kept per core, per content
-  folder or per game, changed in the quick menu; TOOLS > OPTIONS MANAGER
-  shows and deletes what is stored for any core (see
-  [Core options](#core-options)).
-- English and Spanish (GENERAL > LANGUAGE).
+- Save RAM and **savestates** (slots 1-9, each with a thumbnail) kept
+  automatically. **Fast forward**. **Run-ahead** (one setting, for cores
+  with their own run-ahead).
+- **TOOLS > CORES**: a core downloader from a signed index (non-free cores
+  hidden unless you turn them on).
+- **Core options** per core, per folder or per game, with a safe start after a
+  crash (see [Core options](#core-options)).
+- A core's text request gets piccolo's text box (a libretro extension of
+  Multitap's). **ON-SCREEN KEYBOARD** (INPUT > SETTINGS) brings up the
+  system's keyboard for text fields and for cores that ask for one (AUTO: on
+  for phones, TVs and handhelds such as the Steam Deck, off on a PC).
 
-Not there yet: input mapping, state slots, shaders, archives.
+**Picture and sound**
+- Vulkan, with an **OpenGL ES** fallback (GLES 3, or GLES 2 on old devices).
+- Aspect ratio, integer / auto scaling, crop, filters, window and fullscreen.
+- **Shaders**: a curated list of presets through librashader (loaded at run
+  time; without it the plain picture is drawn), plus piccolo's own first pass:
+  picture controls and color profiles (GBA, GBC, DS, PSP, NTSC...). Picked in
+  the quick menu's SHADER tab; a preset too slow for the machine asks KEEP /
+  REVERT. On OpenGL ES, piccolo's own GL presets.
+- Low latency out of the box: Vsync or exact timing, frame delay that tunes
+  itself, audio latency that tunes itself, catch-up of missed frames, GameMode
+  on Linux (see [Automatic settings](#automatic-settings)).
+
+**Input**
+- Any number of controllers on any number of ports; hotkeys and the UI from
+  port 1 and the keyboard. PORTS setting, pause when controllers disconnect.
+- **MAP CONTROLLER** wizard, controller layouts, per-core remaps with
+  per-game copies, **turbo**, **combos** and **macros** (recorded from the pad).
+- Mouse, pointer and lightgun from one cursor per port (several mice).
+
+**Network** (SETTINGS > NETWORK)
+- Pair a phone or another piccolo with a 6-digit code; everything is
+  encrypted. Access levels per device: **GAMEPAD** (play with its
+  controllers), **STREAM** (also get the picture and sound), **FULL** (also
+  settings, loading games, taking the game), **OWNER** (also copy games, saves
+  and states to and from the shared folders).
+- **piccoletto**, the companion app (Android): a phone as a gamepad,
+  **remote play** (piccolo streams the game, lossless, with its sound),
+  DEVICES (who plays on which port), and **GO HEADLESS** (the phone takes the
+  game, piccolo hides behind a tray icon).
+- Across the internet through a beacon (IPv6 and IPv4, hole punching);
+  WebRTC data channels where libdatachannel is built in.
+- **TOOLS > SHARE**: browse another piccolo's game folders (OWNER access) and
+  copy games, saves and states both ways, side by side.
+
+**The rest**
+- The retro UI: themes (BLUE, PURPLE, ZSNES, BLACK, your own), the 5x5 pixel
+  font, scaled to the window (see [Interface themes](#interface-themes)).
+- English and Spanish (GENERAL > LANGUAGE).
+- Settings global, per core or per game (see [Settings and overrides](#settings-and-overrides)).
+
+### Not there yet
+
+- **Rewind** (being designed: realtime with scrub, snapshots, replay, export
+  to video).
+- **Netplay** (playing one game together from two piccolos), achievements,
+  cheats, video recording.
+- Touch controls on screen (drag mode, DS pointer), crosshair, Joy-Cons,
+  overlays, a radial menu, redesigned on-screen messages.
+- A console / TV interface and a phone interface (planned), the imgui docking
+  branch.
+- Android: picking folders on SD cards and USB drives (SAF).
+- Windows' and KDE's on-screen keyboards.
+- Remote play in the browser (the browser build has no network yet), the
+  browser's file panel, saves import / export there.
+- Releases and self-update (planned: releases.get-piccolo.app), subsystems
+  in the UI (the host supports them), libretro extensions beyond run-ahead and
+  text input (multitap adapters, media slots).
+- Not tried on real hardware yet: some pads (SN30 over USB), the Genesis /
+  Saturn layouts, lightguns (Zapper, Super Scope), the legacy APK on a real
+  Tegra 4.
 
 ## Settings and overrides
 
@@ -80,7 +142,7 @@ RECENT list), `settings/imgui.ini` (window layout) and `core_info_cache.cfg`.
 ## Quick menu
 
 F1 while a game runs opens the quick menu (F1 or Esc closes it; the game
-pauses while it's open). Two tabs:
+pauses while it's open). Tabs:
 
 - **SAVESTATES**: slots 1 to 9. Arrows, the keys 1-9 or the mouse pick one
   (it's also the slot F2 / F4 use); used slots are lit. The selected slot
@@ -88,6 +150,9 @@ pauses while it's open). Two tabs:
   picks a slot, so nothing is loaded or overwritten by accident. Also RESET
   and CLOSE GAME.
 - **CORE OPTIONS**: the running core's options (see [Core options](#core-options)).
+- **CONTROLS**: who is on which port, the core's device per port, REMAP
+  (mapping, turbo, combos, macros, mouse / lightgun).
+- **SHADER**: the preset for the core or the game (CHOOSE), and FILTER.
 
 Each state is `states/<core>/<game>.state<N>`, with a thumbnail next to it,
 `<game>.state<N>.png` (also written by F2): the picture as it is shown (the
@@ -130,7 +195,7 @@ game ends, another one starts, piccolo quits): a change that crashes the core at
 
 ## Interface themes
 
-CONFIG > INTERFACE sets the look. THEME sets everything at once:
+SETTINGS > INTERFACE sets the look. THEME sets everything at once:
 
 | Theme | Look |
 |-------|------|
@@ -188,6 +253,9 @@ and next to `piccolo.exe` on Windows.
 | `saves/<core>/<game>.srm` | save RAM |
 | `states/<core>/<game>.state<N>` | savestates (slots 1-9), each with a `.png` thumbnail |
 | `system/` | BIOS and other files cores ask for |
+| `cache/` | games extracted from zip / 7z (trimmed to 4 GiB) |
+| `shaders/` | your own shader presets (piccolo's curated ones come with it) |
+| `themes/` | your own themes |
 | `settings/piccolo.cfg` | the settings (global, per core, per game) |
 | `settings/last_used.cfg` | last core and folder, window size and position |
 | `settings/recent.cfg` | the RECENT list |
@@ -223,20 +291,25 @@ checks with it to the tests:
 git submodule update --init --recursive --checkout deps/test-libretro
 ```
 
+Other platforms (details in [`CLAUDE.md`](CLAUDE.md#build-run-check) and `docs/packaging.md`):
+
+```sh
+MULTITAP_GPU=gl ./build/piccolo       # try the OpenGL ES path on the desktop
+android/build-apk.sh [--legacy]       # the APK (--legacy: Android 5+, armv7, GLES 2)
+web/build-core.sh && web/build.sh     # the browser build (emsdk), web/package.sh for the zip
+```
+
+CI builds the Flatpak, the Windows zip (MSYS2 UCRT64, x64 and ARM64), the APKs
+and the web zip (with a Docker image that serves it with the headers it needs).
+
 A change to one of Multitap's libraries is made in its submodule (commit and
 push it there first), then piccolo's pointer to it is committed.
 
 ## Layout
 
-| Path | What |
-|------|------|
-| `src/main.cpp` | the program: game picture, menu, Esc, actions |
-| `src/retro_ui.*` | the retro look: the themes, themed Dear ImGui widgets, bevels, text shadows, scroll bars, cursor |
-| `src/pixel_font.*` | the 5x5 font (glyphs written as `#`/`.` pictures) |
-| `src/pixel_font_imgui.*` | the font as a Dear ImGui font (custom font loader) |
-| `src/file_picker.*` | the LOAD GAME window |
-| `src/menus.*` | menu contents |
-| `tools/pixel_font_preview.cpp` | writes a PNG of every glyph; `--check` validates the font (CTest) |
+`src/` is the program (menus, windows, the retro UI, the pixel font);
+`android/`, `web/` and `flatpak/` are the platform builds; `deps/` the
+libraries. The full map, file by file, is in [`CLAUDE.md`](CLAUDE.md#layout).
 
 ## License
 

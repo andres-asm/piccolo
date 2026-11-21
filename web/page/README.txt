@@ -22,5 +22,6 @@ Browsers: recent Chrome, Edge, Firefox, Safari, with WebGL 2.
 
 Saves, savestates and settings are kept in the browser (the Origin Private
 File System) for this site's address. No games are included: open your own.
+The FILES button shows them: download, add, delete, or play a file.
 
 Licenses: LICENSES/ (piccolo is MIT; each core and library under its own).

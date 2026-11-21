@@ -10,31 +10,89 @@
 <link rel="manifest" href="../manifest.webmanifest">
 <link rel="icon" href="../icon-32.png">
 <style>
-  :root { --back: #101820; --bar: #2f4f7f; --text: #e8eef4; --dim: #9fb0c4; }
+  :root { --back: #101820; --panel: #18222c; --line: #2a3a4a; --bar: #2f4f7f; --text: #e8eef4; --dim: #9fb0c4; }
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
   body { font: 13px/1.4 ui-monospace, "DejaVu Sans Mono", Menlo, Consolas, monospace; color: var(--text); }
+  button { font: inherit; }
+  /* The canvas fills its stage; SDL takes the window's size from the canvas's
+     CSS size (piccolo-page.js sends a resize event when the stage changes). */
+  #app { display: flex; height: 100%; }
+  #stage { position: relative; flex: 1; min-width: 0; }
   /* touch-action: the fingers are the game's (the touch gamepad), never a zoom or a scroll. */
-  canvas { display: block; width: 100vw; height: 100vh; outline: none; touch-action: none; }
-  #overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+  #overlay { position: fixed; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
              background: var(--back); text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 16px; }
   #overlay.gone { display: none; }
   #overlay .box { max-width: 36em; }
   #overlay progress { width: 16em; height: 6px; margin-top: 12px; accent-color: var(--bar); }
-  #open { position: fixed; right: 8px; bottom: 6px; z-index: 2; background: var(--bar); color: var(--text);
-          border: 0; padding: 3px 10px; font: inherit; font-size: 11px; text-transform: uppercase;
-          letter-spacing: 1px; cursor: pointer; opacity: 0.85; }
-  #open:hover { opacity: 1; }
-  #open[hidden] { display: none; }
-  body.dragging::after { content: "DROP A GAME"; position: fixed; inset: 12px; border: 2px dashed var(--dim);
-                         display: flex; align-items: center; justify-content: center; color: var(--text);
-                         background: rgba(16, 24, 32, 0.7); letter-spacing: 2px; pointer-events: none; }
+  #buttons { position: absolute; right: 8px; bottom: 6px; z-index: 2; display: flex; gap: 4px; }
+  #buttons button { background: var(--bar); color: var(--text); border: 0; padding: 3px 10px; font-size: 11px;
+                    text-transform: uppercase; letter-spacing: 1px; cursor: pointer; opacity: 0.85; }
+  #buttons button:hover, #buttons button.active { opacity: 1; }
+  #buttons button[hidden] { display: none; }
+  body.dragging::after { content: "DROP A GAME (OR, ON THE FILES PANEL, A FILE FOR THAT FOLDER)"; position: fixed; inset: 12px;
+                         z-index: 6; border: 2px dashed var(--dim); display: flex; align-items: center; justify-content: center;
+                         color: var(--text); background: rgba(16, 24, 32, 0.7); letter-spacing: 2px; pointer-events: none;
+                         text-align: center; padding: 16px; }
+
+  /* FILES: the session's filesystem (piccolo-files.js). */
+  #files { width: 320px; flex: none; display: flex; flex-direction: column; background: var(--panel);
+           border-left: 1px solid var(--line); font-size: 12px; text-transform: uppercase; }
+  #files.closed { display: none; }
+  #files header { display: flex; align-items: center; gap: 4px; padding: 4px 6px; background: var(--bar); letter-spacing: 1px; }
+  #files header .title { flex: 1; }
+  #files button { background: transparent; color: var(--text); border: 1px solid transparent; padding: 1px 5px;
+                  font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  #files button:hover { border-color: var(--dim); }
+  #files-path { display: flex; flex-wrap: wrap; padding: 4px 6px; border-bottom: 1px solid var(--line); color: var(--dim);
+                text-transform: none; }
+  #files-path button { padding: 0 1px; color: var(--dim); text-transform: none; letter-spacing: 0; }
+  #files-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; text-transform: none; }
+  #files-list li { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border-bottom: 1px solid rgba(42, 58, 74, 0.5); }
+  #files-list li:hover { background: rgba(47, 79, 127, 0.35); }
+  #files-list li.folder { cursor: pointer; color: #b8d4ff; }
+  #files-list li.empty { color: var(--dim); justify-content: center; padding: 12px; text-transform: uppercase; }
+  #files-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #files-list .size { color: var(--dim); font-size: 11px; white-space: nowrap; }
+  #files-list .actions { display: flex; gap: 2px; visibility: hidden; }
+  #files-list li:hover .actions { visibility: visible; }
+  #files-list .actions button { padding: 0 4px; font-size: 10px; border-color: var(--line); }
+  #files footer { padding: 4px 6px; border-top: 1px solid var(--line); color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+  /* Touch screens have no hover: the actions always show. */
+  @media (hover: none) { #files-list .actions { visibility: visible; } }
+  /* Narrow screens: the panel goes over the game instead of beside it. */
+  @media (max-width: 640px) {
+    #files { position: fixed; inset: 0 0 0 auto; width: min(100%, 360px); z-index: 4; }
+  }
 </style>
 </head>
 <body>
-<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="app">
+  <div id="stage">
+    <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+    <div id="buttons">
+      <button id="open" hidden title="Open a game file (or drop it on the page)">Open game</button>
+      <button id="files-toggle" hidden title="This session's files: saves, states, settings, games">Files</button>
+    </div>
+  </div>
+  <aside id="files" class="closed">
+    <header>
+      <span class="title">Files</span>
+      <button id="files-home" title="piccolo's folder">Home</button>
+      <button id="files-upload" title="Add files to this folder (or drop them on this panel)">Add</button>
+      <button id="files-refresh" title="Read the folder again">Reload</button>
+      <button id="files-close" title="Hide the panel">&times;</button>
+    </header>
+    <div id="files-path"></div>
+    <ul id="files-list"></ul>
+    <footer id="files-usage"></footer>
+    <input id="files-input" type="file" multiple hidden>
+  </aside>
+</div>
 <div id="overlay"><div class="box"><div id="message">LOADING PICCOLO</div><progress id="progress" max="1" value="0"></progress></div></div>
-<button id="open" hidden title="Open a game file (or drop it on the page)">Open game</button>
 <input id="file" type="file" hidden>
+<script src="../piccolo-storage.js"></script>
+<script src="../piccolo-files.js"></script>
 <script src="../piccolo-page.js"></script>
 <script>piccolo_page_start();</script>
 </body>

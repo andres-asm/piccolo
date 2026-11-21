@@ -20,10 +20,11 @@ static WebLoop g_loop = {};
 
 void main_loop_prepare_window(SDL_Window* window)
 {
-    if (!SDL_SetWindowFillDocument(window, true))
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "The canvas can't fill the page: %s", SDL_GetError());
-    }
+    // The page sizes the canvas with CSS (next to its files panel), so SDL
+    // takes the window's size from it on every resize event; the page sends
+    // one when the layout changes. Not SDL's "fill document": that hides
+    // everything else on the page.
+    (void)window;
 }
 
 static void web_frame(void* data)
@@ -36,8 +37,8 @@ static void web_frame(void* data)
     }
 }
 
-// Both run on the main thread during the browser's event, so what save()
-// writes is on OPFS before the page goes (storage.h).
+// Both run on the main thread during the browser's event; save() ends with
+// storage_flush(), which starts writing it to OPFS (storage.h).
 static bool on_visibility_change(int event_type, const EmscriptenVisibilityChangeEvent* event, void* data)
 {
     (void)event_type;
@@ -75,7 +76,7 @@ void main_loop_on_open(MainLoopOpen open, void* data)
     g_loop.open_data = data;
 }
 
-// Called by the page (web/shell.html) with a file it wrote into the virtual
+// Called by the page (web/page/piccolo-page.js) with a file it wrote into the virtual
 // filesystem. On the main thread, between frames.
 extern "C" EMSCRIPTEN_KEEPALIVE void piccolo_web_open(const char* path)
 {

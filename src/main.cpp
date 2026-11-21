@@ -4442,6 +4442,7 @@ static void app_save_on_leave(void* data, bool unloading)
     {
         remove_running_marker(app);
     }
+    storage_flush();
 }
 
 int main(int argc, char** argv)
