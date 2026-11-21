@@ -290,7 +290,7 @@ void ports_widget_draw_tabs(PortsWidget* widget, ImFont* pixel_font, int32_t sca
                             bool menu_shown, uint64_t now_ms)
 {
     PortsViewText text = view_text(strings);
-    ports_view_draw_tabs(&widget->view, pixel_font, scale, &text, menu_shown, widget->open, now_ms);
+    ports_view_draw_tabs(&widget->view, pixel_font, scale, &text, menu_shown, widget->open, false, now_ms);
 }
 
 // ---------------------------------------------------------------------------
