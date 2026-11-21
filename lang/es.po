@@ -2991,6 +2991,18 @@ msgctxt "net_pair_refresh"
 msgid "REFRESH"
 msgstr "RENOVAR"
 
+msgctxt "net_pair_copy_link"
+msgid "COPY LINK"
+msgstr "COPIAR ENLACE"
+
+msgctxt "net_pair_qr_help"
+msgid "From another network (mobile data, a browser): scan this code or open the link, then type the code above."
+msgstr "Desde otra red (datos móviles, un navegador): escanea este código o abre el enlace, y luego escribe el código de arriba."
+
+msgctxt "net_pair_copy_link_help"
+msgid "Copies the pair link: a device that isn't on this network (mobile data, a browser) opens it, then types the code."
+msgstr "Copia el enlace para emparejar: un dispositivo que no está en esta red (datos móviles, un navegador) lo abre y luego escribe el código."
+
 msgctxt "net_section_devices"
 msgid "PAIRED DEVICES"
 msgstr "DISPOSITIVOS VINCULADOS"

@@ -62,3 +62,6 @@
 	path = deps/cores
 	url = https://github.com/multitap-org/cores.git
 	update = none
+[submodule "deps/qrcodegen"]
+	path = deps/qrcodegen
+	url = https://github.com/nayuki/QR-Code-generator.git

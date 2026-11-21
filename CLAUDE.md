@@ -49,7 +49,8 @@ cores, no GUI) and **frontends** (GUI).
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
   (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (zpl-c's ENet: UDP connections, IPv6 dual-stack), `deps/monocypher`
   (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
-  signatures); libcurl from the system (Linux) for the core downloader
+  signatures), `deps/qrcodegen` (Nayuki's QR Code generator, MIT, v1.8.0: its C file only; the pair
+  link as a QR); libcurl from the system (Linux) for the core downloader
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
@@ -180,10 +181,12 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
                               net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              on the LAN or across the internet with net_pair_link: the link / QR,
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _none; peers
+                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _emscripten (the browser,
+                              net_webrtc.js; WebRTC only there) / _none; peers
                               carry their transport, the same channels and bytes as ENet),
                               net_beacon (across the internet: register with the beacon, meet,
                               punch, peer-reflexive), net_signal (WebRTC signaling over the beacon's

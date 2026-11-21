@@ -17,7 +17,9 @@
 //   |   [PAIR A DEVICE]                                             |
 //   |     or, while pairing:                                        |
 //   |   CODE  482 915                       (highlight color)       |
-//   |   VALIDITY: 4:32  [REFRESH] [STOP]                            |
+//   |   VALIDITY: 4:32  [REFRESH] [STOP]  [COPY LINK]               |
+//   |   ######  (INTERNET on: the pair link as a QR, for a device    |
+//   |   ######   on another network: scan it, then type the code)   |
 //   |   Type this code on the other device. It changes after...     |
 //   | -- PAIRED DEVICES ------------------------------------------- |
 //   |   ANA'S PHONE  9c77-3332-311c-4017  CONNECTED                 |
@@ -29,6 +31,7 @@
 // list act on the running NetAccess directly.
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "localization.h"
@@ -53,10 +56,20 @@ struct NetSpeedSummary
 
 // What the tab keeps between frames: OWNER is given only after its
 // confirmation, to the device with this key (the list may change meanwhile).
+// The pair link's QR (qrcodegen) is made again only when the link changes.
+constexpr int32_t  NET_WINDOW_QR_MAX_VERSION = 10;   // 57 x 57 modules; the link needs about version 6
+constexpr uint32_t NET_WINDOW_QR_BUFFER =
+    ((NET_WINDOW_QR_MAX_VERSION * 4 + 17) * (NET_WINDOW_QR_MAX_VERSION * 4 + 17) + 7) / 8 + 1;
+
 struct NetWindowState
 {
     uint8_t owner_key[NET_KEY_SIZE] = {};
     bool    confirm_owner = false;
+    std::string qr_link;             // the pair link `qr` encodes ("" = nothing yet)
+    std::string qr_beacon;           // made for this beacon setting
+    uint8_t qr_key[NET_KEY_SIZE] = {};   // and this host key
+    bool    qr_ok = false;
+    uint8_t qr[NET_WINDOW_QR_BUFFER] = {};
 };
 
 struct NetWindowContext

@@ -62,6 +62,8 @@ cp "$root/deps/libsamplerate/COPYING" "$dist/LICENSES/libsamplerate.txt"
 cp "$root/deps/miniz/LICENSE" "$dist/LICENSES/miniz.txt"
 cp "$root/deps/7zip/DOC/License.txt" "$dist/LICENSES/7zip.txt"
 cp "$root/deps/enet/LICENSE" "$dist/LICENSES/enet.txt"
+# Nayuki's QR Code generator has its MIT license in the source file's header.
+sed -n '1,/\*\//p' "$root/deps/qrcodegen/c/qrcodegen.c" > "$dist/LICENSES/qrcodegen.txt"
 cp "$root/deps/monocypher/LICENCE.md" "$dist/LICENSES/monocypher.txt"
 cp "$build/cores/sameboy-LICENSE" "$dist/LICENSES/SameBoy.txt"
 cp "$build/cores/snes9x-LICENSE" "$dist/LICENSES/Snes9x.txt"
