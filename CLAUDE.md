@@ -30,6 +30,9 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/common/hosts-common`        hosts-common: host code (no GUI) + the project's CMake
                                      helpers (`cmake/multitap.cmake`); added first
 - `deps/common/frontends-common`    frontends-common: window, Vulkan, audio, settings, input router
+- `deps/common/retroui`             retroui: the look shared with piccoletto: the 5x5 pixel font, themes,
+                                     themed ImGui widgets (menu bar from data, windows, buttons...), layers over
+                                     the game, pad picture; `pixel_font_preview` (its test checks the font)
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
@@ -53,10 +56,11 @@ test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork
 used by test-libretro). Later: piccoletto (streaming companion, Android first),
 Multitap (modern multi-host frontend).
 
-**A library change:** edit it in its submodule (the four are on `main`), build
+**A library change:** edit it in its submodule (the five are on `main`), build
 and test here, commit and push THERE first, then commit piccolo's pointer.
-Code shared between frontends goes into frontends-common; code shared between
-libretro frontends into frontend-libretro. Never copy code between frontends.
+Code shared between frontends goes into frontends-common (plumbing) or retroui
+(the look); code shared between libretro frontends into frontend-libretro.
+Never copy code between frontends.
 Hosts never use SDL or frontend code.
 
 ## Ground rules
@@ -115,9 +119,7 @@ CMakeLists.txt            top-level build: options, SDL, Vulkan, imgui, libretro
 STYLE.md                  code rules (mandatory)
 src/
   main.cpp                the app: game fills the window, menus, hotkeys, input frame -> core session
-  retro_ui.*              retro-style UI from themed ImGui: menu bar, status line, theme, bevels, combos
-  pixel_font.*            piccolo's own 5x5 font (static lib `piccolo_font`), pixel_font_imgui.* as an ImGui font
-  menus.*                 menu contents and actions (data only)
+  menus.*                 menu contents and actions (data only; main builds retroui's menu bar data from them)
   strings.txt             ALL of piccolo's UI text in English (key = text); lang/<code>.po translations
   piccolo_text.*          piccolo_text(strings, Str::x): the text in the current language
   piccolo_settings.*      piccolo's settings table (settings/piccolo.cfg)
@@ -133,7 +135,7 @@ src/
   ports_widget.*          the ports over the game (piccoletto's look): tabs at the bottom left that rise
                           when a port changes (peek under the menu), and DEVICES (hotkey.ports: each pad
                           moves itself LEFT / RIGHT, port 1 picks any with UP / DOWN; a mouse clicks)
-  map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
+  map_window.*            MAP CONTROLLER wizard (the controller drawing: retroui's pad_picture)
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
@@ -149,7 +151,7 @@ web/                      the browser build (Emscripten, WebGL 2, pthreads): bui
                           as a static archive), build.sh; src/bundled_files_web.cpp registers the linked core
   main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
                           leave, piccolo_web_open); storage.* the browser's piccolo folder on OPFS (WasmFS)
-tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
+tools/                    strings_check, recent_games_test, stream_measure (remote play
                           codec on real games), netplay_measure (which netplay mode a core and game
                           suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
@@ -195,7 +197,7 @@ deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, 
 ```sh
 git clone --recursive https://github.com/multitap-org/piccolo.git
 git -C piccolo submodule update --init --recursive --checkout deps/test-libretro   # optional, for all tests
-for d in deps/common/hosts-common deps/common/frontends-common deps/libretro/host-libretro deps/libretro/frontend-libretro; do git -C piccolo/$d checkout main; done
+for d in deps/common/hosts-common deps/common/frontends-common deps/common/retroui deps/libretro/host-libretro deps/libretro/frontend-libretro; do git -C piccolo/$d checkout main; done
 ```
 
 System packages: Vulkan loader + headers (1.3+), Khronos validation layers

@@ -58,3 +58,7 @@
 [submodule "deps/libdatachannel"]
 	path = deps/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel.git
+[submodule "deps/common/retroui"]
+	path = deps/common/retroui
+	url = https://github.com/multitap-org/retroui.git
+	branch = main

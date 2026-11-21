@@ -69,6 +69,7 @@
 #include "file_picker.h"
 #include "headless.h"
 #include "pixel_font.h"
+#include "menus.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
 
@@ -237,6 +238,10 @@ struct App
     std::string              recent_path;
     std::vector<std::string> recent_labels;
     std::vector<const char*> recent_label_pointers;
+    // The menu bar as retroui draws it (rebuilt with the labels: language, RECENT).
+    std::vector<std::string>     menu_texts;   // the translated labels the items point to
+    std::vector<RetroUiMenuItem> menu_items;   // every menu's items, back to back
+    std::vector<RetroUiMenu>     menus;
 
     // UI text (piccolo_text.h) and the language setting it was loaded for.
     Localization strings = {};
@@ -474,6 +479,58 @@ static void update_settings_context(App* app)
 // Recent games
 // ---------------------------------------------------------------------------
 
+// The menu bar's item ids: a MenuAction's number, or this plus the index of
+// a game in RECENT.
+constexpr int32_t MENU_ID_RECENT = 1000;
+
+// piccolo's menus (menus.h) as retroui's menu bar takes them: RECENT first
+// (the hamburger glyph), then the menus in the current language. Built when
+// the labels change, never per frame.
+static void build_menus(App* app)
+{
+    app->menu_texts.clear();
+    app->menu_items.clear();
+    app->menus.clear();
+    // The labels first: the items point into them (push_back may move them).
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        app->menu_texts.push_back(piccolo_text(&app->strings, menus_label(menu)));
+        for (int32_t item = 0; item < menus_item_count(menu); item++)
+        {
+            app->menu_texts.push_back(piccolo_text(&app->strings, menus_item_label(menu, item)));
+        }
+    }
+    // The items, every menu's back to back (the menus point into them).
+    for (size_t i = 0; i < app->recent_label_pointers.size(); i++)
+    {
+        app->menu_items.push_back(RetroUiMenuItem{app->recent_label_pointers[i], MENU_ID_RECENT + static_cast<int32_t>(i)});
+    }
+    size_t text = 0;
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        text++;   // (the menu's own label)
+        for (int32_t item = 0; item < menus_item_count(menu); item++)
+        {
+            MenuAction action = menus_item_action(menu, item);
+            int32_t id = action == MenuAction::separator ? RETRO_UI_MENU_SEPARATOR : static_cast<int32_t>(action);
+            app->menu_items.push_back(RetroUiMenuItem{app->menu_texts[text].c_str(), id});
+            text++;
+        }
+    }
+    int32_t recent_count = static_cast<int32_t>(app->recent_label_pointers.size());
+    app->menus.push_back(RetroUiMenu{PIXEL_FONT_UTF8_MENU, app->menu_items.data(), recent_count,
+                                     piccolo_text(&app->strings, Str::menu_recent_empty)});
+    size_t first_item = static_cast<size_t>(recent_count);
+    text = 0;
+    for (int32_t menu = 0; menu < menus_count(); menu++)
+    {
+        int32_t count = menus_item_count(menu);
+        app->menus.push_back(RetroUiMenu{app->menu_texts[text].c_str(), app->menu_items.data() + first_item, count, nullptr});
+        first_item += static_cast<size_t>(count);
+        text += static_cast<size_t>(count) + 1;
+    }
+}
+
 static void refresh_recent_labels(App* app)
 {
     app->recent_labels.clear();
@@ -490,6 +547,7 @@ static void refresh_recent_labels(App* app)
     {
         app->recent_label_pointers.push_back(app->recent_labels[i].c_str());
     }
+    build_menus(app);
 }
 
 static void remember_recent(App* app, const char* core_path, const char* content_path)
@@ -3963,12 +4021,20 @@ static bool app_frame(App* app)
             // others; it starts past the tabs.
             float status_left = ports_widget_tabs_width(&app->ports_widget);
             retro_ui_status_line_from(app->pixel_font, app->ui_scale, app->status, status_left > 4.0f ? status_left : 4.0f);
-            int32_t recent_picked = -1;
-            MenuAction action = retro_ui_menu_bar(app->pixel_font, app->ui_scale, &app->strings,
-                                                  app->recent_label_pointers.data(),
-                                                  static_cast<int32_t>(app->recent_label_pointers.size()),
-                                                  &recent_picked, app->open_first_menu);
+            int32_t picked = retro_ui_menu_bar(app->pixel_font, app->ui_scale, app->menus.data(),
+                                               static_cast<int32_t>(app->menus.size()), app->open_first_menu);
             app->open_first_menu = false;
+            int32_t recent_picked = -1;
+            MenuAction action = MenuAction::none;
+            if (picked >= MENU_ID_RECENT)
+            {
+                action = MenuAction::recent_game;
+                recent_picked = picked - MENU_ID_RECENT;
+            }
+            else if (picked >= 0)
+            {
+                action = static_cast<MenuAction>(picked);
+            }
             if (action == MenuAction::recent_game && recent_picked >= 0)
             {
                 // Started at the top of the next loop, like LOAD GAME (see pending_start).
