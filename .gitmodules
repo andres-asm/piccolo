@@ -65,3 +65,7 @@
 [submodule "deps/qrcodegen"]
 	path = deps/qrcodegen
 	url = https://github.com/nayuki/QR-Code-generator.git
+[submodule "deps/common/retroui"]
+	path = deps/common/retroui
+	url = https://github.com/multitap-org/retroui.git
+	branch = main

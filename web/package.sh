@@ -58,6 +58,7 @@ done
 cp "$root/LICENSE" "$dist/LICENSES/piccolo.txt"
 cp "$root/deps/common/hosts-common/LICENSE" "$dist/LICENSES/hosts-common.txt"
 cp "$root/deps/common/frontends-common/LICENSE" "$dist/LICENSES/frontends-common.txt"
+cp "$root/deps/common/retroui/LICENSE" "$dist/LICENSES/retroui.txt"
 cp "$root/deps/libretro/host-libretro/LICENSE" "$dist/LICENSES/host-libretro.txt"
 cp "$root/deps/libretro/frontend-libretro/LICENSE" "$dist/LICENSES/frontend-libretro.txt"
 cp "$root/deps/SDL/LICENSE.txt" "$dist/LICENSES/SDL.txt"

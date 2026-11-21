@@ -50,6 +50,7 @@ struct InputWindow
 
     std::vector<std::string> names;          // NAME fields being edited, per controller
     uint32_t     map_request = 0;            // DEVICES > MAP...: this joystick (piccolo opens MAP CONTROLLER)
+    bool         edit_touch_layout = false;  // SETTINGS > EDIT LAYOUT: piccolo closes this and edits the on-screen pad
     bool dirty = false;                      // bindings or devices changed: save settings/input.cfg
 };
 

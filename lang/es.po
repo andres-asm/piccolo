@@ -18,6 +18,10 @@ msgctxt "menu_misc"
 msgid "MISC"
 msgstr "VARIOS"
 
+msgctxt "menu_resume"
+msgid "RESUME"
+msgstr "CONTINUAR"
+
 msgctxt "menu_load_game"
 msgid "LOAD GAME..."
 msgstr "CARGAR JUEGO..."
@@ -3413,3 +3417,95 @@ msgstr "REEMPLAZAR TODOS (%u)"
 msgctxt "share_skip_all"
 msgid "SKIP ALL"
 msgstr "SALTAR TODOS"
+
+msgctxt "input_action_hotkey_ports"
+msgid "DEVICES"
+msgstr "DISPOSITIVOS"
+
+msgctxt "ports_tab"
+msgid "P%u"
+msgstr "P%u"
+
+msgctxt "ports_port"
+msgid "PORT %u"
+msgstr "PUERTO %u"
+
+msgctxt "ports_ping"
+msgid "%u MS"
+msgstr "%u MS"
+
+msgctxt "ports_nobody"
+msgid "NOBODY"
+msgstr "NADIE"
+
+msgctxt "ports_off"
+msgid "OFF"
+msgstr "DESC."
+
+msgctxt "ports_out"
+msgid "OUT"
+msgstr "SIN PUERTO"
+
+msgctxt "ports_title"
+msgid "DEVICES"
+msgstr "DISPOSITIVOS"
+
+msgctxt "ports_done"
+msgid "DONE"
+msgstr "LISTO"
+
+msgctxt "ports_help"
+msgid "LEFT / RIGHT: MOVE YOUR CONTROLLER. PORT 1: UP / DOWN PICKS ANY, B: DONE"
+msgstr "IZQUIERDA / DERECHA: MUEVE TU CONTROL. PUERTO 1: ARRIBA / ABAJO ELIGE CUALQUIERA, B: LISTO"
+
+msgctxt "value_touch_pad_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_touch_pad_on"
+msgid "ON"
+msgstr "SÍ"
+
+msgctxt "value_touch_pad_off"
+msgid "OFF"
+msgstr "NO"
+
+msgctxt "setting_touch_pad"
+msgid "SHOW"
+msgstr "MOSTRAR"
+
+msgctxt "setting_touch_pad_help"
+msgid "The touch gamepad over the game. AUTO: on a touch screen, hidden while a real gamepad plays (touch the screen to bring it back). It joins a port with its START, like any controller."
+msgstr "El control táctil sobre el juego. AUTO: en una pantalla táctil, oculto mientras juega un control real (toca la pantalla para que vuelva). Se une a un puerto con su START, como cualquier control."
+
+msgctxt "setting_touch_pad_opacity"
+msgid "OPACITY"
+msgstr "OPACIDAD"
+
+msgctxt "setting_touch_pad_opacity_help"
+msgid "How see-through the touch gamepad is over the game (a layout's own opacity from EDIT LAYOUT wins)."
+msgstr "Cuánto se ve el juego a través del control táctil (la opacidad propia de un layout, de EDITAR LAYOUT, tiene prioridad)."
+
+msgctxt "setting_touch_pad_vibrate"
+msgid "VIBRATE ON PRESS"
+msgstr "VIBRAR AL PRESIONAR"
+
+msgctxt "setting_touch_pad_vibrate_help"
+msgid "A short buzz each time a button of the touch gamepad is pressed (phones with a vibrator)."
+msgstr "Una vibración corta cada vez que se presiona un botón del control táctil (teléfonos con vibrador)."
+
+msgctxt "input_section_touch_pad"
+msgid "ON-SCREEN GAMEPAD"
+msgstr "CONTROL EN PANTALLA"
+
+msgctxt "input_touch_pad_edit"
+msgid "EDIT LAYOUT"
+msgstr "EDITAR LAYOUT"
+
+msgctxt "input_touch_pad_edit_help"
+msgid "Move and resize the touch gamepad's buttons (drag a group, pinch or SIZE, RESET, DONE). Upright and sideways have their own layouts."
+msgstr "Mueve y cambia el tamaño de los botones del control táctil (arrastra un grupo, pellizca o SIZE, RESET, DONE). Vertical y horizontal tienen su propio layout."
+
+msgctxt "touch_pad_menu"
+msgid "MENU"
+msgstr "MENÚ"

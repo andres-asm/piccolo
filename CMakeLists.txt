@@ -89,7 +89,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Submodule check
 # ---------------------------------------------------------------------------
 foreach(_dep imgui/imgui.cpp libretro-common/include/libretro.h libsamplerate/src/samplerate.c
-             common/hosts-common/CMakeLists.txt common/frontends-common/CMakeLists.txt
+             common/hosts-common/CMakeLists.txt common/frontends-common/CMakeLists.txt common/retroui/CMakeLists.txt
              libretro/host-libretro/CMakeLists.txt libretro/frontend-libretro/CMakeLists.txt)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${_dep}")
         message(FATAL_ERROR "deps/${_dep} is missing. Run: git submodule update --init --recursive")
@@ -181,27 +181,19 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/test-libretro/CMakeLists.txt")
 endif()
 add_subdirectory(deps/libretro/host-libretro)
 add_subdirectory(deps/common/frontends-common)
+# The pixel font, the themes, the themed widgets, the pad picture (shared with piccoletto).
+add_subdirectory(deps/common/retroui)
 add_subdirectory(deps/libretro/frontend-libretro)
 
 # ---------------------------------------------------------------------------
 # piccolo
 # ---------------------------------------------------------------------------
 # Plays games through frontend-libretro's core session, with a retro-style UI
-# (themed ImGui widgets with piccolo's pixel font).
-
-# piccolo's own pixel font (5x5, drawn for piccolo; see src/pixel_font.h).
-# A small library so the preview tool and, later, piccolo's UI share it.
-add_library(piccolo_font STATIC
-    src/pixel_font.cpp
-)
-target_include_directories(piccolo_font PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-multitap_set_project_flags(piccolo_font)
+# (retroui: themed ImGui widgets with the pixel font).
 
 set(PICCOLO_SOURCES
     src/main.cpp
     src/menus.cpp
-    src/retro_ui.cpp
-    src/pixel_font_imgui.cpp
     src/file_picker.cpp
     src/piccolo_settings.cpp
     src/settings_ui.cpp
@@ -212,7 +204,6 @@ set(PICCOLO_SOURCES
     src/net_games.cpp
     src/net_remote.cpp
     src/map_window.cpp
-    src/pad_picture.cpp
     src/image_window.cpp
     src/piccolo_window.cpp
     src/piccolo_text.cpp
@@ -225,6 +216,8 @@ set(PICCOLO_SOURCES
     src/shader_check_window.cpp
     src/text_input_window.cpp
     src/quick_menu.cpp
+    src/ports_widget.cpp
+    src/onscreen_pad.cpp
 )
 if(ANDROID)
     # Android (hosts-common's cmake/android-toolchain.cmake, android/build-apk.sh):
@@ -350,7 +343,7 @@ endif()
 add_library(multitap_dep_qrcodegen STATIC "${MULTITAP_DEPS_DIR}/qrcodegen/c/qrcodegen.c")
 target_include_directories(multitap_dep_qrcodegen SYSTEM PUBLIC "${MULTITAP_DEPS_DIR}/qrcodegen/c")
 
-target_link_libraries(piccolo PRIVATE frontend_libretro frontend_net piccolo_font multitap_dep_qrcodegen)
+target_link_libraries(piccolo PRIVATE frontend_libretro frontend_net retroui multitap_dep_qrcodegen)
 
 # Windows: the .exe's icon, as a resource (assets/windows/piccolo.ico, made by
 # tools/make_app_icon.py from the same PNGs as the window icon).
@@ -420,22 +413,15 @@ add_executable(netplay_measure tools/netplay_measure.cpp tools/measure_common.cp
 target_link_libraries(netplay_measure PRIVATE host_libretro frontend_common)
 multitap_set_project_flags(netplay_measure)
 
-# Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
-add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
-target_link_libraries(pixel_font_preview PRIVATE piccolo_font)
-multitap_set_project_flags(pixel_font_preview)
 
 if(MULTITAP_BUILD_TESTS)
-    # Table well formed, no character defined twice, no two glyphs identical.
-    add_test(NAME piccolo_pixel_font COMMAND pixel_font_preview --check)
-    set_tests_properties(piccolo_pixel_font PROPERTIES PASS_REGULAR_EXPRESSION "table OK")
 
     # The UI text against the translations and the font (missing translations,
     # stale keys, characters the font can't draw). Unknown keys in a .po are
     # reported in the log too.
     add_executable(piccolo_strings_check tools/strings_check.cpp "${PICCOLO_GENERATED}/piccolo_strings.cpp")
     target_include_directories(piccolo_strings_check PRIVATE "${PICCOLO_GENERATED}")
-    target_link_libraries(piccolo_strings_check PRIVATE frontend_common piccolo_font)
+    target_link_libraries(piccolo_strings_check PRIVATE frontend_common retroui_font)
     multitap_set_project_flags(piccolo_strings_check)
     add_test(NAME piccolo_strings COMMAND piccolo_strings_check "${CMAKE_CURRENT_SOURCE_DIR}/lang" es)
     set_tests_properties(piccolo_strings PROPERTIES
@@ -455,7 +441,7 @@ if(MULTITAP_BUILD_TESTS)
     add_test(NAME piccolo_gl_presets COMMAND piccolo_gl_presets_check "${CMAKE_CURRENT_SOURCE_DIR}/shaders/gl")
     set_tests_properties(piccolo_gl_presets PROPERTIES
                          SKIP_RETURN_CODE 77
-                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load and run"
+                         PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load, run and come out even"
                          FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
     add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)
