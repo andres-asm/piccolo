@@ -66,6 +66,15 @@ jobs:
           "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
           "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
 
+      # piccoletto (its own repository), in the same zip as piccoletto/: built
+      # from its main once that has a browser build (web/build.sh).
+      - uses: actions/checkout@v4
+        with:
+          repository: multitap-org/piccoletto
+          ref: main
+          path: piccoletto-src
+          submodules: recursive
+
       - name: Build and package
         run: |
           . "$HOME/emsdk/emsdk_env.sh"
@@ -73,6 +82,12 @@ jobs:
             web/build-core.sh "$core"
             web/build.sh "$core"
           done
+          if [ -f piccoletto-src/web/build.sh ]; then
+            piccoletto-src/web/build.sh
+            export PICCOLETTO="$PWD/piccoletto-src"
+          else
+            echo "piccoletto's main has no browser build yet: the zip has none"
+          fi
           web/package.sh
           ls -la web/build/dist
 

@@ -4,12 +4,18 @@
 #
 #   for core in sameboy snes9x; do web/build-core.sh $core && web/build.sh $core; done
 #   web/package.sh
+#
+# With PICCOLETTO=<a piccoletto checkout> whose web/build.sh ran, piccoletto
+# goes in too, as piccoletto/ (its page, its module; the shared scripts and
+# sw.js are the same ones, at the top).
 #     -> web/build/dist/piccolo-<version>-web/      (the folder)
 #        web/build/dist/piccolo-<version>-web.zip   (the same, zipped)
 #
 # Layout (all paths relative):
 #   index.html                 choose the emulator (it lists every core below)
 #   sameboy/ snes9x/           piccolo with that core linked in: index.html, piccolo.js/.wasm/.data
+#   piccoletto/                piccoletto (PICCOLETTO=...): index.html, piccoletto-page.js,
+#                              manifest.webmanifest, icons, piccoletto.js/.wasm
 #   piccolo-page.js            the page's scripts, with piccolo-files.js (the FILES panel)
 #   multitap-page.js multitap-storage.js   frontends-common's web/: the start, the folder on OPFS
 #   sw.js                      the service worker (frontends-common's: COOP/COEP where the server
@@ -72,6 +78,23 @@ sed -n '1,/\*\//p' "$root/deps/qrcodegen/c/qrcodegen.c" > "$dist/LICENSES/qrcode
 cp "$root/deps/monocypher/LICENCE.md" "$dist/LICENSES/monocypher.txt"
 cp "$build/cores/sameboy-LICENSE" "$dist/LICENSES/SameBoy.txt"
 cp "$build/cores/snes9x-LICENSE" "$dist/LICENSES/Snes9x.txt"
+
+# piccoletto, when there's a build of it.
+PICCOLETTO=${PICCOLETTO:-}
+if [ -n "$PICCOLETTO" ]; then
+    if [ ! -f "$PICCOLETTO/web/build/wasm/piccoletto.wasm" ]; then
+        echo "web/package.sh: no browser build in $PICCOLETTO/web/build/wasm (run its web/build.sh first)" >&2
+        exit 1
+    fi
+    mkdir -p "$dist/piccoletto"
+    cp "$PICCOLETTO/web/page/index.html" "$PICCOLETTO/web/page/piccoletto-page.js" \
+       "$PICCOLETTO/web/page/manifest.webmanifest" "$dist/piccoletto/"
+    cp "$PICCOLETTO/web/build/wasm/piccoletto.js" "$PICCOLETTO/web/build/wasm/piccoletto.wasm" "$dist/piccoletto/"
+    for size in 32 128 512; do
+        cp "$PICCOLETTO/assets/branding/png/piccoletto-icon-$size.png" "$dist/piccoletto/icon-$size.png"
+    done
+    cp "$PICCOLETTO/LICENSE" "$dist/LICENSES/piccoletto.txt"
+fi
 
 (cd "$build/dist" && zip -qr9 "$name.zip" "$name")
 echo "web/package.sh: $dist"

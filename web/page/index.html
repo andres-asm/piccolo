@@ -33,10 +33,15 @@
 No games are included.</p>
 <a class="core" href="sameboy/"><b>SameBoy</b><span>Game Boy, Game Boy Color, Super Game Boy</span></a>
 <a class="core" href="snes9x/"><b>Snes9x</b><span>Super Nintendo, Super Famicom</span></a>
+<a class="core" id="piccoletto" href="piccoletto/" hidden><b>piccoletto</b><span>piccolo's companion: this device as a gamepad for a piccolo, remote play, devices</span></a>
 <p id="drop-hint" hidden>Choose the emulator first, then drop the game on its page.</p>
 <footer>piccolo is MIT licensed; each core under its own license (LICENSES/). Keyboard and gamepads (press a button
 first) work. Sound starts after a click or a key.</footer>
 <script>
+  // piccoletto is listed only when this site has it (web/package.sh with PICCOLETTO).
+  fetch('piccoletto/manifest.webmanifest', { method: 'HEAD' }).then(function (response) {
+    document.getElementById('piccoletto').hidden = !response.ok;
+  }).catch(function () {});
   // A game dropped here would make the browser open or download it: say
   // where it goes instead.
   window.addEventListener('dragover', function (event) { event.preventDefault(); });
