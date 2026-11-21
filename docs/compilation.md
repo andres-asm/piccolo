@@ -134,16 +134,25 @@ RUSTFLAGS="-C target-feature=+crt-static" CARGO_TARGET_DIR=build-librashader \
     --release --locked --no-default-features --features runtime-vulkan
 cp build-librashader/release/librashader_capi.dll "$USERPROFILE/piccolo/librashader.dll"
 cp deps/librashader/LICENSE.md "$USERPROFILE/piccolo/librashader-LICENSE.md"
+cp /ucrt64/bin/libstdc++-6.dll /ucrt64/bin/libgcc_s_seh-1.dll \
+    /ucrt64/bin/libwinpthread-1.dll "$USERPROFILE/piccolo/"
 ```
 
-`+crt-static` keeps the DLL from needing a C runtime DLL. CI builds it instead
-with Rust from [rustup](https://rustup.rs/) (the MSVC target, which also needs
-the Visual Studio Build Tools); the same command works from PowerShell there.
+The first build takes a few minutes. Built with MSYS2's Rust (the GNU
+target), the DLL links GCC's C++ runtime dynamically (librashader's shader
+compilers are C++), so it needs the three GCC DLLs copied next to it, from the
+same MSYS2 that built it. `piccolo.exe` itself still doesn't use them.
+
+CI builds it instead with Rust from [rustup](https://rustup.rs/): the MSVC
+target, which also needs the Visual Studio Build Tools. That DLL needs no
+runtime DLL at all (`+crt-static`); the same `cargo build` command works from
+PowerShell there.
 
 ### 6. Check the DLLs (optional)
 
-Neither should list an MSYS2 DLL (`libstdc++`, `libgcc`, `libwinpthread`,
-`SDL3`, ...), only Windows' own and `vulkan-1.dll`:
+`piccolo.exe` should list no MSYS2 DLL (`libstdc++`, `libgcc`,
+`libwinpthread`, `SDL3`, ...), only Windows' own and `vulkan-1.dll`.
+`librashader.dll` built with MSYS2's Rust lists `libstdc++-6.dll` too (step 5):
 
 ```sh
 objdump -p "$USERPROFILE/piccolo/piccolo.exe" | grep 'DLL Name'
