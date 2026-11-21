@@ -1967,20 +1967,22 @@ constexpr uint64_t PORT_PING_EVERY_MS = 500;
 static void update_port_pings(App* app)
 {
     uint64_t now = SDL_GetTicks();
-    bool showing = ports_widget_tabs_visible(&app->ports_widget) || app->ports_widget.open;
-    if (!showing || !app->net_running || now - app->ports_ping_ms < PORT_PING_EVERY_MS)
+    if (!ports_widget_showing(&app->ports_widget) || !app->net_running || now - app->ports_ping_ms < PORT_PING_EVERY_MS)
     {
         return;
     }
     app->ports_ping_ms = now;
+    bool known[NET_MAX_PEERS] = {};
+    uint32_t ping_ms[NET_MAX_PEERS] = {};
     net_service_lock(&app->net_service);
     for (uint32_t peer = 0; peer < NET_MAX_PEERS; peer++)
     {
         NetLinkStats stats;
-        bool known = net_access_peer_stats(&app->net_service.access, peer, &stats);
-        ports_widget_set_ping(&app->ports_widget, peer, known, stats.round_trip_ms);
+        known[peer] = net_access_peer_stats(&app->net_service.access, peer, &stats);
+        ping_ms[peer] = stats.round_trip_ms;
     }
     net_service_unlock(&app->net_service);
+    ports_widget_set_pings(&app->ports_widget, &app->input, &app->input_net, known, ping_ms);
 }
 
 static void app_update_input(App* app)
@@ -3242,8 +3244,10 @@ static void net_remote_message(App* app, const NetAccessEvent* event, const char
         net_change_port_device(app, event->peer, pad, device_id, device);
         return;
     }
-    // devices / device_port: FULL (net_access let them through only then).
-    if (net_settings_read_devices_request(event->data, event->size, &id))
+    // devices / device_port: FULL (net_access let them through only then);
+    // devices_watch, the same list read only, at any level (the ports' tabs).
+    if (net_settings_read_devices_request(event->data, event->size, &id) ||
+        net_settings_read_devices_watch(event->data, event->size, &id))
     {
         app->net_devices_wanted[event->peer] = true;
         net_send_devices(app, event->peer, id);

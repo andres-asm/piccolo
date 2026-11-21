@@ -32,7 +32,8 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/common/frontends-common`    frontends-common: window, Vulkan, audio, settings, input router
 - `deps/common/retroui`             retroui: the look shared with piccoletto: the 5x5 pixel font, themes,
                                      themed ImGui widgets (menu bar from data, windows, buttons...), layers over
-                                     the game, pad picture; `pixel_font_preview` (its test checks the font)
+                                     the game, pad picture, ports_view (the ports' tabs and DEVICES board, same in
+                                     piccoletto) + port_indicators.h; `pixel_font_preview` (its test checks the font)
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
@@ -132,9 +133,9 @@ src/
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
                           combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
-  ports_widget.*          the ports over the game (piccoletto's look): tabs at the bottom left that rise
-                          when a port changes (peek under the menu), and DEVICES (hotkey.ports: each pad
-                          moves itself LEFT / RIGHT, port 1 picks any with UP / DOWN; a mouse clicks)
+  ports_widget.*          the ports over the game: fills retroui's ports_view (tabs that rise when a port
+                          changes, peeking under the menu; DEVICES) from the router; DEVICES' pads (hotkey.ports:
+                          each moves itself LEFT / RIGHT, port 1 picks any with UP / DOWN)
   map_window.*            MAP CONTROLLER wizard (the controller drawing: retroui's pad_picture)
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
@@ -171,8 +172,7 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               frontend_net (optional, with deps/enet):
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
-                              port_indicators.h (port LEDs and ping bars: sizes, colors, thresholds shared
-                              with piccoletto), net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),

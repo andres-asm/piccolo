@@ -889,6 +889,7 @@ share_replace_all = REPLACE ALL (%u)
 share_skip_all = SKIP ALL
 input_action_hotkey_ports = DEVICES
 ports_tab = P%u
+ports_port = PORT %u
 ports_ping = %u MS
 ports_nobody = NOBODY
 ports_off = OFF
