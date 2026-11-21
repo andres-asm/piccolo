@@ -21,6 +21,10 @@
   a.core b { display: block; font: 600 24px/1.2 var(--font-heading); }
   a.core span { display: block; color: var(--muted); font-size: 14px; }
   a.core .go { margin-left: auto; font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--heading-accent); white-space: nowrap; }
+  /* piccoletto isn't an emulator: its own block below the cores. */
+  .companion { display: grid; gap: 12px; margin: 8px 0 32px; padding-top: 28px; border-top: 2px solid var(--shadow); }
+  .companion h2 { margin: 0; font-size: 26px; text-shadow: none; }
+  .companion p { margin: 0; max-width: 46em; color: var(--muted); }
   .notes { color: var(--muted); font-size: 14px; max-width: 46em; }
   .notes p { margin: 0 0 8px; }
   #drop-hint { background: var(--accent); color: var(--on-accent); padding: 10px 14px; font-weight: 700; }
@@ -35,11 +39,16 @@
   <h1>Play in the browser<span class="channel" id="channel" hidden>DEV @COMMIT@</span></h1>
   <p class="intro">Choose the emulator, then open a game file (or drop it on the page). Saves, states and settings stay
   in this browser. No games are included.</p>
+  <p class="label">Emulators</p>
   <div class="cores">
     <a class="core panel" href="sameboy/"><div><b>SameBoy</b><span>Game Boy, Game Boy Color, Super Game Boy</span></div><span class="go">Play</span></a>
     <a class="core panel" href="snes9x/"><div><b>Snes9x</b><span>Super Nintendo, Super Famicom</span></div><span class="go">Play</span></a>
-    <a class="core panel" id="piccoletto" href="piccoletto/" hidden><div><b>piccoletto</b><span>piccolo's companion: this device as a gamepad for a piccolo, remote play, devices</span></div><span class="go">Open</span></a>
   </div>
+  <section class="companion" id="piccoletto" hidden>
+    <h2>Companion app</h2>
+    <p>Not an emulator: piccoletto pairs this browser with a piccolo on your computer or TV.</p>
+    <a class="core panel" href="piccoletto/"><div><b>piccoletto</b><span>This device as a gamepad for a piccolo, remote play, devices</span></div><span class="go">Open</span></a>
+  </section>
   <p id="drop-hint" hidden>Choose the emulator first, then drop the game on its page.</p>
   <div class="notes">
     <p>Keyboard and gamepads (press a button first) work. Sound starts after a click or a key.</p>
