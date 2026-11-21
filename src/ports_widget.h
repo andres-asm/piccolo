@@ -37,6 +37,14 @@ struct PortsWidget
     uint64_t  out_summary = 0;
     bool      open = false;        // DEVICES
     std::vector<uint8_t> held;     // per controller: its directions and BACK last frame
+    // DEVICES' moves wait until it closes (a controller moved OUT keeps its
+    // input until then); port 1's controllers as it opened lead it.
+    std::vector<int32_t> staged;   // per controller: the port it's going to (-1 OUT)
+    std::vector<uint8_t> moved;    // ...if it was moved
+    std::vector<uint8_t> leader;   // on port 1 when DEVICES opened
+    bool      staged_dirty = false;
+    uint64_t  board_summary[INPUT_PORT_COUNT] = {};   // the router as the board last drew it
+    uint64_t  board_out_summary = 0;
 };
 
 // Every frame, after input_update. `port_count` 0 = no game. `net` may be
@@ -59,7 +67,8 @@ void ports_widget_draw_tabs(PortsWidget* widget, ImFont* pixel_font, int32_t sca
 
 // DEVICES: open (what's held now is ignored until let go), close.
 void ports_widget_open(PortsWidget* widget, const InputSystem* input);
-void ports_widget_close(PortsWidget* widget);
+// Closing applies the moves made on it.
+void ports_widget_close(PortsWidget* widget, InputSystem* input);
 
 // Every frame while open, after input_update: the pads' moves (and port 1's
 // BACK, which closes it).

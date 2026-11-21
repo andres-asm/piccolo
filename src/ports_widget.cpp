@@ -156,6 +156,9 @@ static void rebuild(PortsViewColumn* column, const InputSystem* input, const Inp
     }
 }
 
+// (DEVICES' columns from the staged moves: below, with the board.)
+static void rebuild_staged(PortsWidget* widget, const InputSystem* input, const InputNet* net);
+
 void ports_widget_update(PortsWidget* widget, const InputSystem* input, const InputNet* net, const InputFrame* frame,
                          uint32_t port_count, uint64_t now_ms)
 {
@@ -186,6 +189,30 @@ void ports_widget_update(PortsWidget* widget, const InputSystem* input, const In
         }
         rebuild(&view->out, input, net, INPUT_NO_PORT);
         widget->out_summary = out_summary(input);
+        return;
+    }
+    if (widget->open)
+    {
+        // DEVICES: the columns as they'll be (the moves wait until it closes),
+        // again when a move is staged or the router changes (a join, a pad
+        // gone); no tabs meanwhile.
+        bool router_changed = false;
+        uint64_t board_out = out_summary(input);
+        router_changed = board_out != widget->board_out_summary;
+        widget->board_out_summary = board_out;
+        for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+        {
+            uint64_t summary = port_summary(input, p);
+            router_changed = router_changed || summary != widget->board_summary[p];
+            widget->board_summary[p] = summary;
+        }
+        if (router_changed || widget->staged_dirty)
+        {
+            rebuild_staged(widget, input, net);
+            widget->staged_dirty = false;
+        }
+        // (The summaries stay as before DEVICES: when it closes and the moves
+        // happen, the change makes the tabs rise and shows them.)
         return;
     }
     bool changed[PORTS_VIEW_MAX_PORTS] = {};
@@ -321,16 +348,83 @@ static void move_to(InputSystem* input, uint32_t controller, int32_t to)
     }
 }
 
-// One port to the left (OUT before port 1) or right.
-static void move_by(InputSystem* input, uint32_t controller, int32_t direction, uint32_t port_count)
+// The moves wait until DEVICES closes (a controller moved OUT keeps its
+// input meanwhile, so it can still get to DONE). Per controller: where it's
+// going and whether it moved; sized as controllers come (only then).
+static void staged_fit(PortsWidget* widget, const InputSystem* input)
 {
-    int32_t from = input_controller_port(input, controller);   // INPUT_NO_PORT (-1) = OUT
+    size_t count = input->controllers.size();
+    size_t before = widget->staged.size();
+    if (before == count)
+    {
+        return;
+    }
+    widget->staged.resize(count, INPUT_NO_PORT);
+    widget->moved.resize(count, 0);
+    widget->leader.resize(count, 0);   // (a newcomer isn't port 1's)
+    for (size_t c = before; c < count; c++)
+    {
+        widget->staged[c] = input_controller_port(input, static_cast<uint32_t>(c));
+    }
+}
+
+static int32_t staged_port(const PortsWidget* widget, const InputSystem* input, uint32_t controller)
+{
+    return widget->moved[controller] != 0 ? widget->staged[controller] : input_controller_port(input, controller);
+}
+
+static void stage_to(PortsWidget* widget, uint32_t controller, int32_t to)
+{
+    widget->staged[controller] = to;
+    widget->moved[controller] = 1;
+    widget->staged_dirty = true;
+}
+
+// One port to the left (OUT before port 1) or right.
+static void stage_by(PortsWidget* widget, const InputSystem* input, uint32_t controller, int32_t direction)
+{
+    int32_t from = staged_port(widget, input, controller);   // INPUT_NO_PORT (-1) = OUT
     int32_t to = from + direction;
     to = to < INPUT_NO_PORT ? INPUT_NO_PORT : to;
-    to = to >= static_cast<int32_t>(port_count) ? static_cast<int32_t>(port_count) - 1 : to;
+    to = to >= static_cast<int32_t>(widget->port_count) ? static_cast<int32_t>(widget->port_count) - 1 : to;
     if (to != from)
     {
-        move_to(input, controller, to);
+        stage_to(widget, controller, to);
+    }
+}
+
+// The board's columns as they'll be: moved controllers where they're going,
+// the rest where the router has them (on several ports, N:N, too).
+static void rebuild_staged(PortsWidget* widget, const InputSystem* input, const InputNet* net)
+{
+    for (int32_t column = -1; column < static_cast<int32_t>(INPUT_PORT_COUNT); column++)
+    {
+        PortsViewColumn* list = column < 0 ? &widget->view.out : &widget->view.ports[column];
+        std::vector<PortsViewChip> before;
+        before.swap(list->chips);
+        for (size_t c = 0; c < input->controllers.size(); c++)
+        {
+            uint32_t controller = static_cast<uint32_t>(c);
+            const InputDevice* device = shown_device(input, controller);
+            if (device == nullptr)
+            {
+                continue;
+            }
+            bool here = false;
+            if (c < widget->moved.size() && widget->moved[c] != 0)
+            {
+                here = widget->staged[c] == column;
+            }
+            else
+            {
+                here = column < 0 ? input_controller_port(input, controller) == INPUT_NO_PORT
+                                  : input_port_has(input, static_cast<uint32_t>(column), controller);
+            }
+            if (here)
+            {
+                add_chip(list, &before, input, net, controller, device);
+            }
+        }
     }
 }
 
@@ -346,6 +440,22 @@ void ports_widget_open(PortsWidget* widget, const InputSystem* input)
     {
         widget->held[c] = held_bits(input, static_cast<uint32_t>(c));
     }
+    // Nothing moved yet; port 1's controllers now lead the board until it
+    // closes (even if they move themselves elsewhere).
+    widget->staged.clear();
+    widget->moved.clear();
+    widget->leader.clear();
+    staged_fit(widget, input);
+    for (size_t c = 0; c < input->controllers.size(); c++)
+    {
+        widget->leader[c] = input_port_has(input, 0, static_cast<uint32_t>(c)) ? 1 : 0;
+    }
+    widget->staged_dirty = true;   // (the board's columns are drawn from the staged state at once)
+    for (uint32_t p = 0; p < INPUT_PORT_COUNT; p++)
+    {
+        widget->board_summary[p] = port_summary(input, p);
+    }
+    widget->board_out_summary = out_summary(input);
     // Port 1's first gamepad picked (else whoever is first there).
     view->has_pick = false;
     const std::vector<PortsViewChip>* first = &view->ports[0].chips;
@@ -365,9 +475,25 @@ void ports_widget_open(PortsWidget* widget, const InputSystem* input)
     }
 }
 
-void ports_widget_close(PortsWidget* widget)
+void ports_widget_close(PortsWidget* widget, InputSystem* input)
 {
+    if (!widget->open)
+    {
+        return;
+    }
     widget->open = false;
+    // Now the moves happen (the tabs then show what changed).
+    for (size_t c = 0; c < widget->moved.size() && c < input->controllers.size(); c++)
+    {
+        uint32_t controller = static_cast<uint32_t>(c);
+        if (widget->moved[c] != 0 && shown_device(input, controller) != nullptr)
+        {
+            move_to(input, controller, widget->staged[c]);
+        }
+    }
+    widget->staged.clear();
+    widget->moved.clear();
+    widget->leader.clear();
 }
 
 void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
@@ -393,6 +519,7 @@ void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
     {
         view->has_pick = false;
     }
+    staged_fit(widget, input);
     for (size_t c = 0; c < count && widget->open; c++)
     {
         uint32_t controller = static_cast<uint32_t>(c);
@@ -405,13 +532,19 @@ void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
         {
             continue;
         }
-        int32_t direction = (pressed & HELD_LEFT) != 0 ? -1 : ((pressed & HELD_RIGHT) != 0 ? 1 : 0);
-        if (input_port_has(input, 0, controller))
+        // The keyboard can always close it (Escape), like it always drives the UI.
+        if ((pressed & HELD_BACK) != 0 && device->kind == InputDeviceKind::keyboard)
         {
-            // Port 1: picks anyone, moves the pick, closes.
+            ports_widget_close(widget, input);
+            break;
+        }
+        int32_t direction = (pressed & HELD_LEFT) != 0 ? -1 : ((pressed & HELD_RIGHT) != 0 ? 1 : 0);
+        if (widget->leader[c] != 0)
+        {
+            // Port 1 (as DEVICES opened): picks anyone, moves the pick, closes.
             if ((pressed & HELD_BACK) != 0)
             {
-                ports_widget_close(widget);
+                ports_widget_close(widget, input);
                 break;
             }
             if ((pressed & HELD_UP) != 0)
@@ -429,12 +562,12 @@ void ports_widget_board_update(PortsWidget* widget, InputSystem* input)
                     view->picked = controller;
                     view->has_pick = true;
                 }
-                move_by(input, view->picked, direction, widget->port_count);
+                stage_by(widget, input, view->picked, direction);
             }
         }
         else if (direction != 0)
         {
-            move_by(input, controller, direction, widget->port_count);
+            stage_by(widget, input, controller, direction);
         }
     }
 }
@@ -451,10 +584,11 @@ void ports_widget_draw_board(PortsWidget* widget, InputSystem* input, ImFont* pi
     ports_view_draw_board(&widget->view, pixel_font, scale, &text, now_ms, &clicks);
     if (clicks.move && clicks.key < input->controllers.size())
     {
-        move_to(input, clicks.key, clicks.port);
+        staged_fit(widget, input);
+        stage_to(widget, clicks.key, clicks.port);   // (happens when DEVICES closes)
     }
     if (clicks.done)
     {
-        ports_widget_close(widget);
+        ports_widget_close(widget, input);
     }
 }

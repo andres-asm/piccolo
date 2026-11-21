@@ -1116,7 +1116,7 @@ static void resume_game(App* app)
     }
     if (app->ports_widget.open)
     {
-        ports_widget_close(&app->ports_widget);
+        ports_widget_close(&app->ports_widget, &app->input);
     }
     app->picker.open = false;
     app->shader_picker.open = false;
@@ -1546,7 +1546,7 @@ static void close_topmost_or_toggle_menu(App* app)
         }
         else if (app->ports_widget.open)
         {
-            ports_widget_close(&app->ports_widget);   // DEVICES covers everything
+            ports_widget_close(&app->ports_widget, &app->input);   // DEVICES covers everything
         }
         else if (text_input_pending(app))
         {
@@ -1638,7 +1638,7 @@ static void app_handle_hotkeys(App* app, const InputFrame* frame)
     {
         if (app->ports_widget.open)
         {
-            ports_widget_close(&app->ports_widget);
+            ports_widget_close(&app->ports_widget, &app->input);
         }
         else if (game_running(app) && !ui_is_up(app) && app->ports_widget.port_count > 0)
         {
