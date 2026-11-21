@@ -148,13 +148,11 @@ struct App
     uint32_t   net_load_id = 0;
     NetRemote  net_remote = {};          // settings and actions from devices (net_remote.h)
     bool       net_remote_ready = false;
-    bool       net_paused = false;       // PAUSE from a device
     // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
-    bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
-    bool       disconnect_paused = false;     // START, a controller joining, or closing the menu resumes
+    bool       played_with_gamepad = false;   // the last game input came from a local gamepad (CONTROLLERS cause)
+    bool       android_background = false;    // the app is in the background (BACKGROUND cause)
+    bool       menus_built_paused = false;    // GAME > PAUSE read RESUME when the menus were built
     Headless   headless;                      // GO HEADLESS: a streaming device has the game (headless.h)
-    bool       menu_was_open = false;         // last loop: for "closing the menu resumes"
-    uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
     bool       net_fast_forward[NET_MAX_PEERS] = {};   // FAST FORWARD held, per peer
     NetRemoteGame net_actions_sent;      // what the action lists last said (sent again when it changes)
@@ -492,13 +490,19 @@ static void build_menus(App* app)
     app->menu_texts.clear();
     app->menu_items.clear();
     app->menus.clear();
+    app->menus_built_paused = app->ui.user_paused;
     // The labels first: the items point into them (push_back may move them).
     for (int32_t menu = 0; menu < menus_count(); menu++)
     {
         app->menu_texts.push_back(piccolo_text(&app->strings, menus_label(menu)));
         for (int32_t item = 0; item < menus_item_count(menu); item++)
         {
-            app->menu_texts.push_back(piccolo_text(&app->strings, menus_item_label(menu, item)));
+            Str label = menus_item_label(menu, item);
+            if (menus_item_action(menu, item) == MenuAction::pause && app->ui.user_paused)
+            {
+                label = Str::menu_resume;   // GAME > PAUSE reads RESUME while the player paused
+            }
+            app->menu_texts.push_back(piccolo_text(&app->strings, label));
         }
     }
     // The items, every menu's back to back (the menus point into them).
@@ -581,6 +585,18 @@ static void set_status(App* app, const char* text)
     std::snprintf(app->status, sizeof(app->status), "%s", text);
 }
 
+// The USER pause cause (the PAUSE hotkey, QUICK MENU's PAUSE, GAME > PAUSE):
+// only the player lifts it. Paused, the status line says so by itself.
+static void toggle_user_pause(App* app)
+{
+    if (!game_running(app))
+    {
+        return;
+    }
+    app->ui.user_paused = !app->ui.user_paused;
+    set_status(app, app->ui.user_paused ? "" : piccolo_text(&app->strings, Str::status_resumed));
+}
+
 // (UI modes, further down.)
 static UiDerived app_derive(const App* app);
 static void ui_follow_changes(App* app);
@@ -590,7 +606,7 @@ static void ui_follow_changes(App* app);
 static void update_pause(App* app)
 {
     app->ui_derived = app_derive(app);
-    bool pause = game_running(app) && (app->ui_derived.pause != 0 || app->net_paused || app->disconnect_paused);
+    bool pause = game_running(app) && app->ui_derived.pause != 0;
     if (pause && !app->session.paused)
     {
         audio_output_clear(&app->session.audio);
@@ -798,6 +814,7 @@ static bool start_game(App* app, const FilePickerChoice* choice)
     if (started)
     {
         app->crashed_core.clear();   // answered (or not this core's turn): it runs again
+        app->played_with_gamepad = false;   // what plays this game is seen again
         ui_game_started(&app->ui);   // straight into the game, everything closed
         ui_follow_changes(app);
         std::snprintf(app->last_core, sizeof(app->last_core), "%s", choice->core_path);
@@ -1099,7 +1116,11 @@ static void handle_menu_action(App* app, MenuAction action)
             file_picker_open(&app->picker, &app->catalog, app->last_folder, app->last_core, &game_folders);
             break;
         }
-        case MenuAction::resume:
+        case MenuAction::pause:
+            // PAUSE: the player's pause, back to the (paused) game; RESUME
+            // lifts it. Either way everything closes and any input grab is
+            // cancelled: the way out when something holds the input.
+            toggle_user_pause(app);
             resume_game(app);
             break;
         case MenuAction::reset:
@@ -1826,6 +1847,8 @@ static void ui_follow_grabs(App* app)
     }
 }
 
+static bool gamepad_on_a_port(const App* app);   // (input, further down)
+
 // The facts ui_derive() needs, and what it says for this loop.
 static UiDerived app_derive(const App* app)
 {
@@ -1835,6 +1858,10 @@ static UiDerived app_derive(const App* app)
     facts.focused = app->window_focused;
     facts.streaming = app->net_streaming;
     facts.headless = app->headless.on;
+    facts.pause_on_disconnect = settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_DISCONNECT);
+    facts.played_with_gamepad = app->played_with_gamepad;
+    facts.gamepad_on_port = gamepad_on_a_port(app);
+    facts.background = app->android_background;
     return ui_derive(&app->ui, &facts);
 }
 
@@ -1949,6 +1976,11 @@ static void app_handle_hotkeys(App* app, const InputFrame* frame)
     if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_load_state)])
     {
         handle_menu_action(app, MenuAction::load_state);
+    }
+    // PAUSE: the player's own pause; what's up stays up.
+    if (frame->pressed[static_cast<uint32_t>(InputAction::hotkey_pause)] && game_running(app))
+    {
+        toggle_user_pause(app);
     }
 }
 
@@ -2140,9 +2172,11 @@ static bool gamepad_on_a_port(const App* app)
     return false;
 }
 
-// PAUSE WHEN CONTROLLERS DISCONNECT: notes whether a gamepad or the keyboard
-// played last (a RetroPad input held in the game), and resumes on START.
-static void follow_what_plays(App* app, const InputFrame* frame)
+// PAUSE WHEN CONTROLLERS DISCONNECT: notes whether a local gamepad played
+// last (a RetroPad input held in the game), or something that never
+// disconnects that way: the keyboard, a mouse, a device's pad over the
+// network, the on-screen pad (ui_derive's CONTROLLERS cause).
+static void follow_what_plays(App* app)
 {
     uint32_t pad_actions = static_cast<uint32_t>(InputAction::pad_turbo);   // the RetroPad's buttons and sticks
     for (size_t c = 0; c < app->input.controllers.size(); c++)
@@ -2160,30 +2194,7 @@ static void follow_what_plays(App* app, const InputFrame* frame)
         const InputDevice* device = input_devices_find_const(&app->input.devices, controller->device_id);
         if (playing && device != nullptr)
         {
-            app->played_with_gamepad = device->kind == InputDeviceKind::gamepad;
-        }
-    }
-    // Closing the menu (or any window) resumes too: with every pad gone and
-    // the keyboard on no port, nothing else could (Andrés).
-    bool menu_open = app->ui.mode != UiMode::game;
-    bool menu_closed = app->menu_was_open && !menu_open;
-    app->menu_was_open = menu_open;
-    if (!app->disconnect_paused)
-    {
-        return;
-    }
-    bool start = frame->joined_port != INPUT_NO_PORT;
-    for (uint32_t p = 0; p < INPUT_PORT_COUNT && !start; p++)
-    {
-        start = (frame->pad_buttons[p] & (1u << 3)) != 0;   // RETRO_DEVICE_ID_JOYPAD_START
-    }
-    if (start || menu_closed || !game_running(app))
-    {
-        app->disconnect_paused = false;
-        if (start || menu_closed)
-        {
-            set_status(app, piccolo_text(&app->strings, Str::status_resumed));
-            SDL_Log("Resumed: %s", start ? "START" : "the menu closed");
+            app->played_with_gamepad = device->kind == InputDeviceKind::gamepad && !device->game_only && !device->retropad;
         }
     }
 }
@@ -2265,15 +2276,15 @@ static void app_update_input(App* app)
         SDL_Log("%s", message);
         // No CONTROLS here (Andrés): joining again is just START. The game
         // pauses if that was the last gamepad playing (the setting).
+        // (ui_derive's CONTROLLERS cause; it lifts by itself when one is back.)
         if (game_running(app) && settings_get_bool(&app->settings, PICCOLO_PAUSE_ON_DISCONNECT) &&
             app->played_with_gamepad && !gamepad_on_a_port(app))
         {
-            app->disconnect_paused = true;
             set_status(app, piccolo_text(&app->strings, Str::status_paused_disconnected));
             SDL_Log("Paused: the last gamepad playing went away");
         }
     }
-    follow_what_plays(app, &frame);
+    follow_what_plays(app);
     // The ports' tabs and DEVICES: its moves first (each controller reads
     // its own buttons), then who is where.
     bool board_was_open = app->ports_widget.open;
@@ -2351,6 +2362,16 @@ static void app_handle_events(App* app)
         if (event.type == SDL_EVENT_QUIT)
         {
             app->running = false;
+        }
+        // Android: the BACKGROUND pause cause (SDL keeps running a little while
+        // the app is behind another one).
+        if (event.type == SDL_EVENT_DID_ENTER_BACKGROUND)
+        {
+            app->android_background = true;
+        }
+        if (event.type == SDL_EVENT_WILL_ENTER_FOREGROUND || event.type == SDL_EVENT_DID_ENTER_FOREGROUND)
+        {
+            app->android_background = false;
         }
         if (event.type == SDL_EVENT_WINDOW_FOCUS_GAINED || event.type == SDL_EVENT_WINDOW_FOCUS_LOST)
         {
@@ -2968,7 +2989,7 @@ static NetRemoteGame net_remote_game(const App* app)
     NetRemoteGame game;
     game.running = game_running(app);
     game.slot = app->session.state_slot;
-    game.paused = app->net_paused;
+    game.paused = app->ui.user_paused;
     return game;
 }
 
@@ -3011,7 +3032,7 @@ static void headless_back(App* app, bool pause)
     headless_leave(&app->headless, app->shell.window);
     if (pause && game_running(app))
     {
-        app->disconnect_paused = true;
+        app->ui.user_paused = true;   // it stays paused until the player here goes on
         set_status(app, piccolo_text(&app->strings, Str::status_headless_paused));
     }
     else
@@ -3306,15 +3327,11 @@ static void net_follow_remote(App* app)
         }
         size = net_remote_next_change(&app->net_remote, &app->settings);
     }
-    // A PAUSE from a device ends with another game (or none).
-    if (app->net_paused && game_running(app) != app->net_actions_sent.running)
-    {
-        app->net_paused = false;
-    }
     // A device whose access changed (NETWORK): its new welcome went out with
     // net_access_set_level; its action list follows at once, and what its new
-    // level doesn't cover stops: remote play, a FAST FORWARD it holds, a PAUSE
-    // it made (STREAM since 2026-11-20). Speed tests and pads are GAMEPAD.
+    // level doesn't cover stops: remote play and a FAST FORWARD it holds
+    // (STREAM since 2026-11-20; a PAUSE it made stays: only a player lifts
+    // it). Speed tests and pads are GAMEPAD.
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
         if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
@@ -3331,11 +3348,6 @@ static void net_follow_remote(App* app)
             {
                 headless_back(app, true);   // remote play (and so the game) needs STREAM
                 headless_tell(app);
-            }
-            if (app->net_paused && app->net_paused_by == i)
-            {
-                app->net_paused = false;   // it can't resume it any more
-                set_status(app, piccolo_text(&app->strings, Str::status_resumed));
             }
             net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
             app->stream_tuning_set[i] = false;
@@ -3411,10 +3423,11 @@ static void net_do_action(App* app, uint32_t peer, const std::string* key, bool 
     }
     else if (*key == "pause")
     {
-        app->net_paused = !app->net_paused;
-        app->net_paused_by = peer;
+        // The USER pause, the same as here: only a player lifts it (this
+        // device, another one, or here), even after this device leaves.
+        app->ui.user_paused = game_running(app) && !app->ui.user_paused;
         char status[256];
-        if (app->net_paused)
+        if (app->ui.user_paused)
         {
             std::snprintf(status, sizeof(status), "%s %s", piccolo_text(&app->strings, Str::status_paused_remotely),
                           device);
@@ -4081,11 +4094,6 @@ static void net_update_locked(App* app)
                 app->net_fast_forward[event.peer] = false;   // a dropped device doesn't keep it held
                 app->net_peer_language[event.peer][0] = '\0';
                 app->net_devices_wanted[event.peer] = false;
-                if (app->net_paused && app->net_paused_by == event.peer)
-                {
-                    app->net_paused = false;   // nobody here could resume it
-                    set_status(app, piccolo_text(&app->strings, Str::status_resumed));
-                }
             }
             if (app->net_load_waiting && app->net_load_peer == event.peer)
             {
@@ -4159,6 +4167,44 @@ static void net_update_locked(App* app)
     net_follow_stream_tuning(app);
 }
 
+// The status line's text: why the game is paused, if it is ("PAUSED: MENU,
+// FOCUS"), then the last message.
+static void status_line_text(const App* app, char* out, size_t size)
+{
+    static const Str CAUSES[] = {Str::pause_cause_menu, Str::pause_cause_focus, Str::pause_cause_controllers,
+                                 Str::pause_cause_user, Str::pause_cause_background};
+    static_assert(sizeof(CAUSES) / sizeof(CAUSES[0]) == static_cast<size_t>(UiPause::count), "a name per cause");
+    out[0] = '\0';
+    if (!game_running(app) || app->ui_derived.pause == 0)
+    {
+        std::snprintf(out, size, "%s", app->status);
+        return;
+    }
+    char causes[160] = {};
+    size_t used = 0;
+    for (uint32_t c = 0; c < static_cast<uint32_t>(UiPause::count); c++)
+    {
+        if ((app->ui_derived.pause & ui_pause_bit(static_cast<UiPause>(c))) == 0)
+        {
+            continue;
+        }
+        int written = std::snprintf(causes + used, sizeof(causes) - used, "%s%s", used > 0 ? ", " : "",
+                                    piccolo_text(&app->strings, CAUSES[c]));
+        used = written > 0 && static_cast<size_t>(written) < sizeof(causes) - used ? used + static_cast<size_t>(written)
+                                                                                    : sizeof(causes) - 1;
+    }
+    char why[200] = {};
+    std::snprintf(why, sizeof(why), piccolo_text(&app->strings, Str::paused_why), causes);
+    if (app->status[0] != '\0')
+    {
+        std::snprintf(out, size, "%s - %s", why, app->status);
+    }
+    else
+    {
+        std::snprintf(out, size, "%s", why);
+    }
+}
+
 // INTERFACE > BACKDROP: while a menu or a window (DEVICES too) is up over a
 // game, the whole game is covered by black at that opacity, behind every
 // window (the menu bar stays on top of it): the UI reads well over any
@@ -4209,6 +4255,10 @@ static bool app_frame(App* app)
         }
     }
     update_pause(app);
+    if (app->menus_built_paused != app->ui.user_paused)
+    {
+        build_menus(app);   // GAME > PAUSE / RESUME
+    }
     app->session.timing.mode = piccolo_settings_timing(&app->settings);
     if (app->headless.on)
     {
@@ -4317,12 +4367,21 @@ static bool app_frame(App* app)
         // The ports' tabs, behind every window (they peek while the menu is up).
         ports_widget_draw_tabs(&app->ports_widget, app->pixel_font, app->ui_scale, &app->strings, menu_shown, SDL_GetTicks());
         draw_menu_backdrop(app);   // (after the tabs: behind them and every window)
+        // The status line: with the menu bar, or alone over a paused game
+        // (it says why: "PAUSED: ...").
+        char status[400] = {};
+        status_line_text(app, status, sizeof(status));
+        float status_left = ports_widget_tabs_width(&app->ports_widget);
+        status_left = status_left > 4.0f ? status_left : 4.0f;
+        if (!menu_shown && game_running(app) && app->session.paused)
+        {
+            retro_ui_status_line_from(app->pixel_font, app->ui_scale, status, status_left);
+        }
         if (menu_shown)
         {
             // The status line's window goes first, so it stays behind the
             // others; it starts past the tabs.
-            float status_left = ports_widget_tabs_width(&app->ports_widget);
-            retro_ui_status_line_from(app->pixel_font, app->ui_scale, app->status, status_left > 4.0f ? status_left : 4.0f);
+            retro_ui_status_line_from(app->pixel_font, app->ui_scale, status, status_left);
             int32_t picked = retro_ui_menu_bar(app->pixel_font, app->ui_scale, app->menus.data(),
                                                static_cast<int32_t>(app->menus.size()), app->open_first_menu);
             app->open_first_menu = false;
@@ -4382,6 +4441,7 @@ static bool app_frame(App* app)
         quick.core_name = app->core_name;
         quick.game_name = app->game_name;
         quick.shaders_available = app->shader_library.loaded;
+        quick.user_paused = app->ui.user_paused;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
         ports_widget_draw_board(&app->ports_widget, &app->input, app->pixel_font, app->ui_scale, SDL_GetTicks(), &app->strings);
         if (app->quick_menu.choose_shader_request)
@@ -4415,6 +4475,9 @@ static bool app_frame(App* app)
         case QuickMenuAction::close_game:
             app->pending_close_game = true;   // the texture may be in this frame already
             app_enter_game(app);
+            break;
+        case QuickMenuAction::pause:
+            toggle_user_pause(app);   // QUICK MENU stays: RESUME, or back to the game
             break;
         case QuickMenuAction::none:
             break;

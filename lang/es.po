@@ -18,6 +18,10 @@ msgctxt "menu_misc"
 msgid "MISC"
 msgstr "VARIOS"
 
+msgctxt "menu_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
 msgctxt "menu_resume"
 msgid "RESUME"
 msgstr "CONTINUAR"
@@ -391,12 +395,12 @@ msgid "PAUSE WHEN CONTROLLERS DISCONNECT"
 msgstr "PAUSAR AL DESCONECTARSE LOS CONTROLES"
 
 msgctxt "setting_pause_on_disconnect_help"
-msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard was what played. START, or closing the menu, resumes."
-msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado. START, o cerrar el menú, reanuda."
+msgid "Pause when the last controller playing goes away (unplugged, out of battery, a phone that dropped). Not when the keyboard, the mouse, a device's pad or the on-screen pad was what played. It goes on when a controller is back, or when the keyboard plays."
+msgstr "Pausa cuando se va el último control que estaba jugando (desconectado, sin batería, un teléfono que se cayó). No si se jugaba con el teclado, el ratón, el control de un dispositivo o el control en pantalla. Sigue cuando vuelve un control o cuando juega el teclado."
 
 msgctxt "status_paused_disconnected"
-msgid "PAUSED: CONTROLLER DISCONNECTED. START OR THE MENU TO GO ON"
-msgstr "EN PAUSA: CONTROL DESCONECTADO. START O EL MENÚ PARA SEGUIR"
+msgid "CONTROLLER DISCONNECTED"
+msgstr "CONTROL DESCONECTADO"
 
 msgctxt "setting_screensaver"
 msgid "ALLOW SCREENSAVER WHILE PAUSED"
@@ -3505,3 +3509,35 @@ msgstr "FONDO"
 msgctxt "setting_menu_backdrop_help"
 msgid "While a menu or a window is open over a game, the game is darkened this much so the text reads well over any picture (0: not darkened)."
 msgstr "Mientras un menú o una ventana está abierto sobre un juego, el juego se oscurece así para que el texto se lea bien sobre cualquier imagen (0: sin oscurecer)."
+
+msgctxt "paused_why"
+msgid "PAUSED: %s"
+msgstr "EN PAUSA: %s"
+
+msgctxt "pause_cause_menu"
+msgid "MENU"
+msgstr "MENÚ"
+
+msgctxt "pause_cause_focus"
+msgid "FOCUS"
+msgstr "FOCO"
+
+msgctxt "pause_cause_controllers"
+msgid "CONTROLLERS"
+msgstr "CONTROLES"
+
+msgctxt "pause_cause_user"
+msgid "USER"
+msgstr "USUARIO"
+
+msgctxt "pause_cause_background"
+msgid "BACKGROUND"
+msgstr "SEGUNDO PLANO"
+
+msgctxt "quick_menu_pause"
+msgid "PAUSE"
+msgstr "PAUSA"
+
+msgctxt "quick_menu_resume"
+msgid "RESUME"
+msgstr "CONTINUAR"

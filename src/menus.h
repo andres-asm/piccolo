@@ -11,7 +11,7 @@
 enum class MenuAction
 {
     none,
-    resume,        // GAME > RESUME: back to the game, everything else closed
+    pause,         // GAME > PAUSE / RESUME (the USER pause): back to the game, everything else closed
     load_game,
     reset,
     save_state,

@@ -312,6 +312,10 @@ static QuickMenuAction draw_states_tab(QuickMenu* menu, const QuickMenuContext* 
     }
     ImGui::EndDisabled();
     ImGui::Spacing();
+    if (retro_ui_button(piccolo_text(strings, context->user_paused ? Str::quick_menu_resume : Str::quick_menu_pause)))
+    {
+        action = QuickMenuAction::pause;
+    }
     if (retro_ui_button(piccolo_text(strings, Str::quick_menu_reset)))
     {
         action = QuickMenuAction::reset;

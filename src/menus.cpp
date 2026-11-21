@@ -14,7 +14,7 @@ struct Menu
 };
 
 static const MenuItem GAME_ITEMS[] = {
-    { Str::menu_resume,     MenuAction::resume },
+    { Str::menu_pause,      MenuAction::pause },   // reads RESUME while the player paused (main.cpp)
     { Str::menu_load_game,  MenuAction::load_game },
     { Str::menu_reset,      MenuAction::reset },
     { Str::menu_save_state, MenuAction::save_state },
@@ -82,7 +82,7 @@ const char* menu_action_name(MenuAction action)
     switch (action)
     {
         case MenuAction::none:       return "NONE";
-        case MenuAction::resume:     return "RESUME";
+        case MenuAction::pause:      return "PAUSE";
         case MenuAction::load_game:  return "LOAD GAME";
         case MenuAction::reset:      return "RESET";
         case MenuAction::save_state: return "SAVE STATE";
