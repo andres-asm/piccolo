@@ -19,8 +19,7 @@ on:
   workflow_call:
 
 env:
-  EMSDK_VERSION: 6.0.13
-  RGBDS_VERSION: v1.0.1   # the one multitap-org/cores builds SameBoy's boot ROMs with
+  EMSDK_VERSION: 6.0.13   # multitap-org/cores' web job builds with the same one
 
 jobs:
   web:
@@ -42,41 +41,36 @@ jobs:
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
           git submodule update --init --depth 1 deps/librashader
+          # The cores' recipes (web/build-core.sh); its own submodules aren't needed.
+          git submodule update --init --checkout deps/cores
 
       # Ninja; the Vulkan headers (web/build.sh: frontends-common's headers name
-      # Vulkan types even with Vulkan off); bison + libpng to build rgbds; zip.
+      # Vulkan types even with Vulkan off); bison + libpng for the cores repo to
+      # build rgbds (SameBoy's boot ROMs); zip.
       - name: Packages
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q ninja-build libvulkan-dev bison libpng-dev zip
 
-      - name: Cache emsdk and rgbds
-        id: tools-cache
+      - name: Cache emsdk
+        id: emsdk-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ~/emsdk
-            ~/rgbds
-          key: web-tools-emsdk-${{ env.EMSDK_VERSION }}-rgbds-${{ env.RGBDS_VERSION }}
+          path: ~/emsdk
+          key: web-tools-emsdk-${{ env.EMSDK_VERSION }}
 
-      - name: emsdk and rgbds
-        if: steps.tools-cache.outputs.cache-hit != 'true'
+      - name: emsdk
+        if: steps.emsdk-cache.outputs.cache-hit != 'true'
         run: |
           git clone -q https://github.com/emscripten-core/emsdk "$HOME/emsdk"
           "$HOME/emsdk/emsdk" install "$EMSDK_VERSION"
           "$HOME/emsdk/emsdk" activate "$EMSDK_VERSION"
-          # rgbds from source, like multitap-org/cores' scripts/tools.sh.
-          git clone -q --depth 1 --branch "$RGBDS_VERSION" https://github.com/gbdev/rgbds.git "$RUNNER_TEMP/rgbds"
-          cmake -S "$RUNNER_TEMP/rgbds" -B "$RUNNER_TEMP/rgbds/build" -G Ninja -DCMAKE_BUILD_TYPE=Release > /dev/null
-          cmake --build "$RUNNER_TEMP/rgbds/build"
-          mkdir -p "$HOME/rgbds"
-          for exe in rgbasm rgblink rgbfix rgbgfx; do cp "$RUNNER_TEMP/rgbds/$exe" "$HOME/rgbds/"; done
 
       - name: Build and package
         run: |
           . "$HOME/emsdk/emsdk_env.sh"
           for core in sameboy snes9x; do
-            RGBDS="$HOME/rgbds/" web/build-core.sh "$core"
+            web/build-core.sh "$core"
             web/build.sh "$core"
           done
           web/package.sh

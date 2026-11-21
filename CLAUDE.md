@@ -33,6 +33,9 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
+- `deps/cores`                      multitap-org/cores: every core's recipe (source, patches, build per platform);
+                                     the browser build builds its cores with it (`update = none`, web only).
+                                     A core recipe changes THERE (all platforms, web included), never in piccolo
 - `deps/beacon`                     multitap-beacon (multitap-org/multitap-beacon, MIT): the introduction server for
                                      connections across the internet (STUN-like + hole punching, never a relay);
                                      frontends-common builds only its `beacon_wire` library (tests also its server code)
@@ -148,7 +151,7 @@ layouts/                  controller layouts (<Maker>/<model>.cfg)
 android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v7a, Android 5+), res/ (icons,
                           banner), res-debug/ (debug variant)
 web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh <core>
-                          (sameboy, snes9x: a static archive), build.sh <core> (one wasm per core); src/bundled_files_web.cpp registers the linked core
+                          (runs deps/cores' recipe for the web: sameboy, snes9x), build.sh <core> (one wasm per core); src/bundled_files_web.cpp registers the linked core
   main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
                           leave, piccolo_web_open); storage.* the browser's piccolo folder: in memory,
                           kept on OPFS by the page (web/page/piccolo-storage.js; WasmFS's OPFS backend
@@ -204,6 +207,7 @@ deps/libretro/frontend-libretro/ frontend_libretro: core_session, core_catalog, 
 ```sh
 git clone --recursive https://github.com/multitap-org/piccolo.git
 git -C piccolo submodule update --init --recursive --checkout deps/test-libretro   # optional, for all tests
+git -C piccolo submodule update --init --checkout deps/cores                       # optional, for the browser build
 for d in deps/common/hosts-common deps/common/frontends-common deps/libretro/host-libretro deps/libretro/frontend-libretro; do git -C piccolo/$d checkout main; done
 ```
 
@@ -229,7 +233,7 @@ cmake --build build-asan && (cd build-asan && LSAN_OPTIONS=suppressions=$PWD/../
 ./build/piccolo                    # normal builds in the main checkout also copy it to ~/.local/share/piccolo/
                                    # (not from a worktree: MULTITAP_COPY_FROM_WORKTREE=ON to copy)
 MULTITAP_GPU=gl ./build/piccolo     # the OpenGL ES path (GLES 3); -DMULTITAP_GL_ES2=ON builds test like the Tegra 4
-web/build-core.sh snes9x && web/build.sh snes9x  # wasm (emsdk 6.0.13 sourced; rgbds for sameboy): web/build/wasm/<core>/
+web/build-core.sh snes9x && web/build.sh snes9x  # wasm (emsdk 6.0.13 sourced, deps/cores checked out): web/build/wasm/<core>/
 web/package.sh                     # the zip with every core (sameboy and snes9x built first)
 android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-DMULTITAP_GPU_VULKAN=OFF), the SHIELD Portable
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]

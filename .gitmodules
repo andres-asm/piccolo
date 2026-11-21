@@ -58,3 +58,7 @@
 [submodule "deps/libdatachannel"]
 	path = deps/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel.git
+[submodule "deps/cores"]
+	path = deps/cores
+	url = https://github.com/multitap-org/cores.git
+	update = none
