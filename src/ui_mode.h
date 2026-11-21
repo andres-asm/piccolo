@@ -80,7 +80,7 @@ struct UiState
     UiWidget widget = UiWidget::none;          // mode == widget only
     UiWindow windows[UI_WINDOW_MAX] = {};      // MAIN MENU's stack, bottom first
     uint32_t window_count = 0;
-    bool     game_running = false;             // set by ui_set_game_running
+    bool     game_running = false;             // set by ui_game_started / ui_game_stopped
     UiGrab   grab = UiGrab::none;
     UiMode   grab_mode = UiMode::main_menu;    // its owner...
     UiWindow grab_window = UiWindow::none;     // ...and MAIN MENU's window that took it (none: the mode itself)
@@ -88,8 +88,10 @@ struct UiState
     uint32_t changes = 0;                      // counts mode changes
 };
 
-// A game started (GAME, everything closed) or stopped (MAIN MENU).
-void ui_set_game_running(UiState* state, bool running);
+// A game started (GAME, everything closed, no USER pause: it was the old
+// game's) or stopped (MAIN MENU). Stopping again does nothing.
+void ui_game_started(UiState* state);
+void ui_game_stopped(UiState* state);
 
 // The transitions. True when the mode (or the widget) changed. Entering a
 // mode closes what the old one had open (MAIN MENU's stack, the widget).

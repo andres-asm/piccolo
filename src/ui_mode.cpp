@@ -21,22 +21,22 @@ static bool change_mode(UiState* state, UiMode mode, UiWidget widget)
     return true;
 }
 
-void ui_set_game_running(UiState* state, bool running)
+void ui_game_started(UiState* state)
 {
-    if (running == state->game_running)
+    state->game_running = true;
+    state->user_paused = false;
+    change_mode(state, UiMode::game, UiWidget::none);   // straight into the game
+}
+
+void ui_game_stopped(UiState* state)
+{
+    if (!state->game_running)
     {
         return;
     }
-    state->game_running = running;
-    if (running)
-    {
-        change_mode(state, UiMode::game, UiWidget::none);   // straight into the game
-    }
-    else
-    {
-        state->user_paused = false;   // a pause belongs to the game it paused
-        change_mode(state, UiMode::main_menu, UiWidget::none);
-    }
+    state->game_running = false;
+    state->user_paused = false;
+    change_mode(state, UiMode::main_menu, UiWidget::none);
 }
 
 bool ui_enter_game(UiState* state)

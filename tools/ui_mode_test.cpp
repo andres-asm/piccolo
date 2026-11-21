@@ -29,7 +29,7 @@ static void test_transitions()
     ui_push_window(&state, UiWindow::load_game);
 
     uint32_t changes = state.changes;
-    ui_set_game_running(&state, true);
+    ui_game_started(&state);
     check(state.mode == UiMode::game && state.window_count == 0, "a game starts: GAME, LOAD GAME closed");
     check(state.changes == changes + 1, "a game starts: counted as a change");
 
@@ -52,7 +52,7 @@ static void test_transitions()
     check(ui_enter_widget(&state, UiWidget::ports) && state.window_count == 0, "F3 in MAIN MENU: its windows close, DEVICES opens");
 
     changes = state.changes;
-    ui_set_game_running(&state, false);
+    ui_game_stopped(&state);
     check(state.mode == UiMode::main_menu && state.widget == UiWidget::none, "the game stops: MAIN MENU");
     check(state.changes == changes + 1, "the game stops: counted");
 }
@@ -61,7 +61,7 @@ static void test_back()
 {
     UiState state = {};
     check(ui_back(&state, false) == UiBack::none, "back: the bar alone with nothing running stays");
-    ui_set_game_running(&state, true);
+    ui_game_started(&state);
     check(ui_back(&state, false) == UiBack::none, "back: in GAME it's the game's");
     ui_enter_quick_menu(&state);
     check(ui_back(&state, true) == UiBack::close_sub_view, "back: QUICK MENU's sub-view first");
@@ -80,7 +80,7 @@ static void test_back()
 static void test_grabs()
 {
     UiState state = {};
-    ui_set_game_running(&state, true);
+    ui_game_started(&state);
     ui_push_window(&state, UiWindow::settings);
     ui_push_window(&state, UiWindow::input);
     ui_grab_begin(&state, UiGrab::capture);
@@ -113,7 +113,7 @@ static void test_derive()
     check(d.interface_layer && d.keyboard_hotkeys_free && !d.overlay_active && d.pause == 0,
           "derive: nothing runs: interface, free keyboard hotkeys, no overlay, no pause");
 
-    ui_set_game_running(&state, true);
+    ui_game_started(&state);
     d = ui_derive(&state, &facts);
     check(!d.interface_layer && !d.keyboard_hotkeys_free && d.overlay_active && d.pause == 0 && !d.frame_delay_interrupt,
           "derive: GAME: the game's input, overlay on, runs");
@@ -167,7 +167,7 @@ static void test_derive()
     d = ui_derive(&state, &facts);
     check(d.pause == (ui_pause_bit(UiPause::user) | ui_pause_bit(UiPause::background)) && d.frame_delay_interrupt,
           "derive: causes add up (USER + BACKGROUND)");
-    ui_set_game_running(&state, false);
+    ui_game_stopped(&state);
     check(!state.user_paused && ui_derive(&state, &facts).pause == 0, "derive: nothing runs: no pause, USER forgotten");
 }
 
