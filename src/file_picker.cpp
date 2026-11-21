@@ -754,7 +754,7 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
                 picker->listing_stale = true;
             }
             ImGui::PopID();
-            // SD cards and USB drives (Android), as they are while the list is open.
+            // SD cards and USB drives (Android), the drives (Windows), as they are while the list is open.
             for (size_t i = 0; i < picker->volumes.size(); i++)
             {
                 ImGui::PushID(static_cast<int>(1000 + i));
