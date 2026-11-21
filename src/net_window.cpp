@@ -3,7 +3,10 @@
 #include <cstdio>
 #include <cstring>
 
+#include <SDL3/SDL.h>
+
 #include "imgui.h"
+#include "net_pair_link.h"
 
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -51,6 +54,19 @@ static void draw_pairing(const NetWindowContext* context)
     if (retro_ui_button(piccolo_text(strings, Str::net_pair_stop)))
     {
         net_access_close_pairing(access);
+    }
+    // Across the internet (INTERNET on): the pair link, for a device that
+    // can't find us on the LAN (mobile data, a browser). The code is still typed.
+    if (context->internet)
+    {
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::net_pair_copy_link)))
+        {
+            std::string link = net_pair_link(access->host_key,
+                                             settings_get_text(context->settings, PICCOLO_NET_BEACON));
+            SDL_SetClipboardText(link.c_str());
+        }
+        retro_ui_item_tooltip(piccolo_text(strings, Str::net_pair_copy_link_help));
     }
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", piccolo_text(strings, Str::net_pair_instructions));

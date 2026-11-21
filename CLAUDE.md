@@ -177,6 +177,7 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               net_host (ENet + LAN discovery on one UDP port), net_noise (Noise XX),
                               net_link / net_session (encrypted channels per peer), net_cpace (PAKE),
                               net_trust / net_pairing / net_access (host) / net_client (6-digit pairing,
+                              on the LAN or across the internet with net_pair_link: the link / QR,
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
