@@ -1,5 +1,6 @@
 #include "net_window.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
@@ -7,6 +8,7 @@
 
 #include "imgui.h"
 #include "net_pair_link.h"
+#include "qrcodegen.h"
 
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
@@ -26,6 +28,73 @@ static void draw_code(const NetAccess* access)
 //   CODE  482 915
 //   VALIDITY: 4:32  [REFRESH] [STOP]
 //   Type this code on the other device...
+static_assert(NET_WINDOW_QR_BUFFER == qrcodegen_BUFFER_LEN_FOR_VERSION(NET_WINDOW_QR_MAX_VERSION),
+              "the QR buffer size matches qrcodegen's");
+
+// The pair link as a QR code: dark modules on white with the quiet zone
+// scanners want (4 modules), each module a whole number of pixels.
+// The link and its QR are made again only when the key or the beacon change
+// (not every frame).
+static void update_link(NetWindowState* state, const uint8_t* host_key, const char* beacon)
+{
+    if (state->qr_beacon == beacon && std::memcmp(state->qr_key, host_key, NET_KEY_SIZE) == 0 &&
+        !state->qr_link.empty())
+    {
+        return;
+    }
+    state->qr_beacon = beacon;
+    std::memcpy(state->qr_key, host_key, NET_KEY_SIZE);
+    state->qr_link = net_pair_link(host_key, beacon);
+    uint8_t temp[NET_WINDOW_QR_BUFFER];
+    state->qr_ok = qrcodegen_encodeText(state->qr_link.c_str(), temp, state->qr, qrcodegen_Ecc_MEDIUM,
+                                        qrcodegen_VERSION_MIN, NET_WINDOW_QR_MAX_VERSION, qrcodegen_Mask_AUTO, true);
+}
+
+static void draw_qr(const NetWindowState* state)
+{
+    if (!state->qr_ok)
+    {
+        return;
+    }
+    int size = qrcodegen_getSize(state->qr);
+    float module = std::floor(ImGui::GetFontSize() / 3.0f);
+    if (module < 2.0f)
+    {
+        module = 2.0f;
+    }
+    const int quiet = 4;
+    float side = static_cast<float>(size + quiet * 2) * module;
+    ImVec2 origin = ImGui::GetCursorScreenPos();
+    origin.x = std::floor(origin.x);
+    origin.y = std::floor(origin.y);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(origin, ImVec2(origin.x + side, origin.y + side), IM_COL32(255, 255, 255, 255));
+    for (int y = 0; y < size; y++)
+    {
+        // Runs of dark modules on a row as one rectangle each.
+        int x = 0;
+        while (x < size)
+        {
+            if (!qrcodegen_getModule(state->qr, x, y))
+            {
+                x++;
+                continue;
+            }
+            int start = x;
+            while (x < size && qrcodegen_getModule(state->qr, x, y))
+            {
+                x++;
+            }
+            float left = origin.x + static_cast<float>(start + quiet) * module;
+            float top = origin.y + static_cast<float>(y + quiet) * module;
+            draw->AddRectFilled(ImVec2(left, top),
+                                ImVec2(left + static_cast<float>(x - start) * module, top + module),
+                                IM_COL32(0, 0, 0, 255));
+        }
+    }
+    ImGui::Dummy(ImVec2(side, side));
+}
+
 static void draw_pairing(const NetWindowContext* context)
 {
     NetAccess* access = context->access;
@@ -60,13 +129,16 @@ static void draw_pairing(const NetWindowContext* context)
     if (context->internet)
     {
         ImGui::SameLine();
+        update_link(context->state, access->host_key, settings_get_text(context->settings, PICCOLO_NET_BEACON));
         if (retro_ui_button(piccolo_text(strings, Str::net_pair_copy_link)))
         {
-            std::string link = net_pair_link(access->host_key,
-                                             settings_get_text(context->settings, PICCOLO_NET_BEACON));
-            SDL_SetClipboardText(link.c_str());
+            SDL_SetClipboardText(context->state->qr_link.c_str());
         }
         retro_ui_item_tooltip(piccolo_text(strings, Str::net_pair_copy_link_help));
+        draw_qr(context->state);
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::net_pair_qr_help));
+        ImGui::PopTextWrapPos();
     }
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", piccolo_text(strings, Str::net_pair_instructions));

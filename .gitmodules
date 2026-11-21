@@ -58,3 +58,6 @@
 [submodule "deps/libdatachannel"]
 	path = deps/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel.git
+[submodule "deps/qrcodegen"]
+	path = deps/qrcodegen
+	url = https://github.com/nayuki/QR-Code-generator.git

@@ -46,7 +46,8 @@ cores, no GUI) and **frontends** (GUI).
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
   (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (zpl-c's ENet: UDP connections, IPv6 dual-stack), `deps/monocypher`
   (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
-  signatures); libcurl from the system (Linux) for the core downloader
+  signatures), `deps/qrcodegen` (Nayuki's QR Code generator, MIT, v1.8.0: its C file only; the pair
+  link as a QR); libcurl from the system (Linux) for the core downloader
 
 Other repos: libretro-test-frontend (the host's test frontend, same libraries,
 test-libretro always), multitap (README + STYLE.md: the family), imguisw (fork

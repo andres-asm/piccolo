@@ -804,6 +804,7 @@ net_pair_validity = VALIDITY
 net_pair_stop = STOP
 net_pair_refresh = REFRESH
 net_pair_copy_link = COPY LINK
+net_pair_qr_help = From another network (mobile data, a browser): scan this code or open the link, then type the code above.
 net_pair_copy_link_help = Copies the pair link: a device that isn't on this network (mobile data, a browser) opens it, then types the code.
 net_section_connected = CONNECTED DEVICES
 net_no_connected = NO DEVICES CONNECTED
