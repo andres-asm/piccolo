@@ -208,6 +208,7 @@ set(PICCOLO_SOURCES
     src/piccolo_window.cpp
     src/piccolo_text.cpp
     src/recent_games.cpp
+    src/ui_mode.cpp
     src/core_options_ui.cpp
     src/cores_window.cpp
     src/share_window.cpp
@@ -438,6 +439,13 @@ if(MULTITAP_BUILD_TESTS)
                          SKIP_RETURN_CODE 77
                          PASS_REGULAR_EXPRESSION "gl presets: all [0-9]+ load, run and come out even"
                          FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
+
+    add_executable(piccolo_ui_mode_test tools/ui_mode_test.cpp src/ui_mode.cpp)
+    target_include_directories(piccolo_ui_mode_test PRIVATE src)
+    multitap_set_project_flags(piccolo_ui_mode_test)
+    add_test(NAME piccolo_ui_mode COMMAND piccolo_ui_mode_test)
+    set_tests_properties(piccolo_ui_mode PROPERTIES
+        FAIL_REGULAR_EXPRESSION "FAIL|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
     add_executable(piccolo_recent_games_test tools/recent_games_test.cpp src/recent_games.cpp)
     target_include_directories(piccolo_recent_games_test PRIVATE src)
