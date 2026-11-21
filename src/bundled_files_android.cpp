@@ -112,11 +112,37 @@ std::string bundled_files_data_folder()
     {
         return "";
     }
-    // Rewritten at every start, so a newer APK's files replace the old ones.
+    // Copied again only when the APK changed: PiccoloActivity passes the
+    // package's last update time, kept next to the copy in "stamp". Without a
+    // stamp (nothing passed) every start copies, as before.
     // (A file a newer APK no longer ships stays behind; harmless for now.)
     std::string destination = std::string(internal) + "/bundled/";
+    std::string stamp_path = destination + "stamp";
+    const char* stamp = SDL_getenv("PICCOLO_APK_STAMP");
+    bool have_stamp = stamp != nullptr && stamp[0] != '\0';
+    if (have_stamp)
+    {
+        uint8_t* data = nullptr;
+        size_t size = 0;
+        bool same = false;
+        if (host_fs_read_file(stamp_path.c_str(), &data, &size))
+        {
+            same = size == std::strlen(stamp) && std::memcmp(data, stamp, size) == 0;
+            delete[] data;
+        }
+        if (same)
+        {
+            return destination;
+        }
+    }
     copy_asset_folder("layouts", destination);
     copy_asset_folder("themes", destination);
+    copy_asset_folder("shaders", destination);   // piccolo's own presets + the curated ones (shaders/presets)
+    if (have_stamp && !host_fs_write_file(stamp_path.c_str(), stamp, std::strlen(stamp)))
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Bundled files: can't write %s", stamp_path.c_str());
+    }
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Bundled files copied to %s", destination.c_str());
     return destination;
 }
 

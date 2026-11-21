@@ -1,22 +1,35 @@
-# Builds piccolo for Windows (x86_64) natively with MSYS2's UCRT64 toolchain
-# (GCC + libstdc++ + the Universal CRT), the same one used to build it by hand
-# on Windows, runs the tests, and uploads the piccolo folder (GitHub serves it
-# as a zip).
+# Builds piccolo for Windows natively with MSYS2, runs the tests, and uploads
+# the piccolo folder (GitHub serves it as a zip):
+#   x86_64: UCRT64 (GCC + libstdc++ + the Universal CRT), the toolchain used to
+#           build it by hand on Windows.
+#   ARM64:  CLANGARM64 (clang + libc++ + the Universal CRT) on GitHub's
+#           Windows ARM runner; MSYS2 has no GCC for ARM64.
 # The C/C++ runtimes are linked statically, so piccolo.exe only needs Windows'
 # own DLLs and vulkan-1.dll (installed with the GPU driver).
 name: Windows
 
+# Tags: release.yml calls this workflow for v* tags (workflow_call).
 on:
   push:
     branches: [main]
-    tags: ['*']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 jobs:
   windows:
-    name: Windows (UCRT64)
-    runs-on: windows-latest
+    name: Windows (${{ matrix.msystem }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - msystem: UCRT64
+            arch: x86_64
+            runner: windows-latest
+          - msystem: CLANGARM64
+            arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: msys2 {0}
@@ -30,27 +43,35 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: UCRT64
+          msystem: ${{ matrix.msystem }}
           update: true
-          install: >-
-            git
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-vulkan-devel
+          # pacboy adds the environment's prefix; cc is GCC on UCRT64, clang on CLANGARM64.
+          install: git
+          pacboy: >-
+            cc:p
+            cmake:p
+            ninja:p
+            vulkan-devel:p
 
-      # Only the submodules the build uses (deps/test-libretro is optional).
+      # Only the submodules the build uses.
       # deps/librashader without --recursive: its own submodules are tests.
       - name: Submodules
         run: |
           git submodule update --init --recursive --depth 1 \
             deps/SDL deps/imgui deps/libretro-common deps/libsamplerate \
-            deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher \
+            deps/gamemode deps/miniz deps/7zip deps/enet deps/monocypher deps/beacon \
             deps/piccolo-shaders \
             deps/common/hosts-common deps/common/frontends-common \
             deps/libretro/host-libretro deps/libretro/frontend-libretro
           git submodule update --init --depth 1 deps/librashader
+          # Test libretro ships in every package. Its nested submodules
+          # (imguisw's) have SSH URLs: fetched over HTTPS instead.
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive --checkout --depth 1 deps/test-libretro
 
+      # Shared and module libraries (test_libretro.dll is a MODULE) get the
+      # static runtime too. The core downloader uses WinHTTP (Windows' own),
+      # never MSYS2's curl: the DLL check below rejects libcurl.
       # Release without warnings as errors (GCC -O2 gives two harmless ones).
       # MULTITAP_PICCOLO_DIR is the folder that's uploaded: the build copies
       # piccolo.exe, lang/, layouts/, themes/ and shaders/ there.
@@ -59,12 +80,18 @@ jobs:
           cmake -S . -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DMULTITAP_PICCOLO_DIR="$PWD/dist/piccolo" \
-            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
+            -DCMAKE_EXE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-static -static-libgcc -static-libstdc++" \
+            -DCMAKE_MODULE_LINKER_FLAGS="-static -static-libgcc -static-libstdc++"
 
       - name: Build
         run: cmake --build build
 
+      # MULTITAP_NET_HTTP_ONLINE_URL: net_http_test also downloads over the
+      # network (WinHTTP, TLS by Schannel) from the cores site.
       - name: Test
+        env:
+          MULTITAP_NET_HTTP_ONLINE_URL: https://cores.get-piccolo.app/v1/index/windows-x86_64.cfg
         run: ctest --test-dir build --output-on-failure
 
       # librashader (shader presets), which piccolo loads at run time from its
@@ -86,12 +113,19 @@ jobs:
       # Windows' own and vulkan-1.dll), or librashader.dll a C/C++ runtime DLL.
       - name: Check DLL dependencies
         run: |
-          objdump -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
-          if grep -iE 'libstdc|libgcc|libwinpthread|SDL3' dlls.txt; then
+          objdump=$(command -v objdump || command -v llvm-objdump)
+          "$objdump" -p dist/piccolo/piccolo.exe | grep 'DLL Name' | tee dlls.txt
+          if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind|libcurl|SDL3' dlls.txt; then
             echo "piccolo.exe depends on MSYS2 DLLs"
             exit 1
           fi
-          objdump -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
+          # Test libretro ships in every package, in piccolo's cores folder.
+          "$objdump" -p dist/piccolo/cores/test_libretro.dll | grep 'DLL Name' | tee test-core-dlls.txt
+          if grep -iE 'libstdc|libgcc|libwinpthread|libc\+\+|libunwind' test-core-dlls.txt; then
+            echo "test_libretro.dll depends on MSYS2 DLLs"
+            exit 1
+          fi
+          "$objdump" -p dist/piccolo/librashader.dll | grep 'DLL Name' | tee rashader-dlls.txt
           if grep -iE 'vcruntime|msvcp|api-ms-win-crt|libstdc|libgcc' rashader-dlls.txt; then
             echo "librashader.dll depends on a C/C++ runtime DLL"
             exit 1
@@ -99,5 +133,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: piccolo-windows-x86_64
+          name: piccolo-windows-${{ matrix.arch }}
           path: dist/

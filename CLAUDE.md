@@ -13,7 +13,7 @@ Multitap project: sync options, a curated shader list, input mapping, scaling
 options, save/load states. **No game library** (no ROM scanning, playlists or
 metadata). Its UI recreates the look and feel of a classic emulator GUI with
 ImGui ("retro-style UI"), with piccolo's own 5x5 pixel font. The reference is
-ZSNES's GUI (naming it is fine: a theme is called ZSNES). It is GPL: never copy
+ZSNES's GUI (naming it is fine: a theme is called ZSNES). ZSNES is GPL and piccolo is MIT: never copy
 its font, logo or graphics, everything is redrawn. See "piccolo and the
 host-libretro test frontend" in `docs/design-notes.md`.
 
@@ -33,12 +33,18 @@ cores, no GUI) and **frontends** (GUI).
 - `deps/libretro/host-libretro`     host-libretro: the libretro host (no GUI), libretro_core_info, tests
 - `deps/libretro/frontend-libretro` frontend-libretro: core session, core options, core catalog
 - `deps/test-libretro`              test-libretro (the Test libretro core), optional (`update = none`)
+- `deps/beacon`                     multitap-beacon (multitap-org/multitap-beacon, MIT): the introduction server for
+                                     connections across the internet (STUN-like + hole punching, never a relay);
+                                     frontends-common builds only its `beacon_wire` library (tests also its server code)
+- `deps/libdatachannel`             libdatachannel v0.24.6 (MPL-2.0, accepted 2026-11-20): WebRTC data channels natively
+                                     (desktop, Android meet browsers); static, no WebSocket / media; OpenSSL for DTLS.
+                                     Its own submodules: plog, usrsctp, libjuice (`git submodule update --init` there)
 - `deps/piccolo-shaders`            piccolo-shaders: the curated slang presets (branch `piccolo` of a trimmed
                                      slang-shaders, per-file licenses), copied to shaders/presets/; optional.
                                      Rebased on upstream: tag the pinned commit (piccolo-YYYY-MM-DD) first
 - third-party: `deps/SDL`, `deps/imgui`, `deps/libretro-common`, `deps/libsamplerate`,
   `deps/gamemode`, `deps/librashader`, `deps/miniz` (zip reading only), `deps/7zip`
-  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (UDP connections), `deps/monocypher`
+  (only its C 7z decoder + SHA-256, no PPMd), `deps/enet` (zpl-c's ENet: UDP connections, IPv6 dual-stack), `deps/monocypher`
   (X25519, ChaCha20-Poly1305, BLAKE2b, SHA-512 from optional/; EdDSA for the core downloader's
   signatures); libcurl from the system (Linux) for the core downloader
 
@@ -98,9 +104,9 @@ Hosts never use SDL or frontend code.
 - Platform: SDL3 for window, input, audio only.
 - UI: Dear ImGui (official SDL3 + Vulkan backends, unmodified), themed, with
   piccolo's pixel font. No RmlUi in piccolo.
-- Shaders (next milestone): our own pass 0 + librashader loaded at runtime
-  (`librashader_ld.h`, MIT headers; ABI 2, API 5).
-- Build: CMake ≥ 3.25, Ninja. Targets: Linux, Windows, macOS; Android (branch).
+- Shaders: our own pass 0 + librashader loaded at run time by our own loader
+  (librashader's MIT C headers; ABI 2, API >= 5).
+- Build: CMake ≥ 3.25, Ninja. Targets: Linux, Windows, Android; macOS (no CI, state unknown).
 
 ## Layout
 
@@ -122,22 +128,27 @@ src/
                           CHOOSE FOLDER mode (file_picker_open_folder) for picking a folder
   recent_games.*          RECENT menu
   quick_menu.*            QUICK MENU: SAVESTATES, CORE OPTIONS, CONTROLS (ports, remap: mapping, turbo,
-                          combos, macros, mouse / lightgun)
+                          combos, macros, mouse / lightgun), SHADER (scope, preset with CHOOSE, FILTER; only here, not in SETTINGS)
   input_window.*          INPUT: SETTINGS, INTERFACE, HOTKEYS, DEVICES
   map_window.*            MAP CONTROLLER wizard; pad_picture.* the controller drawing
   net_window.*            SETTINGS > NETWORK tab: listener settings, pairing code, paired devices
   net_games.*             games from devices with FULL access: cores, game folders, load (net_content)
   net_remote.*            settings (SETTINGS' pages, the device's language) and actions from devices (net_settings)
+  headless.*              GO HEADLESS: a streaming device takes the game (window hidden behind a tray icon)
   core_options_ui.* safe_start_window.*
+  shader_check.* shader_check_window.*   a preset just applied that's too slow: KEEP / REVERT (15)
+  text_input_window.*     the text box for a core's TEXT request (libretro extension EXT_SET_TEXT_INPUT)
   cores_window.*          TOOLS > CORES: the core downloader's window (core_updater in frontend-libretro)
 layouts/                  controller layouts (<Maker>/<model>.cfg)
-android/                  Android stub (SDL from deps/)
-web/                      the browser build (Emscripten, WebGL 2, pthreads; branch wasm): build-core.sh (SameBoy
+android/                  Android APK: build-apk.sh (--legacy: GLES 2, armeabi-v7a, Android 5+), res/ (icons,
+                          banner), res-debug/ (debug variant)
+web/                      the browser build (Emscripten, WebGL 2, pthreads): build-core.sh (SameBoy
                           as a static archive), build.sh; src/bundled_files_web.cpp registers the linked core
   main_loop.*             who drives the loop: desktop while, or the browser (main_loop_web: rAF, save on
                           leave, piccolo_web_open); storage.* the browser's piccolo folder on OPFS (WasmFS)
 tools/                    pixel_font_preview, strings_check, recent_games_test, stream_measure (remote play
-                          codec on real games), lsan-suppressions.txt
+                          codec on real games), netplay_measure (which netplay mode a core and game
+                          suit: determinism, exact states, cost), lsan-suppressions.txt
 deps/common/hosts-common/     host_common: host_log, host_fs (mkdir -p, read, atomic write; the only
                               <filesystem> user), dynamic_library; cmake/multitap.cmake
 deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan + swapchain + renderer + ImGui),
@@ -159,7 +170,10 @@ deps/common/frontends-common/ frontend_common: app_shell (SDL + window + Vulkan 
                               access levels gamepad / stream / full), net_input + input_net (remote pads
                               in the router, game-only), net_content (browse / load games: messages) +
                               net_content_folders (host: game folders as virtual paths, never left),
-                              net_service (the network on its own thread; remote play is coded and sent
+                              net_rtc (WebRTC under NetHost: net_rtc_datachannel / _none; peers
+                              carry their transport, the same channels and bytes as ENet),
+                              net_beacon (across the internet: register with the beacon, meet,
+                              punch, peer-reflexive), net_service (the network on its own thread; remote play is coded and sent
                               there), net_stream (remote play packets), net_settings (settings and
                               actions described by the host), net_speed (speed
                               test), net_wire (fields);
@@ -207,39 +221,63 @@ android/build-apk.sh [--legacy]    # --legacy: armv7, Android 5+, GLES 2 only (-
 ./build/deps/libretro/host-libretro/libretro_core_info [--frames N] [--set KEY=VALUE]... <core> [content]
 ```
 
-67 tests with test-libretro (48 without). Before calling a larger change done:
+77 tests with test-libretro. Before calling a larger change done:
 warnings-as-errors clean, ctest in both builds, no Vulkan validation messages,
 no ASan/UBSan reports beyond `tools/lsan-suppressions.txt`, resizing and
 quitting work. Benchmarks: Release build (warnings-as-errors OFF: two harmless
 -O2 warnings), `XDG_DATA_HOME=<scratch>`, `taskset -c 4-7` on the RK3588.
 Low-end test target: the RK3588 ARM board (Mali-G610, Mesa panvk).
 
-## Current state (2026-11-19)
+## Current state (2026-11-20)
 
 - piccolo 0.3: plays games through frontend-libretro; LOAD GAME, RECENT,
   SETTINGS (global / core / game layers), IMAGE SETTINGS, QUICK MENU
   (savestates 1-9 with thumbnails, core options, controls), fast forward,
-  native pixel formats, frame delay, localization (es), games from zip / 7z
-  (extracted into <root>/cache, trimmed to 4 GiB; cores never get virtual paths).
+  native pixel formats, frame delay, RUN-AHEAD (one setting, for cores with
+  their own run-ahead), localization (es), games from zip / 7z (extracted into
+  <root>/cache, trimmed to 4 GiB; cores never get virtual paths). Retro UI
+  scale: the biggest block that leaves 640 x 360.
+- Shaders (milestone 6, on main): frontends-common's shader_chain loads
+  librashader at run time (our own loader; ABI 2, API >= 5). Stage 0 = pass 0
+  (PICTURE CONTROLS + color profiles: GBA, GBC, DS, PSP, ... NTSC), stage 1 =
+  the `video_shader_preset` setting or piccolo's scale preset for FILTER.
+  Curated presets from deps/piccolo-shaders; SETTINGS > SHADER: CHOOSE. Without
+  librashader the plain picture path draws. Details: docs/handoff-shaders.md.
+- libretro extensions (Multitap's private environment calls, host-libretro
+  `src/libretro_extensions.h`): run-ahead (0x4D01/02) and text input (0x4D03:
+  KEYS opens a phone's on-screen keyboard only when the core asks, TEXT shows
+  piccolo's text box). Planned: multitap adapters, media slots (docs/design-notes.md).
+- TOOLS > CORES: the core downloader (core_updater in frontend-libretro, signed
+  index); SHOW NON-FREE CORES off by default, confirmed when turned on.
 - Input (done for this version): N:N ports (hotkeys and UI from port 1 + the
   keyboard), per-core remaps with per-game copies, combos and macros (recorder)
   per core, turbo (row box + TURBO BUTTON for the session), mouse / pointer /
   lightgun from one cursor per port (several mice), MAP CONTROLLER wizard,
-  layouts, numbered controller names, PORTS setting. Left for later: touch
-  (drag mode, DS pointer), crosshair, Joy-Cons, per-port unlink, radial menu,
-  overlay, on-screen messages redesign.
+  layouts, numbered controller names, PORTS setting, PAUSE WHEN CONTROLLERS
+  DISCONNECT. Left for later: touch (drag mode, DS pointer), crosshair,
+  Joy-Cons, per-port unlink, radial menu, overlay, on-screen messages redesign.
 - Untested on hardware: SN30 over USB (unknown pad), Genesis / Saturn layouts,
   Shield touchpad pointer, mouse grab, lightguns (Zapper, Super Scope).
-- Network (merged 2026-11-19; pending work in docs/netcode-pending.md): one UDP port
-  (ENet) with LAN discovery, Noise XX encryption, 6-digit pairing, access levels
-  gamepad / stream / full; remote pads (standard pads remapped here, or RetroPad mapped
-  on the phone), what runs, actions (save / load state, slot, fast forward, pause,
-  reset, close), settings, controllers per port, game folders browsed and games loaded
-  from the client. SETTINGS > NETWORK. Remote play: lossless frames (frame_delta) and audio streamed
-  from the network thread; piccoletto's side not written yet.
-- Next: shaders (milestone 6): librashader is in deps/, not wired yet.
-- Release plan (early December): piccolo + piccoletto (Android: remote input,
-  streaming). Branches `android`, `big-picture` still need adapting to deps/.
+- Network (pending work in docs/netcode-pending.md): on its own thread
+  (net_service); one UDP port (ENet) with LAN discovery, Noise XX encryption,
+  6-digit pairing, access levels gamepad / stream / full; remote pads (standard
+  pads remapped here, or RetroPad mapped on the phone), what runs, actions
+  (save / load state, slot, fast forward, pause, reset, close), settings,
+  controllers per port, DEVICES (a phone lists who plays on which port and moves
+  them), game folders browsed and games loaded from the client. SETTINGS >
+  NETWORK. Remote play: piccolo streams the frame it shows (lossless,
+  frame_delta) and the audio it plays; the streaming device negotiates the frame
+  delay (in memory only). piccoletto plays it (tested on the SHIELD).
+- Packaging (docs/packaging.md): app ID site.multitap.piccolo. CI builds the
+  Flatpak (librashader and libgamemode bundled), the Windows zip (MSYS2 UCRT64)
+  and the Android APK. Android is back on main from deps/ (android/,
+  build-apk.sh): with PICCOLO_KEYSTORE a release build, without it a debug
+  variant (android/res-debug, its own banner); CI signs with the
+  ANDROID_KEYSTORE_* secrets when they're set. Branding, adaptive icon included:
+  assets/branding. Site: get-piccolo.app (repo multitap-org/piccolo-site).
+- Release plan (early December): piccolo (Linux Flatpak, Windows, Android) +
+  piccoletto (Android: gamepad, remote play, devices). The `big-picture` branch
+  still needs adapting to deps/.
 - Known: Release builds fail with warnings-as-errors (GCC -O2 only:
   `instance_layer_available` unused outside Debug, a -Wformat-truncation in a
   log note). Pending: imgui docking branch.

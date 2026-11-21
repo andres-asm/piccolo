@@ -16,7 +16,7 @@ import android.util.Log;
 // PiccoloActivity (SDL + piccolo) and goes away.
 //
 // Why a separate activity: piccolo picks its folder once, at start
-// (frontends-common app_paths: /sdcard/piccolo with access, the private folder
+// (frontends-common app_paths: /sdcard/piccolo with access, the app's Android/media folder
 // without). SDL starts SDL_main as soon as its activity is resumed with a
 // surface, and the permission dialog doesn't stop that (it's a translucent
 // activity on top). Asking here, before SDL exists, means piccolo always
@@ -60,7 +60,7 @@ public class StartActivity extends Activity {
         } else if (usesLegacyStorage(this)) {
             requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, STORAGE_REQUEST);
         } else if (!askForAllFilesAccess()) {
-            startPiccolo();   // no screen to ask on: start with the private folder
+            startPiccolo();   // no screen to ask on: start with the Android/media folder
         }
     }
 
@@ -68,7 +68,7 @@ public class StartActivity extends Activity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         if (requestCode == STORAGE_REQUEST) {
             if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Log.w(TAG, "storage permission refused: using the app's private folder (deleted on uninstall)");
+                Log.w(TAG, "storage permission refused: using the app's Android/media folder (deleted on uninstall)");
             }
             startPiccolo();
         }

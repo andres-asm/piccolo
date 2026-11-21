@@ -355,8 +355,9 @@ static void draw_scoped_settings(InputWindow* window, const InputWindowContext* 
 
 static void draw_settings(InputWindow* window, const InputWindowContext* context)
 {
-    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_PORTS, PICCOLO_INPUT_PRESS_TIME, PICCOLO_INPUT_HOLD_TIME};
-    draw_scoped_settings(window, context, KEYS, 3);
+    static const char* const KEYS[] = {PICCOLO_INPUT_SHARE_PORT1, PICCOLO_INPUT_PORTS, PICCOLO_INPUT_PRESS_TIME,
+                                       PICCOLO_INPUT_HOLD_TIME, PICCOLO_INPUT_OSK};
+    draw_scoped_settings(window, context, KEYS, sizeof(KEYS) / sizeof(KEYS[0]));
 }
 
 // ---------------------------------------------------------------------------

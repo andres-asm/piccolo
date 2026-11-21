@@ -30,6 +30,10 @@ constexpr const char* PICCOLO_GAME_MODE = "game_mode";
 constexpr const char* PICCOLO_INPUT_SHARE_PORT1 = "input_keyboard_shares_port1";
 constexpr const char* PICCOLO_INPUT_PRESS_TIME = "input_press_seconds";   // binding: wait for a press this long, then go on
 constexpr const char* PICCOLO_INPUT_HOLD_TIME = "input_hold_seconds";     // binding with SET / MAP CONTROLLER: hold this long
+// INPUT > ENABLE OSK: the system's on-screen keyboard for text fields and for
+// a core that asks for the keyboard. "auto" = on for phones, TVs and handhelds
+// (Android, Steam Deck, no physical keyboard), off on a PC. Global only.
+constexpr const char* PICCOLO_INPUT_OSK = "input_osk";
 constexpr const char* PICCOLO_INPUT_PORTS = "input_ports";                // CONTROLS: how many ports it shows (of the core's)
 // The emulated device on each port (the core's own ids; 1 = the joypad),
 // picked in the quick menu's CONTROLS; kept per core (or game).
@@ -40,6 +44,8 @@ constexpr const char* PICCOLO_INPUT_PORT_DEVICES[4] = {"input_port1_device", "in
 constexpr const char* PICCOLO_NET_ENABLED = "net_enabled";
 constexpr const char* PICCOLO_NET_PORT = "net_port";
 constexpr const char* PICCOLO_NET_NAME = "net_name";   // what discovery shows
+constexpr const char* PICCOLO_NET_INTERNET = "net_internet";   // paired devices from outside, through the beacon
+constexpr const char* PICCOLO_NET_BEACON = "net_beacon";       // the beacon server (net_beacon.h)
 constexpr const char* PICCOLO_PATH_CORES = "path_cores";
 constexpr const char* PICCOLO_PATH_SYSTEM = "path_system";
 constexpr const char* PICCOLO_PATH_SAVES = "path_saves";
@@ -48,7 +54,9 @@ constexpr const char* PICCOLO_PATH_STATES = "path_states";
 // piccolo.cfg), and the development switch that lets it be http:// or file://.
 constexpr const char* PICCOLO_CORE_SERVER = "core_server";
 constexpr const char* PICCOLO_CORE_SERVER_INSECURE = "core_server_insecure";
-constexpr const char* PICCOLO_CORES_SHOW_NON_FREE = "cores_show_non_free";   // TOOLS > CORES's checkbox
+constexpr const char* PICCOLO_CORES_SHOW_NON_FREE = "cores_show_non_free";   // TOOLS > CORES's SHOW row
+constexpr const char* PICCOLO_CORES_SHOW_LEGACY = "cores_show_legacy";
+constexpr const char* PICCOLO_CORES_SHOW_EXPERIMENTAL = "cores_show_experimental";
 // Game folders (SETTINGS > GENERAL, "+" adds one): LOAD GAME offers them as
 // places to start, and they're the only folders a network client may browse
 // and load games from. Global only; kept in order, no gaps (an emptied slot
@@ -247,6 +255,9 @@ const char* piccolo_settings_ui_color_key(uint32_t index);
 
 // The Input settings (SETTINGS > INPUT) as the input layer's.
 void piccolo_settings_input(const Settings* settings, InputSettings* input);
+
+// INPUT > ENABLE OSK resolved for this machine ("auto" decided here).
+bool piccolo_settings_osk(const Settings* settings);
 
 // The Sound settings as audio_output's config.
 void piccolo_settings_audio(const Settings* settings, AudioOutputConfig* config);

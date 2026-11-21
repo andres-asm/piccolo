@@ -76,6 +76,13 @@ static const SettingEnumValue LANGUAGE_VALUES[] = {
 };
 constexpr uint32_t LANGUAGE_COUNT = sizeof(LANGUAGE_VALUES) / sizeof(LANGUAGE_VALUES[0]);
 
+static const SettingEnumValue OSK_VALUES[] = {
+    {"auto", text_id(Str::value_osk_auto)},
+    {"on", text_id(Str::value_osk_on)},
+    {"off", text_id(Str::value_osk_off)},
+};
+constexpr uint32_t OSK_COUNT = sizeof(OSK_VALUES) / sizeof(OSK_VALUES[0]);
+
 static const SettingEnumValue FRAMES_IN_FLIGHT_VALUES[] = {
     {"2", text_id(Str::value_frames_2)},
     {"1", text_id(Str::value_frames_1)},
@@ -168,6 +175,8 @@ static const SettingDescriptor SETTINGS[] = {
      .step_real = 0.5, .label = text_id(Str::setting_input_press_time), .help = text_id(Str::setting_input_press_time_help)},
     {.key = PICCOLO_INPUT_HOLD_TIME, .type = SettingType::real, .default_value = "0.5", .min_real = 0.1, .max_real = 5.0,
      .step_real = 0.1, .label = text_id(Str::setting_input_hold_time), .help = text_id(Str::setting_input_hold_time_help)},
+    {.key = PICCOLO_INPUT_OSK, .type = SettingType::enumeration, .default_value = "auto", .values = OSK_VALUES,
+     .value_count = OSK_COUNT, .label = text_id(Str::setting_input_osk), .help = text_id(Str::setting_input_osk_help)},
     {.key = PICCOLO_INPUT_PORTS, .type = SettingType::integer, .default_value = "4", .overridable = true, .min = 1, .max = 4,
      .label = text_id(Str::setting_input_ports), .help = text_id(Str::setting_input_ports_help)},
     {.key = PICCOLO_INPUT_PORT_DEVICES[0], .type = SettingType::integer, .default_value = "1", .overridable = true,
@@ -187,6 +196,12 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_net_port), .help = text_id(Str::setting_net_port_help)},
     {.key = PICCOLO_NET_NAME, .type = SettingType::text, .default_value = "PICCOLO",
      .label = text_id(Str::setting_net_name), .help = text_id(Str::setting_net_name_help)},
+    // Off by default: on, piccolo tells the beacon server it's here (Andrés
+    // decides the default). beacon.get-piccolo.app = NET_BEACON_DEFAULT_SERVER.
+    {.key = PICCOLO_NET_INTERNET, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::setting_net_internet), .help = text_id(Str::setting_net_internet_help)},
+    {.key = PICCOLO_NET_BEACON, .type = SettingType::text, .default_value = "beacon.get-piccolo.app",
+     .label = text_id(Str::setting_net_beacon), .help = text_id(Str::setting_net_beacon_help)},
     {.key = PICCOLO_PATH_CORES, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_cores),
      .help = text_id(Str::setting_path_cores_help)},
     {.key = PICCOLO_PATH_SYSTEM, .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_system),
@@ -201,6 +216,10 @@ static const SettingDescriptor SETTINGS[] = {
      .label = text_id(Str::setting_core_server_insecure), .help = text_id(Str::setting_core_server_insecure_help)},
     {.key = PICCOLO_CORES_SHOW_NON_FREE, .type = SettingType::boolean, .default_value = "false",
      .label = text_id(Str::cores_show_non_free), .help = text_id(Str::cores_show_non_free_help)},
+    {.key = PICCOLO_CORES_SHOW_LEGACY, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::cores_show_legacy_setting), .help = text_id(Str::cores_show_legacy_help)},
+    {.key = PICCOLO_CORES_SHOW_EXPERIMENTAL, .type = SettingType::boolean, .default_value = "false",
+     .label = text_id(Str::cores_show_experimental_setting), .help = text_id(Str::cores_show_experimental_help)},
     {.key = PICCOLO_PATH_GAMES[0], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
      .help = text_id(Str::setting_path_games_help)},
     {.key = PICCOLO_PATH_GAMES[1], .type = SettingType::path, .default_value = "", .label = text_id(Str::setting_path_games),
@@ -1150,4 +1169,30 @@ void piccolo_settings_input(const Settings* settings, InputSettings* input)
     input->keyboard_shares_port1 = settings_get_bool(settings, PICCOLO_INPUT_SHARE_PORT1);
     input->press_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_PRESS_TIME) * 1000.0 + 0.5);
     input->hold_ms = static_cast<uint64_t>(settings_get_real(settings, PICCOLO_INPUT_HOLD_TIME) * 1000.0 + 0.5);
+}
+
+bool piccolo_settings_osk(const Settings* settings)
+{
+    uint32_t value = settings_get_enum(settings, PICCOLO_INPUT_OSK);   // OSK_VALUES: auto, on, off
+    if (value == 1)
+    {
+        return true;
+    }
+    if (value == 2)
+    {
+        return false;
+    }
+#if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
+    return true;
+#else
+    // Steam sets SteamDeck=1 on the Deck (desktop mode too). Otherwise SDL
+    // says it has a screen keyboard only where it's the only way to type
+    // (Wayland without a physical keyboard: a tablet).
+    const char* steam_deck = SDL_getenv("SteamDeck");
+    if (steam_deck != nullptr && std::string_view(steam_deck) == "1")
+    {
+        return true;
+    }
+    return SDL_HasScreenKeyboardSupport();
+#endif
 }

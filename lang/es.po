@@ -338,6 +338,26 @@ msgctxt "shader_picker_use"
 msgid "USE"
 msgstr "USAR"
 
+msgctxt "shader_slow_title"
+msgid "SHADER TOO SLOW"
+msgstr "SHADER DEMASIADO LENTO"
+
+msgctxt "shader_slow_text"
+msgid "RUNS AT %.0f FPS. THE GAME NEEDS %.0f."
+msgstr "CORRE A %.0f FPS. EL JUEGO NECESITA %.0f."
+
+msgctxt "shader_slow_question"
+msgid "KEEP IT?"
+msgstr "¿MANTENERLO?"
+
+msgctxt "shader_slow_keep"
+msgid "KEEP"
+msgstr "MANTENER"
+
+msgctxt "shader_slow_revert_n"
+msgid "REVERT (%d)"
+msgstr "REVERTIR (%d)"
+
 msgctxt "setting_language"
 msgid "LANGUAGE"
 msgstr "IDIOMA"
@@ -790,6 +810,18 @@ msgctxt "value_scaling_auto"
 msgid "AUTO"
 msgstr "AUTO"
 
+msgctxt "value_osk_auto"
+msgid "AUTO"
+msgstr "AUTO"
+
+msgctxt "value_osk_on"
+msgid "ON"
+msgstr "ACTIVADO"
+
+msgctxt "value_osk_off"
+msgid "OFF"
+msgstr "DESACTIVADO"
+
 msgctxt "value_filter_nearest"
 msgid "NEAREST"
 msgstr "VECINO MÁS CERCANO"
@@ -1171,6 +1203,18 @@ msgid "Deletes every option stored for this core (core, folders and games), then
 msgstr "Borra todas las opciones guardadas de este core (core, carpetas y juegos) y arranca con sus valores."
 
 msgctxt "safe_start_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "text_input_title"
+msgid "ENTER TEXT"
+msgstr "ESCRIBIR TEXTO"
+
+msgctxt "text_input_ok"
+msgid "OK"
+msgstr "ACEPTAR"
+
+msgctxt "text_input_cancel"
 msgid "CANCEL"
 msgstr "CANCELAR"
 
@@ -2008,6 +2052,14 @@ msgctxt "setting_input_ports_help"
 msgid "How many of the core's ports QUICK MENU > CONTROLS shows (1 to 4; per core: 2 for a SNES core, say). A controller on a port not shown stays there."
 msgstr "Cuántos de los puertos del core muestra MENÚ RÁPIDO > CONTROLES (1 a 4; por core: 2 para un core de SNES, por ejemplo). Un control en un puerto que no se muestra sigue ahí."
 
+msgctxt "setting_input_osk"
+msgid "ON-SCREEN KEYBOARD"
+msgstr "TECLADO EN PANTALLA"
+
+msgctxt "setting_input_osk_help"
+msgid "Show the system's on-screen keyboard when a text field is chosen, or when a core asks for the keyboard. AUTO: on for phones, TVs and handhelds (Steam Deck), off on a PC. On a PC it shows only where the system has one (Steam's keyboard; on Wayland the desktop decides)."
+msgstr "Muestra el teclado en pantalla del sistema al elegir un campo de texto, o cuando un core pide el teclado. AUTO: activado en teléfonos, TVs y portátiles (Steam Deck), desactivado en un PC. En un PC solo aparece donde el sistema tiene uno (el teclado de Steam; en Wayland decide el escritorio)."
+
 msgctxt "setting_input_share_port1_help"
 msgid "The keyboard starts on port 1, and the first gamepad to press START joins it there (QUICK MENU > CONTROLS can take it off). Off: the keyboard joins its own port with START."
 msgstr "El teclado empieza en el puerto 1, y el primer gamepad que presione START se une ahí con él (MENÚ RÁPIDO > CONTROLES puede sacarlo). Apagado: el teclado se une a su propio puerto con START."
@@ -2093,6 +2145,10 @@ msgstr "%s DESCONECTADO (PUERTO %d)"
 msgctxt "quick_menu_tab_controls"
 msgid "CONTROLS"
 msgstr "CONTROLES"
+
+msgctxt "quick_menu_tab_shader"
+msgid "SHADER"
+msgstr "SHADER"
 
 msgctxt "quick_menu_no_ports"
 msgid "NOBODY HAS JOINED: PRESS START ON A CONTROLLER"
@@ -2663,6 +2719,10 @@ msgctxt "menu_cores"
 msgid "CORES..."
 msgstr "CORES..."
 
+msgctxt "menu_share"
+msgid "SHARE..."
+msgstr "COMPARTIR..."
+
 msgctxt "cores_title"
 msgid "CORES"
 msgstr "CORES"
@@ -2819,6 +2879,70 @@ msgctxt "setting_net_port_help"
 msgid "The UDP port for everything network. Change it only if another program uses it."
 msgstr "El puerto UDP para todo lo de red. Cámbialo solo si otro programa lo usa."
 
+msgctxt "setting_net_internet"
+msgid "INTERNET"
+msgstr "INTERNET"
+
+msgctxt "setting_net_internet_help"
+msgid "Lets paired devices connect from outside this network, through the BEACON SERVER. It only introduces the two devices: the game never goes through it. Some networks don't let the connection through."
+msgstr "Deja que los dispositivos vinculados se conecten desde fuera de esta red, a través del SERVIDOR BEACON. Solo presenta a los dos dispositivos: el juego nunca pasa por él. Algunas redes no dejan pasar la conexión."
+
+msgctxt "setting_net_beacon"
+msgid "BEACON SERVER"
+msgstr "SERVIDOR BEACON"
+
+msgctxt "setting_net_beacon_help"
+msgid "The server that introduces paired devices across the internet. Anyone can run their own (MULTITAP-BEACON)."
+msgstr "El servidor que presenta a los dispositivos vinculados a través de internet. Cualquiera puede montar el suyo (MULTITAP-BEACON)."
+
+msgctxt "net_beacon_status"
+msgid "INTERNET STATUS"
+msgstr "ESTADO DE INTERNET"
+
+msgctxt "net_beacon_status_help"
+msgid "Whether the beacon server knows this PICCOLO, so paired devices can find it from outside."
+msgstr "Si el servidor beacon conoce este PICCOLO, para que los dispositivos vinculados lo encuentren desde fuera."
+
+msgctxt "net_beacon_off"
+msgid "OFF"
+msgstr "APAGADO"
+
+msgctxt "net_beacon_waiting"
+msgid "CONNECTING TO THE BEACON..."
+msgstr "CONECTANDO CON EL BEACON..."
+
+msgctxt "net_beacon_registered"
+msgid "READY: PAIRED DEVICES CAN CONNECT"
+msgstr "LISTO: LOS DISPOSITIVOS VINCULADOS PUEDEN CONECTARSE"
+
+msgctxt "net_beacon_symmetric"
+msgid "READY, BUT THIS NETWORK MAY BLOCK CONNECTIONS (SYMMETRIC NAT)"
+msgstr "LISTO, PERO ESTA RED PUEDE BLOQUEAR CONEXIONES (NAT SIMÉTRICO)"
+
+msgctxt "net_beacon_unreachable"
+msgid "THE BEACON SERVER DOESN'T ANSWER"
+msgstr "EL SERVIDOR BEACON NO RESPONDE"
+
+msgctxt "headless_show"
+msgid "SHOW PICCOLO"
+msgstr "MOSTRAR PICCOLO"
+
+msgctxt "headless_play_here"
+msgid "PLAY HERE AGAIN"
+msgstr "JUGAR AQUÍ DE NUEVO"
+
+msgctxt "headless_tooltip"
+msgid "PICCOLO: THE GAME IS ON A DEVICE"
+msgstr "PICCOLO: EL JUEGO ESTÁ EN UN DISPOSITIVO"
+
+msgctxt "status_headless_back"
+msgid "BACK ON PICCOLO"
+msgstr "DE VUELTA EN PICCOLO"
+
+msgctxt "status_headless_paused"
+msgid "THE DEVICE WITH THE GAME LEFT: PAUSED"
+msgstr "EL DISPOSITIVO CON EL JUEGO SE FUE: EN PAUSA"
+
 msgctxt "net_this_device"
 msgid "THIS DEVICE"
 msgstr "ESTE DISPOSITIVO"
@@ -2903,8 +3027,8 @@ msgstr "VINCULACIÓN CERRADA"
 
 
 msgctxt "net_device_access_help"
-msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game."
-msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego."
+msgid "What this device may do here. GAMEPAD: play with its controllers. STREAM: also receive the game's picture and sound. FULL: also change settings, load games and take the game. OWNER: also copy games, saves and states to and from the shared folders."
+msgstr "Lo que este dispositivo puede hacer aquí. GAMEPAD: jugar con sus controles. STREAM: además recibir la imagen y el sonido del juego. COMPLETO: además cambiar ajustes, cargar juegos y llevarse el juego. DUEÑO: además copiar juegos, partidas y estados desde y hacia las carpetas compartidas."
 
 msgctxt "net_access_gamepad"
 msgid "GAMEPAD"
@@ -2917,6 +3041,26 @@ msgstr "STREAM"
 msgctxt "net_access_full"
 msgid "FULL"
 msgstr "COMPLETO"
+
+msgctxt "net_access_owner"
+msgid "OWNER"
+msgstr "DUEÑO"
+
+msgctxt "net_owner_confirm_title"
+msgid "OWNER ACCESS"
+msgstr "ACCESO DE DUEÑO"
+
+msgctxt "net_owner_confirm_text"
+msgid "THIS DEVICE WILL BE ABLE TO COPY GAMES, SAVES AND STATES FROM THIS PICCOLO'S SHARED FOLDERS, AND TO WRITE FILES INTO THEM. GIVE IT OWNER ACCESS?"
+msgstr "ESTE DISPOSITIVO PODRÁ COPIAR JUEGOS, PARTIDAS Y ESTADOS DE LAS CARPETAS COMPARTIDAS DE ESTE PICCOLO, Y ESCRIBIR ARCHIVOS EN ELLAS. ¿DARLE ACCESO DE DUEÑO?"
+
+msgctxt "net_owner_confirm_yes"
+msgid "GIVE OWNER ACCESS"
+msgstr "DAR ACCESO DE DUEÑO"
+
+msgctxt "net_owner_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
 
 msgctxt "action_slot_next"
 msgid "NEXT SLOT"
@@ -3002,6 +3146,42 @@ msgctxt "cores_non_free_confirm_yes"
 msgid "SHOW THEM"
 msgstr "MOSTRARLOS"
 
+msgctxt "cores_show"
+msgid "SHOW:"
+msgstr "MOSTRAR:"
+
+msgctxt "cores_show_legacy"
+msgid "OLDER VERSIONS"
+msgstr "VERSIONES VIEJAS"
+
+msgctxt "cores_show_legacy_setting"
+msgid "SHOW OLDER CORE VERSIONS"
+msgstr "MOSTRAR VERSIONES VIEJAS DE CORES"
+
+msgctxt "cores_show_legacy_help"
+msgid "Also lists older versions of cores (Snes9x 2005...), kept for weak devices or old game sets. Off: only the current ones, plus older ones already installed."
+msgstr "También lista versiones viejas de cores (Snes9x 2005...), para equipos débiles o sets de juegos viejos. Apagado: solo las actuales, más las viejas ya instaladas."
+
+msgctxt "cores_show_experimental"
+msgid "EXPERIMENTAL"
+msgstr "EXPERIMENTALES"
+
+msgctxt "cores_show_experimental_setting"
+msgid "SHOW EXPERIMENTAL CORES"
+msgstr "MOSTRAR CORES EXPERIMENTALES"
+
+msgctxt "cores_show_experimental_help"
+msgid "Also lists cores that are unsupported upstream or don't fully work in piccolo yet. Off: they're hidden, unless already installed."
+msgstr "También lista cores sin soporte de sus autores o que todavía no funcionan del todo en piccolo. Apagado: ocultos, salvo los ya instalados."
+
+msgctxt "cores_legacy_note"
+msgid "AN OLDER VERSION OF A CORE: FOR WEAK DEVICES OR OLD GAME SETS."
+msgstr "VERSIÓN VIEJA DE UN CORE: PARA EQUIPOS DÉBILES O SETS DE JUEGOS VIEJOS."
+
+msgctxt "cores_experimental_note"
+msgid "EXPERIMENTAL: UNSUPPORTED, OR NOT FULLY WORKING IN PICCOLO YET."
+msgstr "EXPERIMENTAL: SIN SOPORTE, O TODAVÍA NO FUNCIONA DEL TODO EN PICCOLO."
+
 msgctxt "setting_run_ahead"
 msgid "RUN-AHEAD"
 msgstr "RUN-AHEAD"
@@ -3025,3 +3205,199 @@ msgstr "ESTE CORE HACE HASTA"
 msgctxt "run_ahead_no_game"
 msgid "NO GAME RUNNING"
 msgstr "NINGÚN JUEGO CORRIENDO"
+
+msgctxt "share_title"
+msgid "SHARE"
+msgstr "COMPARTIR"
+
+msgctxt "share_this_piccolo"
+msgid "THIS PICCOLO"
+msgstr "ESTE PICCOLO"
+
+msgctxt "share_other_piccolo"
+msgid "OTHER PICCOLO"
+msgstr "OTRO PICCOLO"
+
+msgctxt "share_shared_folders"
+msgid "SHARED FOLDERS"
+msgstr "CARPETAS COMPARTIDAS"
+
+msgctxt "share_not_connected"
+msgid "NO PICCOLO CONNECTED WITH OWNER ACCESS"
+msgstr "NINGÚN PICCOLO CONECTADO CON ACCESO DE DUEÑO"
+
+msgctxt "share_list_failed"
+msgid "THIS FOLDER CAN'T BE READ"
+msgstr "NO SE PUEDE LEER ESTA CARPETA"
+
+msgctxt "share_no_files"
+msgid "NO FILES HERE"
+msgstr "NO HAY ARCHIVOS AQUÍ"
+
+msgctxt "share_copy_to_remote_help"
+msgid "Copies the selected file into the folder open on the other piccolo."
+msgstr "Copia el archivo elegido a la carpeta abierta en el otro piccolo."
+
+msgctxt "share_copy_to_local_help"
+msgid "Copies the selected file from the other piccolo into the folder open here."
+msgstr "Copia el archivo elegido del otro piccolo a la carpeta abierta aquí."
+
+msgctxt "share_hint"
+msgid "SELECT A FILE, OPEN A FOLDER ON THE OTHER SIDE, THEN PRESS THE ARROW."
+msgstr "ELIGE UN ARCHIVO, ABRE UNA CARPETA DEL OTRO LADO Y PULSA LA FLECHA."
+
+msgctxt "share_sending"
+msgid "SENDING"
+msgstr "ENVIANDO"
+
+msgctxt "share_receiving"
+msgid "RECEIVING"
+msgstr "RECIBIENDO"
+
+msgctxt "share_paused"
+msgid "PAUSED: REMOTE PLAY"
+msgstr "EN PAUSA: JUEGO REMOTO"
+
+msgctxt "share_cancel"
+msgid "CANCEL"
+msgstr "CANCELAR"
+
+msgctxt "share_network_off"
+msgid "THE NETWORK COULDN'T START (SEE THE LOG)."
+msgstr "LA RED NO PUDO ARRANCAR (MIRA EL REGISTRO)."
+
+msgctxt "share_needs_owner"
+msgid "CONNECTED, BUT THIS PICCOLO DIDN'T GIVE US OWNER ACCESS. GIVE IT ON THAT PICCOLO: SETTINGS > NETWORK, THIS DEVICE, OWNER."
+msgstr "CONECTADO, PERO ESTE PICCOLO NO NOS DIO ACCESO DE DUEÑO. DALO EN ESE PICCOLO: AJUSTES > RED, ESTE DISPOSITIVO, DUEÑO."
+
+msgctxt "share_disconnect"
+msgid "DISCONNECT"
+msgstr "DESCONECTAR"
+
+msgctxt "share_found"
+msgid "PICCOLOS ON THIS NETWORK"
+msgstr "PICCOLOS EN ESTA RED"
+
+msgctxt "share_found_none"
+msgid "LOOKING... (THE OTHER PICCOLO NEEDS NETWORK ON IN SETTINGS > NETWORK)"
+msgstr "BUSCANDO... (EL OTRO PICCOLO NECESITA LA RED ACTIVADA EN AJUSTES > RED)"
+
+msgctxt "share_code"
+msgid "CODE"
+msgstr "CÓDIGO"
+
+msgctxt "share_code_help"
+msgid "The first time only: the 6 digits the other piccolo shows after SETTINGS > NETWORK > PAIR A DEVICE."
+msgstr "Sólo la primera vez: los 6 dígitos que muestra el otro piccolo tras AJUSTES > RED > VINCULAR UN DISPOSITIVO."
+
+msgctxt "share_connect"
+msgid "CONNECT"
+msgstr "CONECTAR"
+
+msgctxt "share_connecting"
+msgid "CONNECTING..."
+msgstr "CONECTANDO..."
+
+msgctxt "share_refused_not_paired"
+msgid "NOT PAIRED YET: TYPE THE CODE IT SHOWS."
+msgstr "AÚN NO EMPAREJADOS: ESCRIBE EL CÓDIGO QUE MUESTRA."
+
+msgctxt "share_refused_pairing_closed"
+msgid "IT ISN'T PAIRING NOW: OPEN PAIRING ON IT FIRST."
+msgstr "NO ESTÁ EMPAREJANDO: ABRE EL EMPAREJAMIENTO EN ÉL PRIMERO."
+
+msgctxt "share_refused_wrong_code"
+msgid "WRONG CODE."
+msgstr "CÓDIGO INCORRECTO."
+
+msgctxt "share_refused_unknown_host"
+msgid "IT ISN'T THE PICCOLO WE PAIRED WITH."
+msgstr "NO ES EL PICCOLO CON EL QUE NOS EMPAREJAMOS."
+
+msgctxt "share_refused_connection"
+msgid "COULDN'T CONNECT."
+msgstr "NO SE PUDO CONECTAR."
+
+msgctxt "share_done_exists"
+msgid "ALREADY THERE"
+msgstr "YA ESTÁ AHÍ"
+
+msgctxt "share_done_no_space"
+msgid "NOT ENOUGH SPACE"
+msgstr "NO HAY ESPACIO"
+
+msgctxt "share_done_mismatch"
+msgid "ARRIVED DAMAGED, THROWN AWAY"
+msgstr "LLEGÓ DAÑADO, DESCARTADO"
+
+msgctxt "share_done_refused"
+msgid "NOT ALLOWED"
+msgstr "NO PERMITIDO"
+
+msgctxt "share_done_busy"
+msgid "THE OTHER PICCOLO IS BUSY, TRY AGAIN"
+msgstr "EL OTRO PICCOLO ESTÁ OCUPADO, INTÉNTALO DE NUEVO"
+
+msgctxt "share_done_failed"
+msgid "FAILED"
+msgstr "FALLÓ"
+
+msgctxt "share_done_same"
+msgid "ALREADY THERE, SAME FILE"
+msgstr "YA ESTÁ AHÍ, EL MISMO ARCHIVO"
+
+msgctxt "share_same_legend"
+msgid "GREY: ALREADY ON THE OTHER SIDE, SAME FILE"
+msgstr "GRIS: YA ESTÁ DEL OTRO LADO, EL MISMO ARCHIVO"
+
+msgctxt "share_same_help"
+msgid "The same name, size and date: piccolo's copies keep the date, so it's the file copied before."
+msgstr "El mismo nombre, tamaño y fecha: las copias de piccolo conservan la fecha, así que es el archivo que ya se copió."
+
+msgctxt "share_with_save"
+msgid "WITH ITS SAVE"
+msgstr "CON SU PARTIDA"
+
+msgctxt "share_with_state"
+msgid "WITH ITS STATE"
+msgstr "CON SU ESTADO"
+
+msgctxt "share_with_states"
+msgid "WITH ITS %u STATES"
+msgstr "CON SUS %u ESTADOS"
+
+msgctxt "share_with_save_state"
+msgid "WITH ITS SAVE AND STATE"
+msgstr "CON SU PARTIDA Y SU ESTADO"
+
+msgctxt "share_with_save_states"
+msgid "WITH ITS SAVE AND %u STATES"
+msgstr "CON SU PARTIDA Y %u ESTADOS"
+
+msgctxt "share_with_help"
+msgid "Also copies this game's save and states (SAVES and STATES, in the core's folder), so it goes on where it was on the other piccolo."
+msgstr "También copia la partida y los estados de este juego (SAVES y STATES, en la carpeta del núcleo), para seguir donde quedó en el otro piccolo."
+
+msgctxt "share_replace_title"
+msgid "ALREADY THERE"
+msgstr "YA ESTÁ AHÍ"
+
+msgctxt "share_replace_text"
+msgid "ANOTHER FILE WITH THIS NAME IS ALREADY THERE. REPLACE IT?"
+msgstr "YA HAY OTRO ARCHIVO CON ESTE NOMBRE. ¿REEMPLAZARLO?"
+
+msgctxt "share_replace"
+msgid "REPLACE"
+msgstr "REEMPLAZAR"
+
+msgctxt "share_skip"
+msgid "SKIP"
+msgstr "SALTAR"
+
+msgctxt "share_replace_all"
+msgid "REPLACE ALL (%u)"
+msgstr "REEMPLAZAR TODOS (%u)"
+
+msgctxt "share_skip_all"
+msgid "SKIP ALL"
+msgstr "SALTAR TODOS"

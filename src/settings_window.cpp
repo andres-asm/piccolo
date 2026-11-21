@@ -153,7 +153,14 @@ static void draw_general(SettingsWindow* window, const SettingsUiContext* ui, co
         const char* keys[4] = {PICCOLO_PATH_CORES, PICCOLO_PATH_SYSTEM, PICCOLO_PATH_SAVES, PICCOLO_PATH_STATES};
         const char* hints[4] = {context->paths->cores.c_str(), context->paths->system.c_str(),
                                 context->paths->saves.c_str(), context->paths->states.c_str()};
-        for (uint32_t i = 0; i < 4; i++)
+        // Android: no CORES row. Cores load only from the app's private
+        // storage (shared storage is noexec); main.cpp ignores the setting.
+#if defined(SDL_PLATFORM_ANDROID)
+        uint32_t first = 1;
+#else
+        uint32_t first = 0;
+#endif
+        for (uint32_t i = first; i < 4; i++)
         {
             if (settings_ui_folder_row(ui, keys[i], hints[i]))
             {
@@ -176,17 +183,7 @@ static void draw_picture(SettingsWindow* window, const SettingsUiContext* ui, co
     settings_ui_row(ui, PICCOLO_VIDEO_SCALING, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_MAX_OFFSCREEN, nullptr);
     settings_ui_row(ui, PICCOLO_VIDEO_FILTER, nullptr);
-    bool choose_shader = false;
-    settings_ui_path_row_with_button(ui, PICCOLO_VIDEO_SHADER_PRESET, piccolo_text(ui->strings, Str::shader_preset_none),
-                                     piccolo_text(ui->strings, Str::shader_choose), &choose_shader);
-    if (choose_shader)
-    {
-        window->choose_shader_request = true;
-    }
-    if (context->image != nullptr && !context->image->controls_available)
-    {
-        ImGui::TextDisabled("%s", piccolo_text(ui->strings, Str::shader_unavailable));
-    }
+    // The shader preset is in the QUICK MENU (SHADER), next to the game.
     settings_ui_row(ui, PICCOLO_VIDEO_POSITION, nullptr);
 
     // The crop (and more image settings later) live in their own window.

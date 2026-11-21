@@ -57,16 +57,26 @@ static void size_text(int64_t bytes, char* out, size_t out_size)
     }
 }
 
-// Listed: free cores; non-free ones when SHOW NON-FREE CORES is on, or when
-// they're installed (so they can still be removed or updated).
+// Listed: installed cores always (so they can still be removed or updated);
+// the others when the SHOW switches allow both their license and their type.
 static bool listed(const CoresWindow* window, const CoreUpdater* updater, int32_t entry)
 {
-    const CoreIndexEntry* chosen = &updater->index.entries[static_cast<size_t>(entry)];
-    if (chosen->free || window->show_non_free)
+    if (core_updater_status(updater, entry) != CoreStatus::not_installed)
     {
         return true;
     }
-    return core_updater_status(updater, entry) != CoreStatus::not_installed;
+    const CoreIndexEntry* chosen = &updater->index.entries[static_cast<size_t>(entry)];
+    if (!chosen->free && !window->show_non_free)
+    {
+        return false;
+    }
+    switch (chosen->type)
+    {
+        case CoreType::main:         return true;
+        case CoreType::legacy:       return window->show_legacy;
+        case CoreType::experimental: return window->show_experimental;
+    }
+    return false;
 }
 
 // UPDATE ALL: whenever the downloader is idle, the next core with an update
@@ -149,7 +159,7 @@ static void draw_selected(CoresWindow* window, const CoresWindowContext* context
     if (window->selected >= static_cast<int32_t>(updater->index.entries.size()) ||
         (window->selected >= 0 && !listed(window, updater, window->selected)))
     {
-        window->selected = -1;   // hidden by SHOW NON-FREE CORES, or a shorter list
+        window->selected = -1;   // hidden by a SHOW switch, or a shorter list
     }
     if (window->selected < 0)
     {
@@ -174,6 +184,14 @@ static void draw_selected(CoresWindow* window, const CoresWindowContext* context
     if (!entry->free)
     {
         ImGui::TextDisabled("%s", piccolo_text(strings, Str::cores_non_free_note));
+    }
+    if (entry->type == CoreType::legacy)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::cores_legacy_note));
+    }
+    else if (entry->type == CoreType::experimental)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, Str::cores_experimental_note));
     }
     if (status == CoreStatus::installed_by_hand)
     {
@@ -206,11 +224,11 @@ static void draw_selected(CoresWindow* window, const CoresWindowContext* context
     ImGui::EndDisabled();
 }
 
-// SHOW NON-FREE CORES, and the confirmation turning it on asks for.
+// NON-FREE, and the confirmation turning it on asks for.
 static void draw_non_free_switch(CoresWindow* window, const Localization* strings)
 {
     bool shown = window->show_non_free;
-    if (retro_ui_checkbox(piccolo_text(strings, Str::cores_show_non_free), &shown))
+    if (retro_ui_checkbox(piccolo_text(strings, Str::cores_non_free), &shown))
     {
         if (shown)
         {
@@ -219,7 +237,7 @@ static void draw_non_free_switch(CoresWindow* window, const Localization* string
         else
         {
             window->show_non_free = false;
-            window->show_non_free_changed = true;
+            window->show_changed = true;
         }
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::cores_show_non_free_help));
@@ -244,7 +262,7 @@ static void draw_non_free_switch(CoresWindow* window, const Localization* string
         if (retro_ui_button(piccolo_text(strings, Str::cores_non_free_confirm_yes)))
         {
             window->show_non_free = true;
-            window->show_non_free_changed = true;
+            window->show_changed = true;
             close = true;
         }
         ImGui::SameLine();
@@ -259,6 +277,36 @@ static void draw_non_free_switch(CoresWindow* window, const Localization* string
         }
         ImGui::EndPopup();
     }
+}
+
+// One SHOW switch without a confirmation (OLDER VERSIONS, EXPERIMENTAL).
+static void draw_show_switch(CoresWindow* window, const Localization* strings, Str label, Str help, bool* value)
+{
+    bool shown = *value;
+    if (retro_ui_checkbox(piccolo_text(strings, label), &shown))
+    {
+        *value = shown;
+        window->show_changed = true;
+    }
+    retro_ui_item_tooltip(piccolo_text(strings, help));
+}
+
+// SHOW: NON-FREE (not in store builds), OLDER VERSIONS, EXPERIMENTAL.
+static void draw_show_row(CoresWindow* window, const CoresWindowContext* context)
+{
+    const Localization* strings = context->strings;
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::cores_show));
+    if (!context->updater->free_only)
+    {
+        ImGui::SameLine();
+        draw_non_free_switch(window, strings);
+    }
+    ImGui::SameLine();
+    draw_show_switch(window, strings, Str::cores_show_legacy, Str::cores_show_legacy_help, &window->show_legacy);
+    ImGui::SameLine();
+    draw_show_switch(window, strings, Str::cores_show_experimental, Str::cores_show_experimental_help,
+                     &window->show_experimental);
 }
 
 void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, ImFont* pixel_font, int32_t scale)
@@ -322,11 +370,6 @@ void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, I
                 updater->message_is_error = false;   // a new run: don't stop on the last error
             }
             ImGui::EndDisabled();
-            if (!updater->free_only)
-            {
-                ImGui::SameLine();
-                draw_non_free_switch(window, strings);
-            }
             if (busy)
             {
                 ImGui::SameLine();
@@ -336,6 +379,7 @@ void cores_window_draw(CoresWindow* window, const CoresWindowContext* context, I
                     core_updater_cancel(updater);
                 }
             }
+            draw_show_row(window, context);
 
             // Status: the download's progress, or what the downloader did last.
             int64_t received = 0;

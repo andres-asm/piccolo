@@ -24,8 +24,8 @@
 //   - else, exactly one file inside the core can load: that file
 //     ("a.7z#dir/Game.sfc", extracted by the core session);
 //   - else: opens it as a folder, like BROWSE, which always does that.
-// FOLDER jumps to one of the game folders (SETTINGS > GENERAL) or HOME, and
-// shows the one we're in. The picker isn't limited to them: they're only
+// FOLDER jumps to one of the game folders (SETTINGS > GENERAL), HOME or (Android)
+// an SD card / USB drive, and shows the one we're in. The picker isn't limited to them: they're only
 // places to start (the network is limited to them, not the local user).
 // Esc or the window's close button closes the picker.
 //
@@ -66,6 +66,7 @@ struct FilePicker
 
     int32_t core_index = -1;   // index into the catalog; -1 = none chosen yet
     std::vector<std::string> game_folders;   // FOLDER's choices (copied at open), then HOME
+    std::vector<std::string> volumes;        // then SD cards / USB drives (Android), read when FOLDER opens
     bool    show_all   = false;
     char    shader_extension[16] = ".slangp";   // shader_preset mode: the files listed
 

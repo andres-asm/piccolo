@@ -1,0 +1,144 @@
+# A v* tag becomes a GitHub Release with every package and a manifest.cfg;
+# cores-server's publish-apps.sh pulls it from there into
+# https://releases.get-piccolo.app (signed index for the update indicator,
+# stable names for get-piccolo.app's links).
+#
+#   vX.Y.Z          stable channel
+#   vX.Y.Z-beta.N   prerelease, beta channel
+#
+# It builds through the usual workflows (workflow_call), so a release is
+# exactly what CI builds on main. Assets, piccolo-<version>-<target>.<ext>:
+#   windows-x86_64.zip  windows-arm64.zip
+#   linux-x86_64.flatpak  linux-aarch64.flatpak
+#   android-arm64-v8a.apk  android-armeabi-v7a-legacy.apk
+#   web.zip
+# manifest.cfg: app, version, tag, then one [<target>] block per asset with
+# asset, size, sha256 (the format publish-apps.sh reads).
+#
+# Refuses to release without the Android release key in the secrets (never a
+# debug APK in a release) or when the tag doesn't match PICCOLO_VERSION_BASE.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  check:
+    name: Check the tag
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version and release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+        run: |
+          tag="${{ github.ref_name }}"
+          version="${tag#v}"
+          if ! echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'; then
+            echo "tag $tag is not vX.Y.Z or vX.Y.Z-beta.N"
+            exit 1
+          fi
+          base=$(sed -n 's/^set(PICCOLO_VERSION_BASE \([^)]*\))$/\1/p' CMakeLists.txt)
+          case "$version" in
+            "$base"|"$base".*|"$base"-*) ;;
+            *) echo "tag $tag doesn't match PICCOLO_VERSION_BASE $base in CMakeLists.txt"; exit 1 ;;
+          esac
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASS" ]; then
+            echo "no Android release key in the secrets: a release never ships a debug APK"
+            exit 1
+          fi
+
+  android:
+    needs: check
+    uses: ./.github/workflows/android.yml
+    secrets: inherit
+
+  flatpak:
+    needs: check
+    uses: ./.github/workflows/flatpak.yml
+
+  windows:
+    needs: check
+    uses: ./.github/workflows/windows.yml
+
+  web:
+    needs: check
+    uses: ./.github/workflows/web.yml
+    permissions:
+      contents: read
+      packages: write   # web.yml pushes the image's :<version> and :latest tags
+
+  release:
+    name: GitHub Release
+    needs: [android, flatpak, windows, web]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      # Artifacts are found by file name, not by artifact name (the Flatpak
+      # action names its own).
+      - name: Release files
+        run: |
+          tag="${{ github.ref_name }}"
+          version="${tag#v}"
+          mkdir release
+          find artifacts -type f | sort
+
+          one() {   # one <find -name pattern>: exactly one file
+            found=$(find artifacts -type f -name "$1")
+            if [ "$(echo "$found" | grep -c .)" != 1 ]; then
+              echo "expected one $1, found: $found"
+              exit 1
+            fi
+            echo "$found"
+          }
+          for arch in x86_64 arm64; do
+            dir=$(find artifacts -type d -path "*piccolo-windows-$arch/piccolo")
+            [ -n "$dir" ] || { echo "no Windows $arch folder"; exit 1; }
+            (cd "$dir/.." && zip -q -r -9 "$GITHUB_WORKSPACE/release/piccolo-$version-windows-$arch.zip" piccolo)
+          done
+          for arch in x86_64 aarch64; do
+            cp "$(one "piccolo-$arch.flatpak")" "release/piccolo-$version-linux-$arch.flatpak"
+          done
+          cp "$(one piccolo.apk)" "release/piccolo-$version-android-arm64-v8a.apk"
+          cp "$(one piccolo-legacy.apk)" "release/piccolo-$version-android-armeabi-v7a-legacy.apk"
+          cp "$(one '*-web.zip')" "release/piccolo-$version-web.zip"
+
+          manifest=release/manifest.cfg
+          {
+            echo "# piccolo $tag: the release's files (release.yml)"
+            echo "app=piccolo"
+            echo "version=$version"
+            echo "tag=$tag"
+          } > "$manifest"
+          for file in release/piccolo-*; do
+            asset="${file#release/}"
+            target="${asset#piccolo-$version-}"
+            target="${target%.*}"
+            {
+              echo ""
+              echo "[$target]"
+              echo "asset=$asset"
+              echo "size=$(stat -c %s "$file")"
+              echo "sha256=$(sha256sum "$file" | cut -d ' ' -f 1)"
+            } >> "$manifest"
+          done
+          cat "$manifest"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_name }}"
+          flags="--latest"
+          case "$tag" in
+            *-beta.*) flags="--prerelease" ;;
+          esac
+          gh release create "$tag" release/* --repo "${{ github.repository }}" \
+            --title "piccolo ${tag#v}" --verify-tag --generate-notes $flags

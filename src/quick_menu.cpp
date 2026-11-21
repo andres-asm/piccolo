@@ -15,6 +15,7 @@
 #include "piccolo_settings.h"
 #include "piccolo_text.h"
 #include "retro_ui.h"
+#include "settings_ui.h"
 
 // Room for any thumbnail (the picture at x1: a few hundred pixels across).
 constexpr uint32_t THUMBNAIL_CAPACITY = 1024;
@@ -46,6 +47,8 @@ void quick_menu_open_remap(QuickMenu* menu, uint32_t slot, uint32_t port, uint32
 void quick_menu_open(QuickMenu* menu, uint32_t slot)
 {
     menu->open_on_tab = menu->tab;   // back on the tab it was closed on
+    menu->shader_choose_scope = true;
+    menu->choose_shader_request = false;
     menu->remap = false;
     menu->capturing = false;
     menu->bind_all = false;
@@ -185,6 +188,34 @@ static void draw_slots(QuickMenu* menu, float block, bool appearing)
             menu->slot = slot;
             menu->focus_slot = true;
         }
+    }
+}
+
+// The SHADER tab: the scope, the preset (CHOOSE opens the shader picker,
+// through piccolo) and FILTER, which applies when there's no preset. The
+// same rows as SETTINGS > PICTURE, for changing the look without leaving the
+// game.
+static void draw_shader_tab(QuickMenu* menu, const QuickMenuContext* context)
+{
+    settings_ui_scope(context->settings, context->strings, context->core_name, context->game_name, &menu->shader_scope,
+                      &menu->shader_choose_scope);
+    ImGui::Spacing();
+    SettingsUiContext ui = {};
+    ui.settings = context->settings;
+    ui.strings = context->strings;
+    ui.scope = menu->shader_scope;
+    ui.label_width = settings_ui_label_width(context->settings, context->strings);
+    bool choose = false;
+    settings_ui_path_row_with_button(&ui, PICCOLO_VIDEO_SHADER_PRESET, piccolo_text(context->strings, Str::shader_preset_none),
+                                     piccolo_text(context->strings, Str::shader_choose), &choose);
+    if (choose)
+    {
+        menu->choose_shader_request = true;
+    }
+    settings_ui_row(&ui, PICCOLO_VIDEO_FILTER, nullptr);
+    if (!context->shaders_available)
+    {
+        ImGui::TextDisabled("%s", piccolo_text(context->strings, Str::shader_unavailable));
     }
 }
 
@@ -2203,7 +2234,7 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
         char label[200] = {};
         if (ImGui::BeginTabBar("quick_tabs"))
         {
-            int tab_count = 3;
+            int tab_count = 4;
             int target = appearing ? menu->open_on_tab : retro_ui_tab_switch(menu->tab, tab_count);
             // SAVESTATES first: it's what the menu is for. It opens again on the tab it was closed on.
             std::snprintf(label, sizeof(label), "%s###states", piccolo_text(strings, Str::quick_menu_tab_states));
@@ -2229,6 +2260,14 @@ QuickMenuAction quick_menu_draw(QuickMenu* menu, const QuickMenuContext* context
             {
                 menu->tab = 2;
                 draw_controls_tab(menu, context, block);
+                ImGui::EndTabItem();
+            }
+            std::snprintf(label, sizeof(label), "%s###shader", piccolo_text(strings, Str::quick_menu_tab_shader));
+            if (context->settings != nullptr &&
+                ImGui::BeginTabItem(label, nullptr, target == 3 ? ImGuiTabItemFlags_SetSelected : 0))
+            {
+                menu->tab = 3;
+                draw_shader_tab(menu, context);
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();

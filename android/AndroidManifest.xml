@@ -31,6 +31,10 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.type.pc" android:required="false" />
 
+    <!-- Downloads (TOOLS > CORES, net_http_android.cpp) and the network
+         (remote pads, remote play). A normal permission: no dialog. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Rumble -->
     <uses-permission android:name="android.permission.VIBRATE" />
 

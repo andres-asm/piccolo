@@ -38,6 +38,9 @@
 #include "quick_menu.h"
 #include "recent_games.h"
 #include "safe_start_window.h"
+#include "shader_check.h"
+#include "shader_check_window.h"
+#include "text_input_window.h"
 #include "settings_window.h"
 #include "archive.h"
 #include "host_fs.h"
@@ -45,6 +48,7 @@
 #include "core_catalog.h"
 #include "core_updater.h"
 #include "cores_window.h"
+#include "share_window.h"
 #include "content_cache.h"
 #include "core_session.h"
 #include "debug_ui.h"
@@ -62,6 +66,7 @@
 #include "net_trust.h"
 #include "net_window.h"
 #include "file_picker.h"
+#include "headless.h"
 #include "pixel_font.h"
 #include "pixel_font_imgui.h"
 #include "retro_ui.h"
@@ -117,6 +122,10 @@ struct App
     NetKeypair net_identity = {};
     char       net_fingerprint[32] = "";
     uint16_t   net_port = 0;             // what `net` listens on
+    std::string net_beacon_applied;      // the beacon server handed to the service ("" = INTERNET off)
+    std::string net_share_applied;     // the shared folders the service has (piccolo-share), as one text
+    uint32_t    net_share_revision = 0;   // the settings' revision they were looked at for
+    bool        net_share_set = false;    // the service has them
     bool       net_streaming = false;    // a device is streaming (remote play): frames and audio are handed over
     // stream_tuning (net_stream.h): what streaming devices asked for, kept only
     // here (never in the settings or the files: a crash leaves nothing changed).
@@ -146,6 +155,7 @@ struct App
     // PAUSE WHEN CONTROLLERS DISCONNECT: what played last, and the pause it set.
     bool       played_with_gamepad = false;   // the last game input came from a gamepad (not the keyboard)
     bool       disconnect_paused = false;     // START, a controller joining, or closing the menu resumes
+    Headless   headless;                      // GO HEADLESS: a streaming device has the game (headless.h)
     bool       menu_was_open = false;         // last loop: for "closing the menu resumes"
     uint32_t   net_paused_by = NET_NO_PEER;   // which: its leaving (or another game) resumes
     char       net_peer_language[NET_MAX_PEERS][8] = {};   // what each device asked for ("" = English)
@@ -157,13 +167,15 @@ struct App
     NetSpeedSender   net_speed_sender;     // a speed test, down (one at a time)
     NetSpeedReceiver net_speed_receiver;   // a speed test, up
     bool             net_speed_reporting = false;   // the sender finished: its report goes out
+    NetWindowState net_window_state;   // SETTINGS > NETWORK between frames (OWNER's confirmation)
     std::vector<NetSpeedSummary> net_speed_results;  // what devices' speed tests found (SETTINGS > NETWORK)
     NetAccessLevel   net_actions_level[NET_MAX_PEERS] = {};   // the level each device's action list was made for
     // What the devices were last told runs (game_state): sent again when it changes.
     std::string net_sent_core;           // "" = nothing runs
     std::string net_sent_content;
     FilePicker  picker  = {};
-    FilePicker  shader_picker = {};   // SETTINGS > SHADER > CHOOSE
+    FilePicker  shader_picker = {};   // QUICK MENU > SHADER > CHOOSE
+    SettingLayer shader_picker_scope = SettingLayer::global;   // where its pick goes
     bool        menu_visible = true;   // only hideable while a game runs
 
     // What the LOAD GAME window picked, started at the top of the NEXT loop:
@@ -183,6 +195,17 @@ struct App
     std::string   shader_scale_paths[3];
     std::vector<std::string> shader_failed;   // presets that failed: not retried until the setting changes
     std::string   shader_preset_seen;         // the preset setting those failures are for
+    // A preset just applied that's too slow asks KEEP / REVERT
+    // (shader_check.h). REVERT puts the preset setting of every layer
+    // (global, core, game) back as it was before the change.
+    ShaderCheck   shader_check = {};
+    uint64_t      shader_check_asked_ms = 0;
+    uint32_t      shader_layers_start = UINT32_MAX;   // game_starts the layers below are from
+    bool          shader_layer_set[3] = {};           // the preset setting in each layer now
+    std::string   shader_layer_value[3];
+    bool          shader_revert_set[3] = {};          // ... and before the change being checked
+    std::string   shader_revert_value[3];
+    bool          shader_reverted = false;            // the next change is REVERT's: not checked
     float         pass0_applied[PICCOLO_PASS0_CONTROL_COUNT] = {};   // what pass 0's parameters hold
     float         profile_applied[PICCOLO_PROFILE_PARAM_COUNT] = {};  // the same for the color profile's
     bool          pass0_stale = true;         // set them all (pass 0 was just loaded)
@@ -262,6 +285,9 @@ struct App
     std::string      marker_content_path;
     std::string      crashed_core;                    // short name of the core whose session didn't end
     bool             crashed_after_options = false;
+    // A core's TEXT request (text_input_window.h): open while it's pending.
+    TextInputWindow  text_input_window = {};
+
     bool             safe_start_open = false;
     bool             safe_start_confirmed = false;    // the next start skips the check (answered)
     FilePickerChoice safe_start_pending = {};
@@ -276,6 +302,16 @@ struct App
     // up when the window opens (the server and cores folder may have changed).
     CoreUpdater        core_updater;
     CoresWindow        cores_window;
+    ShareWindow        share_window;     // TOOLS > SHARE (files with another piccolo at OWNER level)
+    NetShareFolders    share_folders;    // this piccolo's shared folders: game folders, saves, states
+    NetShareLink       share_link;       // SHARE's connection to another piccolo, as its client
+    NetShareLinkStatus share_status;     // read once per loop while SHARE is open
+    bool               share_connected = false;   // last loop: connected with OWNER access
+    std::vector<NetShareClientDone> share_done;
+    uint32_t           share_rate_id = 0;    // the copy the rate is measured for
+    uint64_t           share_rate_done = 0;
+    uint64_t           share_rate_ticks = 0;
+    uint32_t           share_rate_kbps = 0;
 
     QuickMenu quick_menu;              // F1 while a game runs
     bool      pending_close_game = false;   // CLOSE GAME: done at the top of the next loop (like starts)
@@ -382,7 +418,13 @@ static void apply_folders(App* app)
     std::snprintf(app->session.system_directory, sizeof(app->session.system_directory), "%s", system.c_str());
     std::snprintf(app->session.cache_directory, sizeof(app->session.cache_directory), "%s", app->paths.cache.c_str());
 
+#if defined(SDL_PLATFORM_ANDROID)
+    // Android: cores load only from the app's private storage (shared storage
+    // is noexec), so the CORES setting isn't offered (settings_window.cpp).
+    std::string cores = app->paths.cores;
+#else
     std::string cores = folder_setting(app, PICCOLO_PATH_CORES, app->paths.cores);
+#endif
     if (cores != app->cores_directory)
     {
         app->cores_directory = cores;
@@ -466,6 +508,12 @@ static bool game_running(const App* app)
     return core_session_running(&app->session);
 }
 
+// The running core asked for a string (TEXT): its box is up, the game paused.
+static bool text_input_pending(const App* app)
+{
+    return game_running(app) && app->session.host->text_input.mode == RETRO_EXT_TEXT_INPUT_TEXT;
+}
+
 static void set_status(App* app, const char* text)
 {
     std::snprintf(app->status, sizeof(app->status), "%s", text);
@@ -478,7 +526,13 @@ static void update_pause(App* app)
     bool menu_open = app->menu_visible || app->picker.open || app->shader_picker.open || app->settings_window.open ||
                      app->settings_window.image_open || app->quick_menu.open || app->core_options_manager ||
                      app->input_window.open || map_window_open_now(&app->map_window);
-    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt;
+    // The text box always pauses (the core's text isn't typed into a running game).
+    bool pause_for_menu = (menu_open && settings_get_bool(&app->settings, PICCOLO_PAUSE_IN_MENU)) || app->remap_prompt ||
+                          text_input_pending(app);
+    if (app->headless.on)
+    {
+        pause_for_menu = text_input_pending(app);   // nobody sees the menus here; the core's text box still waits
+    }
     // Not while a device streams: whoever plays is looking at the phone, not
     // at this window.
     bool pause_for_focus = !app->window_focused && !app->net_streaming &&
@@ -788,6 +842,189 @@ static void open_cores_window(App* app)
     cores_window_open(&app->cores_window, &app->core_updater);
 }
 
+// What this piccolo shares with OWNER devices (and lists on SHARE's own
+// side): the game folders, SAVES and STATES as the settings say now.
+static void share_folder_paths(const App* app, std::vector<std::string>* game_folders, std::string* saves,
+                               std::string* states)
+{
+    piccolo_settings_game_folders(&app->settings, game_folders);
+    *saves = folder_setting(app, PICCOLO_PATH_SAVES, app->paths.saves);
+    *states = folder_setting(app, PICCOLO_PATH_STATES, app->paths.states);
+}
+
+static bool net_prepare(App* app);
+
+// TOOLS > SHARE: this piccolo's shared folders as they are now, and the
+// connection to another piccolo (started the first time, kept afterwards so
+// copies go on with the window closed).
+static void open_share_window(App* app)
+{
+    std::vector<std::string> game_folders;
+    std::string saves;
+    std::string states;
+    share_folder_paths(app, &game_folders, &saves, &states);
+    net_share_set_folders(&app->share_folders, &game_folders, saves.c_str(), states.c_str());
+    if (!net_share_link_started(&app->share_link) && net_prepare(app))
+    {
+        std::string hosts_path = app->paths.settings + "/net_hosts.cfg";
+        net_share_link_start(&app->share_link, &app->net_identity, settings_get_text(&app->settings, PICCOLO_NET_NAME),
+                             hosts_path.c_str());
+    }
+    if (net_share_link_started(&app->share_link))
+    {
+        net_share_link_set_folders(&app->share_link, &game_folders, saves.c_str(), states.c_str());
+    }
+    share_window_open(&app->share_window);
+}
+
+// What a copy that didn't go well says on SHARE's bottom line.
+static Str share_done_text(NetShareStatus status)
+{
+    switch (status)
+    {
+    case NetShareStatus::exists:
+        return Str::share_done_exists;
+    case NetShareStatus::same:
+        return Str::share_done_same;
+    case NetShareStatus::no_space:
+        return Str::share_done_no_space;
+    case NetShareStatus::mismatch:
+        return Str::share_done_mismatch;
+    case NetShareStatus::refused:
+    case NetShareStatus::not_found:
+        return Str::share_done_refused;
+    case NetShareStatus::busy:
+        return Str::share_done_busy;
+    default:
+        return Str::share_done_failed;
+    }
+}
+
+// SHARE, once per loop while the window is open or the connection runs:
+// the window's clicks go to the connection, its answers to the window.
+static void share_update(App* app, ShareTransferLine* line)
+{
+    ShareWindow* window = &app->share_window;
+    NetShareLink* link = &app->share_link;
+    if (!net_share_link_started(link))
+    {
+        window->connect = false;
+        window->disconnect = false;
+        window->copies.clear();
+        window->cancel = false;
+        return;
+    }
+    if (window->open)
+    {
+        net_share_link_status(link, &app->share_status);
+    }
+    if (window->connect)
+    {
+        window->connect = false;
+        if (window->found_selected >= 0 && static_cast<size_t>(window->found_selected) < app->share_status.found.size())
+        {
+            net_share_link_connect(link, app->share_status.found[static_cast<size_t>(window->found_selected)].address,
+                                   window->code);
+        }
+    }
+    if (window->disconnect)
+    {
+        window->disconnect = false;
+        net_share_link_disconnect(link);
+    }
+    bool connected = app->share_status.state == NetShareLinkState::ready &&
+                     app->share_status.access == NetAccessLevel::owner;
+    if (connected != app->share_connected)
+    {
+        app->share_connected = connected;
+        share_window_remote_reset(window);   // a new piccolo, or none: its side starts over
+        window->code[0] = '\0';             // used (or not needed any more)
+    }
+    std::string path;
+    if (connected && share_window_remote_wants_list(window, &path))
+    {
+        net_share_link_list(link, path.c_str());
+    }
+    NetShareStatus status = NetShareStatus::ok;
+    std::vector<NetShareEntry> entries;
+    if (connected && net_share_link_listing(link, &path, &status, &entries))
+    {
+        share_window_set_remote_list(window, path.c_str(), status, &entries);
+    }
+    for (size_t i = 0; i < window->copies.size(); i++)
+    {
+        const ShareCopy* copy = &window->copies[i];
+        const char* local = copy->to_remote ? copy->from.c_str() : copy->to.c_str();
+        const char* remote = copy->to_remote ? copy->to.c_str() : copy->from.c_str();
+        net_share_link_copy(link, copy->to_remote, local, remote, copy->size, copy->mtime,
+                            copy->replace ? NET_SHARE_PUT_REPLACE : 0);
+        window->message.clear();
+    }
+    window->copies.clear();
+    if (window->cancel)
+    {
+        window->cancel = false;
+        net_share_link_cancel(link);
+    }
+    net_share_link_take_done(link, &app->share_done);
+    for (size_t i = 0; i < app->share_done.size(); i++)
+    {
+        const NetShareClientDone* done = &app->share_done[i];
+        if (done->status == NetShareStatus::ok)
+        {
+            window->local.stale = true;   // a new file on one side
+            window->remote.stale = true;
+            continue;
+        }
+        if (done->status == NetShareStatus::exists)
+        {
+            // Another file with that name there: SHARE asks whether to replace it.
+            ShareCopy conflict;
+            conflict.to_remote = done->copy.to_remote;
+            conflict.from = done->copy.to_remote ? done->copy.local : done->copy.remote;
+            conflict.to = done->copy.to_remote ? done->copy.remote : done->copy.local;
+            conflict.size = done->copy.size;
+            conflict.mtime = done->copy.mtime;
+            share_window_add_conflict(window, &conflict);
+            continue;
+        }
+        const std::string* name = done->copy.to_remote ? &done->copy.local : &done->copy.remote;
+        window->message = std::string(piccolo_text(&app->strings, share_done_text(done->status))) + ": " + *name;
+    }
+
+    // The bottom line, with the rate over about a second.
+    NetShareProgress progress;
+    NetShareClientCopy copy;
+    uint32_t queued = 0;
+    net_share_link_progress(link, &progress, &copy, &queued);
+    line->active = progress.role != NetShareRole::none;
+    if (line->active)
+    {
+        uint64_t now = SDL_GetTicks();
+        if (progress.id != app->share_rate_id)
+        {
+            app->share_rate_id = progress.id;
+            app->share_rate_done = progress.done;
+            app->share_rate_ticks = now;
+            app->share_rate_kbps = 0;
+        }
+        else if (now - app->share_rate_ticks >= 1000)
+        {
+            uint64_t bytes = progress.done - app->share_rate_done;
+            app->share_rate_kbps = static_cast<uint32_t>(bytes * 8 / (now - app->share_rate_ticks));
+            app->share_rate_done = progress.done;
+            app->share_rate_ticks = now;
+        }
+        size_t slash = copy.remote.rfind('/');
+        line->name = slash == std::string::npos ? copy.remote : copy.remote.substr(slash + 1);
+        line->sending = copy.to_remote;
+        line->done = progress.done;
+        line->size = progress.size;
+        line->rate_kbps = app->share_rate_kbps;
+        line->queued = queued;
+    }
+}
+
 static void handle_menu_action(App* app, MenuAction action)
 {
     switch (action)
@@ -849,6 +1086,9 @@ static void handle_menu_action(App* app, MenuAction action)
             break;
         case MenuAction::cores:
             open_cores_window(app);
+            break;
+        case MenuAction::share:
+            open_share_window(app);
             break;
         case MenuAction::network:
             settings_window_open(&app->settings_window, SettingsTab::network);
@@ -1098,13 +1338,79 @@ static void refresh_audio_devices(App* app)
     }
 }
 
+// The slow shader question is up (shader_check.h).
+static bool shader_check_asking(const App* app)
+{
+    return app->shader_check.state == ShaderCheckState::asking;
+}
+
+constexpr SettingLayer SHADER_LAYERS[3] = {SettingLayer::global, SettingLayer::core, SettingLayer::game};
+
+// The preset setting as each layer holds it now (absent or a value).
+static void shader_layers_read(const App* app, bool set[3], std::string value[3])
+{
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        const char* text = settings_get_layer(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET);
+        set[i] = text != nullptr;
+        value[i] = text != nullptr ? text : "";
+    }
+}
+
+// KEEP: nothing changes. REVERT: every layer's preset setting as before the
+// change, saved. Either way the check is over until the next change.
+static void shader_check_answer(App* app, ShaderCheckChoice choice)
+{
+    shader_check_stop(&app->shader_check);
+    if (choice != ShaderCheckChoice::revert)
+    {
+        return;
+    }
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        if (app->shader_revert_set[i])
+        {
+            settings_set(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET, app->shader_revert_value[i].c_str());
+        }
+        else
+        {
+            settings_reset(&app->settings, SHADER_LAYERS[i], PICCOLO_VIDEO_SHADER_PRESET);
+        }
+    }
+    app->shader_reverted = true;
+    save_settings(app);
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shader preset too slow: reverted");
+}
+
+// Once per loop that ran core frames: times the loop for the check. The
+// target is a display refresh in Vsync timing (each loop presents one), a
+// core frame in Exact. Fast forward is fast on purpose: not a sample.
+static void measure_shader_check(App* app)
+{
+    const FrameTiming* timing = &app->session.timing;
+    double hz = timing->effective == TimingMode::vsync ? timing->display_hz : timing->core_fps;
+    if (hz <= 0.0)
+    {
+        return;
+    }
+    bool sample = !core_session_fast_forwarding(&app->session);
+    if (shader_check_loop(&app->shader_check, sample, SDL_GetTicksNS(), 1e9 / hz))
+    {
+        app->shader_check_asked_ms = SDL_GetTicks();
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Shader preset too slow: %.1f fps, target %.1f",
+                    1e9 / app->shader_check.measured_ns, hz);
+    }
+}
+
 // A window is open over the menu bar (or the game).
 static bool any_window_open(const App* app)
 {
-    return app->picker.open || app->shader_picker.open || app->settings_window.open || app->settings_window.image_open ||
-           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->safe_start_open ||
+    return app->picker.open || app->shader_picker.open || shader_check_asking(app) || app->settings_window.open ||
+           app->settings_window.image_open ||
+           app->quick_menu.open || app->core_options_manager || app->cores_window.open || app->share_window.open ||
+           app->safe_start_open ||
            app->show_debug_window || app->input_window.open ||
-           map_window_open_now(&app->map_window);
+           map_window_open_now(&app->map_window) || text_input_pending(app);
 }
 
 // A menu or a dialog is up: the controllers drive it, not the game.
@@ -1124,9 +1430,21 @@ static bool game_has_keyboard(const App* app)
 static void close_topmost_or_toggle_menu(App* app)
 {
     {
-        if (map_window_open_now(&app->map_window))
+        if (text_input_pending(app))
+        {
+            libretro_host_text_input_answer(app->session.host, nullptr);   // the core's box is on top: cancelled
+        }
+        else if (shader_check_asking(app))
+        {
+            shader_check_answer(app, ShaderCheckChoice::revert);   // on top of everything: Esc reverts
+        }
+        else if (map_window_open_now(&app->map_window))
         {
             map_window_close(&app->map_window, &app->input);
+        }
+        else if (app->shader_picker.open)   // opened from the QUICK MENU: closes before it
+        {
+            app->shader_picker.open = false;
         }
         else if (app->quick_menu.open)
         {
@@ -1140,16 +1458,19 @@ static void close_topmost_or_toggle_menu(App* app)
         {
             app->cores_window.open = false;
         }
+        else if (app->share_window.open)
+        {
+            if (app->share_window.conflicts.empty())   // otherwise its REPLACE? question takes Escape
+            {
+                app->share_window.open = false;
+            }
+        }
         else if (app->input_window.open)
         {
             if (!app->input_window.capturing)   // Escape cancels a SET instead
             {
                 app->input_window.open = false;
             }
-        }
-        else if (app->shader_picker.open)   // opened from SETTINGS: closes before it
-        {
-            app->shader_picker.open = false;
         }
         else if (app->picker.open && app->picker.mode == FilePickerMode::folder)
         {
@@ -1567,6 +1888,7 @@ static void app_update_input(App* app)
     bool ui_up = ui_is_up(app);
     app->input.settings.ui_active = ui_up;   // the INTERFACE layer
     piccolo_settings_input(&app->settings, &app->input.settings);   // SETTINGS > INPUT, per core / game too
+    text_input_set_osk(&app->shell.text_input, piccolo_settings_osk(&app->settings) ? TextInputOsk::on : TextInputOsk::off);
     // The core and the device on each port: a controller's bindings for them.
     app->input.core_name = game_running(app) ? app->core_name : "";
     app->input.game_name = game_running(app) ? app->game_name : "";   // a game's own remaps
@@ -1753,6 +2075,34 @@ static void update_shader_stages(App* app, ViewportFilter filter)
         return;
     }
     const char* preset = settings_get_text(&app->settings, PICCOLO_VIDEO_SHADER_PRESET);
+    // A preset applied while this game runs is checked for speed; the one a
+    // game starts with (its core / game layers) isn't: that's not a change
+    // made now, and there's nothing to revert to.
+    bool new_game = app->shader_layers_start != app->game_starts;
+    if (new_game || app->shader_preset_seen != preset)
+    {
+        if (!new_game && preset[0] != '\0' && !app->shader_reverted)
+        {
+            // Changed again while a check runs: REVERT still goes back to
+            // before the first change (the last preset that was fine).
+            if (app->shader_check.state == ShaderCheckState::idle)
+            {
+                for (uint32_t i = 0; i < 3; i++)
+                {
+                    app->shader_revert_set[i] = app->shader_layer_set[i];
+                    app->shader_revert_value[i] = app->shader_layer_value[i];
+                }
+            }
+            shader_check_start(&app->shader_check);
+        }
+        else
+        {
+            shader_check_stop(&app->shader_check);
+        }
+        shader_layers_read(app, app->shader_layer_set, app->shader_layer_value);
+        app->shader_layers_start = app->game_starts;
+        app->shader_reverted = false;
+    }
     if (app->shader_preset_seen != preset)
     {
         app->shader_preset_seen = preset;   // a new choice: everything may be tried again
@@ -1927,6 +2277,45 @@ static void choose_folder_done(App* app, const FilePickerChoice* picked)
     }
 }
 
+// QUICK MENU > SHADER > CHOOSE: the picker opens in the
+// chosen preset's folder, else in the curated presets. What's picked goes to
+// `scope`, the scope the QUICK MENU's SHADER tab edits.
+static void open_shader_picker(App* app, SettingLayer scope)
+{
+    std::string folder = settings_get_at(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, nullptr);
+    size_t slash = folder.find_last_of("/\\");
+    folder = slash == std::string::npos || !shader_fits(app, folder) ? app->shader_presets_folder
+                                                                      : folder.substr(0, slash);
+    if (!host_fs_exists(folder.c_str()))
+    {
+        folder = app->shader_presets_folder;
+    }
+    app->shader_picker_scope = scope;
+    file_picker_open_shader(&app->shader_picker, folder.c_str(), shader_extension(app));
+}
+
+// Drawn over the QUICK MENU.
+static void draw_shader_picker(App* app)
+{
+    FilePickerChoice choice = {};
+    if (!file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings, &choice))
+    {
+        return;
+    }
+    // NONE: no preset at this scope. Globally that's the default; a core or
+    // game says it explicitly, so a global preset doesn't apply there.
+    SettingLayer scope = app->shader_picker_scope;
+    if (choice.content_path[0] != '\0' || scope != SettingLayer::global)
+    {
+        settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, choice.content_path);
+    }
+    else
+    {
+        settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
+    }
+    save_settings(app);
+}
+
 static void draw_settings(App* app)
 {
     const CoreSession* session = &app->session;
@@ -1952,12 +2341,14 @@ static void draw_settings(App* app)
     context.strings = &app->strings;
     context.themes = &app->themes;
     NetWindowContext network;
+    network.state = &app->net_window_state;
     network.settings = &app->settings;
     network.strings = &app->strings;
     network.access = app->net_running ? &app->net_service.access : nullptr;
     network.listen_failed = app->net_listen_failed;
     network.this_device = app->net_fingerprint;
     network.speed = &app->net_speed_results;
+    network.internet = settings_get_bool(&app->settings, PICCOLO_NET_INTERNET);
     context.network = &network;
     // Text with numbers: the translated part, then the numbers (no formats in translations).
     const char* window_label = piccolo_text(&app->strings, Str::section_window);
@@ -2097,42 +2488,8 @@ static void draw_settings(App* app)
         }
     }
 
-    // SHADER > CHOOSE: the picker opens in the chosen preset's folder, else
-    // in the curated presets.
-    if (app->settings_window.choose_shader_request)
-    {
-        app->settings_window.choose_shader_request = false;
-        std::string folder = settings_get_at(&app->settings, app->settings_window.scope, PICCOLO_VIDEO_SHADER_PRESET,
-                                             nullptr);
-        size_t slash = folder.find_last_of("/\\");
-        folder = slash == std::string::npos || !shader_fits(app, folder) ? app->shader_presets_folder
-                                                                          : folder.substr(0, slash);
-        if (!host_fs_exists(folder.c_str()))
-        {
-            folder = app->shader_presets_folder;
-        }
-        file_picker_open_shader(&app->shader_picker, folder.c_str(), shader_extension(app));
-    }
-    FilePickerChoice shader_choice = {};
-    if (file_picker_draw(&app->shader_picker, &app->catalog, app->pixel_font, app->ui_scale, &app->strings,
-                         &shader_choice))
-    {
-        // NONE: no preset at this scope. Globally that's the default; a core
-        // or game says it explicitly, so a global preset doesn't apply there.
-        SettingLayer scope = app->settings_window.scope;
-        if (shader_choice.content_path[0] != '\0' || scope != SettingLayer::global)
-        {
-            settings_set(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET, shader_choice.content_path);
-        }
-        else
-        {
-            settings_reset(&app->settings, scope, PICCOLO_VIDEO_SHADER_PRESET);
-        }
-    }
-
-    // Closed (by its button or Esc): apply the folders and save. The shader
-    // picker counts as part of it.
-    bool open = app->settings_window.open || app->settings_window.image_open || app->shader_picker.open;
+    // Closed (by its button or Esc): apply the folders and save.
+    bool open = app->settings_window.open || app->settings_window.image_open;
     if (app->settings_window_was_open && !open)
     {
         apply_folders(app);
@@ -2254,6 +2611,45 @@ static NetAccessLevel net_peer_access(const App* app, uint32_t peer)
         return NetAccessLevel::gamepad;
     }
     return app->net_service.access.trust.devices[static_cast<size_t>(device)].access;
+}
+
+// GO HEADLESS (headless.h, net_stream.h): the state, to every authorized
+// device that may stream (each learns whether it's the one holding it).
+static void headless_tell(App* app)
+{
+    for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
+    {
+        if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
+            !net_access_allows(net_peer_access(app, i), NetAccessLevel::stream))
+        {
+            continue;
+        }
+        uint8_t out[4];
+        size_t size = net_stream_write_headless_state(out, sizeof(out), app->headless.on,
+                                                      app->headless.on && app->headless.peer == i);
+        net_access_send(&app->net_service.access, i, NetChannel::control, out, size);
+    }
+}
+
+// Back on piccolo's window. `pause`: the device that had the game is gone
+// (or stopped streaming), so nobody plays it: paused until someone here does.
+static void headless_back(App* app, bool pause)
+{
+    if (!app->headless.on)
+    {
+        return;
+    }
+    headless_leave(&app->headless, app->shell.window);
+    if (pause && game_running(app))
+    {
+        app->disconnect_paused = true;
+        set_status(app, piccolo_text(&app->strings, Str::status_headless_paused));
+    }
+    else
+    {
+        set_status(app, piccolo_text(&app->strings, Str::status_headless_back));
+    }
+    SDL_Log("Headless: back on the window%s", pause ? " (paused)" : "");
 }
 
 // The actions one authorized peer may trigger (`id` 0: sent unasked), or
@@ -2554,9 +2950,9 @@ static void net_follow_remote(App* app)
         app->net_paused = false;
     }
     // A device whose access changed (NETWORK): its new welcome went out with
-    // net_access_set_level; its action list follows at once, and a speed test
-    // its new level doesn't cover stops. (Nothing else it holds needs more
-    // than GAMEPAD: pause, fast forward, its pads.)
+    // net_access_set_level; its action list follows at once, and what its new
+    // level doesn't cover stops: remote play, a FAST FORWARD it holds, a PAUSE
+    // it made (STREAM since 2026-11-20). Speed tests and pads are GAMEPAD.
     for (uint32_t i = 0; i < NET_MAX_PEERS; i++)
     {
         if (app->net_service.access.peers[i].state != NetAccessPeerState::authorized ||
@@ -2568,14 +2964,16 @@ static void net_follow_remote(App* app)
         NetAccessLevel level = net_peer_access(app, i);
         if (!net_access_allows(level, NetAccessLevel::stream))
         {
-            if (app->net_speed_sender.active && app->net_speed_sender.peer == i)
+            app->net_fast_forward[i] = false;
+            if (app->headless.on && app->headless.peer == i)
             {
-                app->net_speed_sender.active = false;
-                app->net_speed_reporting = false;
+                headless_back(app, true);   // remote play (and so the game) needs STREAM
+                headless_tell(app);
             }
-            if (app->net_speed_receiver.active && app->net_speed_receiver.peer == i)
+            if (app->net_paused && app->net_paused_by == i)
             {
-                app->net_speed_receiver.active = false;
+                app->net_paused = false;   // it can't resume it any more
+                set_status(app, piccolo_text(&app->strings, Str::status_resumed));
             }
             net_service_set_stream(&app->net_service, i, 0);   // remote play needs STREAM
             app->stream_tuning_set[i] = false;
@@ -2930,6 +3328,7 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     }
     uint8_t type = event->data[0];
     uint8_t flags = 0;
+    bool headless_on = false;
     if (net_stream_read_start(event->data, event->size, &flags))
     {
         net_service_set_stream(&app->net_service, event->peer, flags);
@@ -2938,6 +3337,11 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     }
     else if (type == NET_STREAM_STOP && event->size == 1)
     {
+        if (app->headless.on && app->headless.peer == event->peer)
+        {
+            headless_back(app, true);   // it no longer sees the game
+            headless_tell(app);
+        }
         net_service_set_stream(&app->net_service, event->peer, 0);
         if (event->peer < NET_MAX_PEERS)
         {
@@ -2948,6 +3352,25 @@ static void net_stream_message(App* app, const NetAccessEvent* event, const char
     else if (type == NET_STREAM_KEYFRAME_REQUEST && event->size == 1)
     {
         net_service_request_keyframe(&app->net_service, event->peer);
+    }
+    else if (net_stream_read_go_headless(event->data, event->size, &headless_on))
+    {
+        // Taken only by a device streaming a running game, and only if no
+        // other device holds it; given back only by the one holding it.
+        bool streaming = event->peer < NET_MAX_PEERS && app->net_service.stream.flags[event->peer] != 0;
+        if (headless_on && !app->headless.on && game_running(app) && streaming)
+        {
+            headless_enter(&app->headless, app->shell.window, event->peer, &app_icon_images[2],
+                           piccolo_text(&app->strings, Str::headless_tooltip),
+                           piccolo_text(&app->strings, Str::headless_show),
+                           piccolo_text(&app->strings, Str::headless_play_here));
+            SDL_Log("Headless: %s took the game", device);
+        }
+        else if (!headless_on && app->headless.on && app->headless.peer == event->peer)
+        {
+            headless_back(app, false);
+        }
+        headless_tell(app);   // the asker learns the result either way
     }
     else if (event->peer < NET_MAX_PEERS &&
              net_stream_read_tuning(event->data, event->size, NET_STREAM_TUNING, &app->stream_tuning_asked[event->peer]))
@@ -3076,22 +3499,20 @@ static void net_games_message(App* app, const NetAccessEvent* event, const char*
 
 // The listener, when SETTINGS has it on. Started at launch and restarted
 // when ALLOW CONNECTIONS or PORT change (net_update).
-static void net_start(App* app)
+// The network library and this device's key (made once, kept in the
+// settings folder): for the listener and for SHARE's connection alike.
+static bool net_prepare(App* app)
 {
-    // Any failure below is remembered with the port it was tried on, so it
-    // isn't retried every frame (net_update).
-    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
-    app->net_listen_failed = true;
     if (app->paths.settings.empty())
     {
-        return;   // nowhere to keep the device key: networking stays off
+        return false;   // nowhere to keep the device key: networking stays off
     }
     if (!app->net_ready)
     {
         app->net_ready = net_init();
         if (!app->net_ready)
         {
-            return;
+            return false;
         }
     }
     if (!app->net_has_identity)
@@ -3100,10 +3521,23 @@ static void net_start(App* app)
         app->net_has_identity = net_identity_load_or_create(identity_path.c_str(), &app->net_identity);
         if (!app->net_has_identity)
         {
-            return;
+            return false;
         }
         net_key_fingerprint(app->net_identity.public_key, app->net_fingerprint, sizeof(app->net_fingerprint));
         SDL_Log("Network: this device is %s", app->net_fingerprint);
+    }
+    return true;
+}
+
+static void net_start(App* app)
+{
+    // Any failure below is remembered with the port it was tried on, so it
+    // isn't retried every frame (net_update).
+    app->net_port = static_cast<uint16_t>(settings_get_int(&app->settings, PICCOLO_NET_PORT));
+    app->net_listen_failed = true;
+    if (!net_prepare(app))
+    {
+        return;
     }
     app->net_service.access = NetAccess{};
     net_games_init(&app->net_games);
@@ -3119,6 +3553,8 @@ static void net_start(App* app)
     }
     app->net_listen_failed = false;
     app->net_running = true;
+    app->net_beacon_applied.clear();   // a new service: net_update hands it the beacon again
+    app->net_share_set = false;        // and its shared folders
 }
 
 static void net_stop(App* app)
@@ -3136,6 +3572,7 @@ static void net_stop(App* app)
 
 static void net_shutdown_all(App* app)
 {
+    net_share_link_stop(&app->share_link);
     net_stop(app);
     net_keypair_wipe(&app->net_identity);
     if (app->net_ready)
@@ -3170,17 +3607,57 @@ static void net_update(App* app)
     }
     if (!app->net_running)
     {
+        headless_back(app, false);   // networking went off: nobody streams
         return;
+    }
+    // INTERNET and BEACON SERVER: the service resolves the name on its own
+    // thread. Only when they change (an empty name is off too).
+    std::string beacon = settings_get_bool(&app->settings, PICCOLO_NET_INTERNET)
+                             ? settings_get_text(&app->settings, PICCOLO_NET_BEACON)
+                             : "";
+    if (beacon != app->net_beacon_applied)
+    {
+        app->net_beacon_applied = beacon;
+        net_service_set_beacon(&app->net_service, beacon.c_str());
+    }
+    // The shared folders OWNER devices reach (piccolo-share): looked at
+    // again only when a setting changed, handed over only when they did.
+    bool share_check = !app->net_share_set || app->settings.revision != app->net_share_revision;
+    std::vector<std::string> share_games;
+    std::string share_saves;
+    std::string share_states;
+    std::string share_key;
+    if (share_check)
+    {
+        app->net_share_revision = app->settings.revision;
+        share_folder_paths(app, &share_games, &share_saves, &share_states);
+        share_key = share_saves + "\n" + share_states;
+        for (size_t i = 0; i < share_games.size(); i++)
+        {
+            share_key += "\n" + share_games[i];
+        }
     }
     // The network thread polls; this loop handles what it queued, holding
     // the lock for all of it (the NetAccess, its peers and lists).
     net_service_lock(&app->net_service);
+    if (share_check && (!app->net_share_set || share_key != app->net_share_applied))
+    {
+        app->net_share_applied = share_key;
+        app->net_share_set = true;
+        net_service_set_share_folders(&app->net_service, &share_games, share_saves.c_str(), share_states.c_str());
+    }
     net_update_locked(app);
     net_service_unlock(&app->net_service);
 }
 
 static void net_update_locked(App* app)
 {
+    // GO HEADLESS ends from the tray, or when no game runs any more.
+    if (app->headless.on && (app->headless.back_asked || !game_running(app)))
+    {
+        headless_back(app, false);
+        headless_tell(app);
+    }
     // A new NAME is used at once (discovery and pairing show it).
     const char* name = settings_get_text(&app->settings, PICCOLO_NET_NAME);
     if (app->net_service.access.name != name)
@@ -3216,6 +3693,11 @@ static void net_update_locked(App* app)
             break;
         }
         case NetAccessEventType::closed:
+            if (app->headless.on && app->headless.peer == event.peer)
+            {
+                headless_back(app, true);   // the device that had the game left
+                headless_tell(app);
+            }
             if (event.peer < NET_MAX_PEERS && app->net_speed_sender.peer == event.peer)
             {
                 app->net_speed_sender.active = false;   // its test ends with it
@@ -3267,9 +3749,8 @@ static void net_update_locked(App* app)
         case NetAccessEventType::message:
             if (event.channel == NetChannel::input && event.size > 0 && event.data[0] == NET_INPUT_TYPE_SPEED)
             {
-                // A speed test's packet (up): counted for STREAM devices only.
-                if (net_access_allows(event.access, NetAccessLevel::stream) &&
-                    event.peer == app->net_speed_receiver.peer)
+                // A speed test's packet (up), from the device running the test.
+                if (event.peer == app->net_speed_receiver.peer)
                 {
                     net_speed_receive(&app->net_speed_receiver, event.data, event.size, net_seconds());
                 }
@@ -3277,6 +3758,8 @@ static void net_update_locked(App* app)
             else if (event.channel == NetChannel::input && event.device >= 0)
             {
                 const NetTrustedDevice* paired = &app->net_service.access.trust.devices[static_cast<size_t>(event.device)];
+                input_net_set_hotkeys(&app->input_net, &app->input, event.peer,
+                                      net_access_allows(event.access, NetAccessLevel::stream));
                 input_net_receive(&app->input_net, &app->input, event.peer, paired->key, paired->name.c_str(),
                                   event.data, event.size);
             }
@@ -3343,6 +3826,12 @@ static bool app_frame(App* app)
     }
     update_pause(app);
     app->session.timing.mode = piccolo_settings_timing(&app->settings);
+    if (app->headless.on)
+    {
+        // No presents (a hidden window gets no frame callbacks): the
+        // Exact timer paces the core, frames only go to the stream.
+        app->session.timing.mode = TimingMode::exact;
+    }
     app->session.timing.catch_up = settings_get_bool(&app->settings, PICCOLO_VIDEO_CATCH_UP);
     update_window(app);
     update_language(app);
@@ -3378,6 +3867,10 @@ static bool app_frame(App* app)
                                         (stream_delay_overrides(app) &&
                                          app->stream_tuning.delay != NetStreamDelay::off)));
     piccolo_settings_audio(&app->settings, &app->session.audio_config);
+    if (app->headless.on)
+    {
+        app->session.audio_config.muted = true;   // the device plays it
+    }
     apply_learned_latency(app);
     // Held for the whole game, paused or not: a request is a D-Bus call
     // that may block, so not on every pause and resume.
@@ -3397,6 +3890,7 @@ static bool app_frame(App* app)
     if (ran == CoreSessionFrame::ran)
     {
         net_stream_frame(app);
+        measure_shader_check(app);
     }
     if (ran != CoreSessionFrame::skipped || !game_running(app))
     {
@@ -3410,7 +3904,7 @@ static bool app_frame(App* app)
         remove_running_marker(app);   // the core shut down on its own: a proper end
     }
 
-    if (app_shell_begin_frame(&app->shell))
+    if (!app->headless.on && app_shell_begin_frame(&app->shell))
     {
         app->ui_scale = retro_ui_scale_for_window(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y);
 
@@ -3472,8 +3966,17 @@ static bool app_frame(App* app)
         quick.sdl = &app->input_sdl;
         quick.layouts = &app->layouts;
         quick.now_ms = SDL_GetTicks();
+        quick.core_name = app->core_name;
+        quick.game_name = app->game_name;
+        quick.shaders_available = app->shader_library.loaded;
         QuickMenuAction quick_action = quick_menu_draw(&app->quick_menu, &quick, app->pixel_font, app->ui_scale);
         draw_remap_prompt(app);
+        if (app->quick_menu.choose_shader_request)
+        {
+            app->quick_menu.choose_shader_request = false;
+            open_shader_picker(app, app->quick_menu.shader_scope);
+        }
+        draw_shader_picker(app);   // over the QUICK MENU
         if (app->quick_menu.slot != slot_before || app->quick_menu.open)
         {
             app->session.state_slot = app->quick_menu.slot;   // F2 / F4 follow the picked slot
@@ -3525,12 +4028,31 @@ static bool app_frame(App* app)
         cores_context.updater = &app->core_updater;
         cores_context.running_file = running_file.c_str();
         app->cores_window.show_non_free = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_NON_FREE);
+        app->cores_window.show_legacy = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_LEGACY);
+        app->cores_window.show_experimental = settings_get_bool(&app->settings, PICCOLO_CORES_SHOW_EXPERIMENTAL);
         cores_window_draw(&app->cores_window, &cores_context, app->pixel_font, app->ui_scale);
-        if (app->cores_window.show_non_free_changed)
+
+        // SHARE: this side from our folders, the other from the connection.
+        if (app->share_window.open)
         {
-            app->cores_window.show_non_free_changed = false;
+            ShareTransferLine share_line;
+            share_update(app, &share_line);
+            ShareWindowContext share_context;
+            share_context.strings = &app->strings;
+            share_context.local_folders = &app->share_folders;
+            share_context.link = net_share_link_started(&app->share_link) ? &app->share_status : nullptr;
+            share_context.line = &share_line;
+            share_window_draw(&app->share_window, &share_context, app->pixel_font, app->ui_scale);
+        }
+        if (app->cores_window.show_changed)
+        {
+            app->cores_window.show_changed = false;
             settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_NON_FREE,
                               app->cores_window.show_non_free);
+            settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_LEGACY,
+                              app->cores_window.show_legacy);
+            settings_set_bool(&app->settings, SettingLayer::global, PICCOLO_CORES_SHOW_EXPERIMENTAL,
+                              app->cores_window.show_experimental);
             save_settings(app);
         }
         InputWindowContext input_context = {};
@@ -3593,6 +4115,44 @@ static bool app_frame(App* app)
                 {
                     net_answer_load(app, NetContentStatus::failed);   // not started after all
                 }
+            }
+        }
+        if (shader_check_asking(app))
+        {
+            std::string name = app->shader_preset_seen;
+            size_t slash = name.find_last_of("/\\");
+            name = slash == std::string::npos ? name : name.substr(slash + 1);
+            size_t dot = name.rfind('.');
+            name = dot == std::string::npos ? name : name.substr(0, dot);
+            for (size_t i = 0; i < name.size(); i++)
+            {
+                name[i] = static_cast<char>(SDL_toupper(static_cast<unsigned char>(name[i])));   // the pixel font has capitals
+            }
+            const FrameTiming* timing = &app->session.timing;
+            double target = timing->effective == TimingMode::vsync ? timing->display_hz : timing->core_fps;
+            ShaderCheckChoice answer = shader_check_window_draw(
+                app->pixel_font, app->ui_scale, &app->strings, name.c_str(), 1e9 / app->shader_check.measured_ns,
+                target, app->shader_check_asked_ms, SDL_GetTicks());
+            if (answer != ShaderCheckChoice::none)
+            {
+                shader_check_answer(app, answer);
+            }
+        }
+        if (text_input_pending(app))
+        {
+            TextInputChoice answer = text_input_window_draw(&app->text_input_window, &app->session.host->text_input,
+                                                            app->pixel_font, app->ui_scale, &app->strings);
+            if (app->session.host->text_input.type == RETRO_EXT_TEXT_INPUT_TYPE_NUMBER)
+            {
+                text_input_ui_field_number(&app->shell.text_input);   // the OSK's number keypad
+            }
+            if (answer == TextInputChoice::ok)
+            {
+                libretro_host_text_input_answer(app->session.host, app->text_input_window.buffer);
+            }
+            else if (answer == TextInputChoice::cancel)
+            {
+                libretro_host_text_input_answer(app->session.host, nullptr);
             }
         }
         if (app->show_debug_window)
@@ -3806,8 +4366,13 @@ int main(int argc, char** argv)
         io.IniFilename = nullptr;
     }
 
+    // The files that come with piccolo (layouts, themes, shaders): next to the
+    // program; on Android a copy out of the APK (bundled_files.h).
+    std::string program_folder = bundled_files_data_folder();
+
     // librashader (shader presets): next to the program, in piccolo's folder,
-    // or wherever the system finds it. Without it, presets are off.
+    // or wherever the system finds it (on Android: the APK's native
+    // libraries, where dlopen looks for a bare name). Without it, presets are off.
     std::vector<std::string> shader_library_folders;
     const char* program_folder_for_shaders = SDL_GetBasePath();   // SDL owns it
     if (program_folder_for_shaders != nullptr)
@@ -3850,8 +4415,6 @@ int main(int argc, char** argv)
     std::string database_path = app->paths.settings.empty() ? "" : app->paths.settings + "/gamecontrollerdb.txt";
     // Controller layouts: the ones next to the program, then piccolo's folder's
     // (the same id there wins), and GENERIC built in if neither has it.
-    // (next to the program; on Android a copy out of the APK: bundled_files.h)
-    std::string program_folder = bundled_files_data_folder();
     std::string bundled_layouts = program_folder + "layouts";
     host_fs_forward_slashes(bundled_layouts.data());
     input_layouts_load_directory(&app->layouts, bundled_layouts.c_str());
@@ -3893,6 +4456,7 @@ int main(int argc, char** argv)
     main_loop_on_open(app_open_file, app);
     main_loop_run(app_frame_callback, app);
 
+    headless_leave(&app->headless, app->shell.window);   // the tray icon goes, the window comes back for its size
     piccolo_window_capture(&app->window, app->shell.window);
     save_last_used(app);
     save_settings(app);

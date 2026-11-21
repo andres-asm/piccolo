@@ -208,6 +208,7 @@ set(PICCOLO_SOURCES
     src/settings_window.cpp
     src/input_window.cpp
     src/net_window.cpp
+    src/headless.cpp
     src/net_games.cpp
     src/net_remote.cpp
     src/map_window.cpp
@@ -218,7 +219,11 @@ set(PICCOLO_SOURCES
     src/recent_games.cpp
     src/core_options_ui.cpp
     src/cores_window.cpp
+    src/share_window.cpp
     src/safe_start_window.cpp
+    src/shader_check.cpp
+    src/shader_check_window.cpp
+    src/text_input_window.cpp
     src/quick_menu.cpp
 )
 if(ANDROID)
@@ -398,9 +403,15 @@ multitap_copy_after_build(piccolo "${MULTITAP_PICCOLO_DIR}")
 
 # Development tool: what remote play's lossless codec (frame_delta.h) sends for a
 # real game, and its cost (netcode milestone 6).
-add_executable(stream_measure tools/stream_measure.cpp)
+add_executable(stream_measure tools/stream_measure.cpp tools/measure_common.cpp)
 target_link_libraries(stream_measure PRIVATE host_libretro frontend_common)
 multitap_set_project_flags(stream_measure)
+
+# Development tool: which netplay mode (rollback / delay / stream) a core and
+# game are good for: determinism, exact states, their cost (instrumented runs).
+add_executable(netplay_measure tools/netplay_measure.cpp tools/measure_common.cpp)
+target_link_libraries(netplay_measure PRIVATE host_libretro frontend_common)
+multitap_set_project_flags(netplay_measure)
 
 # Development tool: writes a PNG of every glyph + sample text, to judge the font by eye.
 add_executable(pixel_font_preview tools/pixel_font_preview.cpp)
@@ -422,6 +433,13 @@ if(MULTITAP_BUILD_TESTS)
     add_test(NAME piccolo_strings COMMAND piccolo_strings_check "${CMAKE_CURRENT_SOURCE_DIR}/lang" es)
     set_tests_properties(piccolo_strings PROPERTIES
         FAIL_REGULAR_EXPRESSION "some keys are unknown|ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
+
+    add_executable(piccolo_shader_check_test tools/shader_check_test.cpp src/shader_check.cpp)
+    target_include_directories(piccolo_shader_check_test PRIVATE src)
+    multitap_set_project_flags(piccolo_shader_check_test)
+    add_test(NAME piccolo_shader_check COMMAND piccolo_shader_check_test)
+    set_tests_properties(piccolo_shader_check PROPERTIES
+        FAIL_REGULAR_EXPRESSION "ERROR: AddressSanitizer|ERROR: LeakSanitizer|runtime error:")
 
     # The OpenGL ES presets (shaders/gl/) compile and run (needs a display; skipped without).
     add_executable(piccolo_gl_presets_check tools/gl_presets_check.cpp)

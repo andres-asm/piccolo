@@ -733,6 +733,10 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (retro_ui_begin_combo("##folder", folder_preview(picker, strings)))
         {
+            if (ImGui::IsWindowAppearing())
+            {
+                app_paths_storage_volumes(&picker->volumes);   // read again every time the list opens
+            }
             for (size_t i = 0; i < picker->game_folders.size(); i++)
             {
                 ImGui::PushID(static_cast<int>(i));
@@ -750,6 +754,17 @@ bool file_picker_draw(FilePicker* picker, const CoreCatalog* catalog, ImFont* pi
                 picker->listing_stale = true;
             }
             ImGui::PopID();
+            // SD cards and USB drives (Android), as they are while the list is open.
+            for (size_t i = 0; i < picker->volumes.size(); i++)
+            {
+                ImGui::PushID(static_cast<int>(1000 + i));
+                if (ImGui::Selectable(picker->volumes[i].c_str()))
+                {
+                    std::snprintf(picker->directory, sizeof(picker->directory), "%s", picker->volumes[i].c_str());
+                    picker->listing_stale = true;
+                }
+                ImGui::PopID();
+            }
             ImGui::EndCombo();
         }
 

@@ -58,12 +58,14 @@ static void draw_pairing(const NetWindowContext* context)
 }
 
 static const Str ACCESS_LABELS[NET_ACCESS_LEVEL_COUNT] = {Str::net_access_gamepad, Str::net_access_stream,
-                                                          Str::net_access_full};
+                                                          Str::net_access_full, Str::net_access_owner};
 
-// ACCESS: GAMEPAD / STREAM / FULL for one device, as a row of buttons
-// (applied and saved at once).
-static void draw_access(NetAccess* access, uint32_t device, const Localization* strings)
+// ACCESS: GAMEPAD / STREAM / FULL / OWNER for one device, as a row of buttons
+// (applied and saved at once; OWNER only after its confirmation).
+static void draw_access(const NetWindowContext* context, uint32_t device)
 {
+    NetAccess* access = context->access;
+    const Localization* strings = context->strings;
     const char* labels[NET_ACCESS_LEVEL_COUNT];
     for (uint32_t level = 0; level < NET_ACCESS_LEVEL_COUNT; level++)
     {
@@ -72,9 +74,69 @@ static void draw_access(NetAccess* access, uint32_t device, const Localization* 
     uint32_t current = static_cast<uint32_t>(access->trust.devices[device].access);
     if (retro_ui_choice_buttons("##access", labels, NET_ACCESS_LEVEL_COUNT, &current))
     {
-        net_access_set_level(access, device, static_cast<NetAccessLevel>(current));
+        NetAccessLevel chosen = static_cast<NetAccessLevel>(current);
+        if (chosen == NetAccessLevel::owner)
+        {
+            // Writing files on this machine: asked first (draw_owner_confirm).
+            std::memcpy(context->state->owner_key, access->trust.devices[device].key, NET_KEY_SIZE);
+            context->state->confirm_owner = true;
+        }
+        else
+        {
+            net_access_set_level(access, device, chosen);
+        }
     }
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_access_help));
+}
+
+// The confirmation OWNER asks for: the device can read and write files in
+// the shared folders. Given to the device with the key kept when OWNER was
+// clicked, if it's still in the list.
+static void draw_owner_confirm(const NetWindowContext* context)
+{
+    NetWindowState* state = context->state;
+    const Localization* strings = context->strings;
+    char title[128] = {};
+    std::snprintf(title, sizeof(title), "%s###owner_confirm", piccolo_text(strings, Str::net_owner_confirm_title));
+    if (state->confirm_owner && !ImGui::IsPopupOpen(title))
+    {
+        ImGui::OpenPopup(title);
+    }
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(static_cast<float>(static_cast<int>(viewport->Size.x * 0.4f)), 0.0f),
+                             ImGuiCond_Appearing);
+    if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+    {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(piccolo_text(strings, Str::net_owner_confirm_text));
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        bool close = ImGui::IsKeyPressed(ImGuiKey_Escape);   // (B on a gamepad sends Escape while a popup is up)
+        if (retro_ui_button(piccolo_text(strings, Str::net_owner_confirm_yes)))
+        {
+            NetAccess* access = context->access;
+            for (size_t i = 0; i < access->trust.devices.size(); i++)
+            {
+                if (std::memcmp(access->trust.devices[i].key, state->owner_key, NET_KEY_SIZE) == 0)
+                {
+                    net_access_set_level(access, static_cast<uint32_t>(i), NetAccessLevel::owner);
+                }
+            }
+            close = true;
+        }
+        ImGui::SameLine();
+        if (retro_ui_button(piccolo_text(strings, Str::net_owner_cancel)))
+        {
+            close = true;
+        }
+        if (close)
+        {
+            state->confirm_owner = false;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 }
 
 static const NetSpeedSummary* speed_of(const NetWindowContext* context, const uint8_t* key)
@@ -218,7 +280,7 @@ static void draw_devices(const NetWindowContext* context)
                 retro_ui_item_tooltip(piccolo_text(strings, Str::net_device_ping_help));
             }
         }
-        draw_access(access, static_cast<uint32_t>(i), strings);
+        draw_access(context, static_cast<uint32_t>(i));
         ImGui::SameLine();
         if (retro_ui_button(piccolo_text(strings, Str::net_device_forget)))
         {
@@ -230,6 +292,49 @@ static void draw_devices(const NetWindowContext* context)
     if (forget >= 0)
     {
         net_access_remove_device(access, static_cast<uint32_t>(forget));
+    }
+    draw_owner_confirm(context);
+}
+
+// INTERNET STATUS: what the beacon says (net_access_beacon_status).
+static void draw_beacon_status(const NetWindowContext* context, float label_width)
+{
+    const Localization* strings = context->strings;
+    Str text = Str::net_beacon_off;
+    bool good = false;
+    switch (net_access_beacon_status(context->access))
+    {
+    case NetBeaconStatus::off:
+        text = Str::net_beacon_off;
+        break;
+    case NetBeaconStatus::waiting:
+        text = Str::net_beacon_waiting;
+        break;
+    case NetBeaconStatus::registered:
+        text = Str::net_beacon_registered;
+        good = true;
+        break;
+    case NetBeaconStatus::symmetric_nat:
+        text = Str::net_beacon_symmetric;
+        break;
+    case NetBeaconStatus::unreachable:
+        text = Str::net_beacon_unreachable;
+        break;
+    }
+    ImGui::Dummy(ImGui::CalcTextSize("C"));
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    float start = ImGui::GetCursorPosX();
+    ImGui::TextUnformatted(piccolo_text(strings, Str::net_beacon_status));
+    retro_ui_item_tooltip(piccolo_text(strings, Str::net_beacon_status_help));
+    ImGui::SameLine(start + label_width);
+    if (good)
+    {
+        ImGui::TextUnformatted(piccolo_text(strings, text));
+    }
+    else
+    {
+        ImGui::TextDisabled("%s", piccolo_text(strings, text));
     }
 }
 
@@ -244,6 +349,8 @@ void net_window_draw_tab(const NetWindowContext* context, float label_width)
     settings_ui_row(&rows, PICCOLO_NET_ENABLED, nullptr);
     settings_ui_row(&rows, PICCOLO_NET_NAME, nullptr);
     settings_ui_row(&rows, PICCOLO_NET_PORT, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_INTERNET, nullptr);
+    settings_ui_row(&rows, PICCOLO_NET_BEACON, nullptr);
 
     // As a row: the marker column, then the label column.
     ImGui::Dummy(ImGui::CalcTextSize("C"));
@@ -254,6 +361,11 @@ void net_window_draw_tab(const NetWindowContext* context, float label_width)
     retro_ui_item_tooltip(piccolo_text(strings, Str::net_this_device_help));
     ImGui::SameLine(start + label_width);
     ImGui::TextUnformatted(context->this_device[0] != '\0' ? context->this_device : "-");
+
+    if (context->access != nullptr && context->internet)
+    {
+        draw_beacon_status(context, label_width);
+    }
 
     if (context->access == nullptr)
     {

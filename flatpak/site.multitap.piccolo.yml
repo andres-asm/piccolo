@@ -71,11 +71,15 @@ modules:
     build-commands:
       # MULTITAP_PICCOLO_DIR empty: don't copy the build to ~/.local/share.
       - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DMULTITAP_PICCOLO_DIR= -DMULTITAP_BUILD_TESTS=OFF
-      - cmake --build build --target piccolo
+      # Test libretro ships in every package (deps/test-libretro must be checked
+      # out): in /app/lib/piccolo/cores, copied at start into piccolo's own
+      # cores folder (src/bundled_files.cpp).
+      - cmake --build build --target piccolo test_libretro
       # piccolo reads lang/, layouts/ and shaders/ next to its program (SDL_GetBasePath,
       # which follows the symlink in /app/bin).
       - install -Dm755 build/piccolo /app/lib/piccolo/piccolo
       - cp -r lang layouts build/shaders /app/lib/piccolo/
+      - install -Dm755 build/deps/test-libretro/test_libretro.so /app/lib/piccolo/cores/test_libretro.so
       - mkdir -p /app/bin && ln -s ../lib/piccolo/piccolo /app/bin/piccolo
       - install -Dm644 assets/linux/site.multitap.piccolo.desktop /app/share/applications/site.multitap.piccolo.desktop
       - install -Dm644 assets/linux/site.multitap.piccolo.metainfo.xml /app/share/metainfo/site.multitap.piccolo.metainfo.xml
@@ -88,5 +92,4 @@ modules:
           - build
           - build-flatpak
           - .flatpak-builder
-          - deps/test-libretro
           # deps/librashader stays: shader_chain.h includes its C headers.
